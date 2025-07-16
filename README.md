@@ -72,6 +72,9 @@ f_summary(your_dataframe)
 f_aov(response_var1 +  response_var1 ~ predictor1 * predictor2, data = your_dataframe)
 
 # Create a boxplot of a variable
+f_aov(response_var1 +  response_var1 ~ predictor1 * predictor2, data = your_dataframe)
+
+# Create a boxplot of a variable
 data(mtcars)
 f_boxplot(hp + disp ~ gear*cyl,
            data=mtcars,
