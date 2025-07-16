@@ -69,10 +69,6 @@ library(rfriend)
   f_summary(your_dataframe)
 
 # Run ANOVA on multiple response variables
-<<<<<<< HEAD
-  f_aov(response_var1 +  response_var1 ~ predictor1 * predictor2, data = your_dataframe)
-
-# Create a boxplot of a variable
   f_aov(response_var1 +  response_var1 ~ predictor1 * predictor2, data = your_dataframe)
 
 # Create a boxplot of a variable
@@ -85,23 +81,17 @@ library(rfriend)
 
 # Perform Box-Cox transformation
   transformed <- f_boxcox(your_dataframe$variable)
-=======
-f_aov(response_var1 +  response_var1 ~ predictor1 * predictor2, data = your_dataframe)
 
 # Create a boxplot of a variable
-f_aov(response_var1 +  response_var1 ~ predictor1 * predictor2, data = your_dataframe)
-
-# Create a boxplot of a variable
-data(mtcars)
-f_boxplot(hp + disp ~ gear*cyl,
-           data=mtcars,
-           boxplot_explanation = FALSE,
-           output_type = "word"
-           )
+  data(mtcars)
+  f_boxplot(hp + disp ~ gear*cyl,
+             data=mtcars,
+             boxplot_explanation = FALSE,
+             output_type = "word"
+             )
 
 # Perform Box-Cox transformation
 transformed <- f_boxcox(your_dataframe$variable)
->>>>>>> cd418841b93ed896883e8120e6f239ffed790fa8
 
 # Clear workspace and restart R
   f_clear()
