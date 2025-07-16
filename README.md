@@ -66,24 +66,27 @@ devtools::install_github("delde001/rfriend")
 library(rfriend)
 
 # Summary of your dataset
-f_summary(your_dataframe)
+  f_summary(your_dataframe)
 
 # Run ANOVA on multiple response variables
-f_aov(response_var1 +  response_var1 ~ predictor1 * predictor2, data = your_dataframe)
+  f_aov(response_var1 +  response_var1 ~ predictor1 * predictor2, data = your_dataframe)
 
 # Create a boxplot of a variable
-data(mtcars)
-f_boxplot(hp + disp ~ gear*cyl,
-           data=mtcars,
-           boxplot_explanation = FALSE,
-           output_type = "word"
-           )
+  f_aov(response_var1 +  response_var1 ~ predictor1 * predictor2, data = your_dataframe)
+
+# Create a boxplot of a variable
+  data(mtcars)
+  f_boxplot(hp + disp ~ gear*cyl,
+             data=mtcars,
+             boxplot_explanation = FALSE,
+             output_type = "word"
+             )
 
 # Perform Box-Cox transformation
-transformed <- f_boxcox(your_dataframe$variable)
+  transformed <- f_boxcox(your_dataframe$variable)
 
 # Clear workspace and restart R
-f_clear()
+  f_clear()
 
 ```
 
