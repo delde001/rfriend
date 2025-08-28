@@ -557,7 +557,8 @@ header-includes:
 
   } else if (output_type == "off"){
     #Nothing to show output will be output_list.
-    return(invisible(output_list))
+    return(output_list)
+
   } else if (output_type == "console"){
     #Print output list to the console (forced)
     print(output_list)

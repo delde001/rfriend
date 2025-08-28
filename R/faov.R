@@ -100,7 +100,7 @@ f_aov <- function(
     aov_assumptions_text = TRUE,  # Print short explanation about aov assumptions in output file
     close_generated_files = FALSE,# Closes either open excel or word files depending on the output format.
     open_generated_files = TRUE,  # Open files after creation
-    output_type = "off",          # Output type can be excel, word, pdf, rmd, off
+    output_type = "off",          # Output type can be excel, word, pdf, rmd, console, off
     output_file = NULL,           # Specify the name of the file.
     output_dir = NULL,            # Specify the name of the output dir to save the file in.
     save_in_wdir = FALSE          # Save file output in the working directory.
@@ -906,8 +906,9 @@ header-includes:
       return(invisible(output_list))
 
     } else if (output_type == "off"){
-      #Nothing to show output will be output_list.
-      return(invisible(output_list))
+      #Default R behavior only show when not stored in an new object
+      return(output_list)
+
     } else if (output_type == "console"){
       #Print output list to the console (forced)
       print(output_list)

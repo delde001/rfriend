@@ -423,7 +423,7 @@ header-includes:
 
     if(plots == TRUE) plot(output_list)
 
-    return(invisible(output_list))
+    return(output_list)
 
   } else {
     warning("Invalid output format specified. No file generated.")

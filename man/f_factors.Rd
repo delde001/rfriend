@@ -8,7 +8,7 @@ f_factors(
   data,
   select = NULL,
   exclude = NULL,
-  console = FALSE,
+  properties = FALSE,
   force_factors = FALSE,
   unique_num_treshold = 8,
   repeats_threshold = 2,
@@ -22,7 +22,7 @@ f_factors(
 
 \item{exclude}{A character vector specifying the names of the columns NOT to convert into factors. If \code{NULL}, no columns are excluded. Default is \code{NULL}.}
 
-\item{console}{Logical. If \code{TRUE}, prints a detailed table about the properties of the new data frame to the console. Default is \code{TRUE}, if \code{FALSE} no property table will be printed to the console.}
+\item{properties}{Logical. If \code{TRUE}, prints a detailed table about the properties of the new data frame to the console. If \code{FALSE} no property table will be printed to the console. Default is \code{FALSE}.}
 
 \item{force_factors}{Logical. If \code{TRUE} all columns in the data.frame will be converted to factors except for the excluded columns using \code{exclude}.}
 
@@ -33,7 +33,7 @@ f_factors(
 \item{...}{Additional arguments passed to the \code{factor()} function of baseR.}
 }
 \value{
-Returns the modified data frame with the specified (or all suitable) columns converted to factors. Can also force a print of a summary of the data frame's structure to the console (console = TRUE).
+Returns the modified data frame with the specified (or all suitable) columns converted to factors. Can also force a print of a summary of the data frame's structure to the console (properties = TRUE).
 }
 \description{
 Converts multiple specified columns of a data frame into factors. If no columns are specified, it automatically detects and converts columns that are suitable to be factors. The function returns the entire data frame including non factor columns and reports the properties of this new data frame in the console.

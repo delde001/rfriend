@@ -6,7 +6,7 @@
 #' @param select A character vector specifying the names of the columns to convert into factors. If \code{NULL}, the function automatically detects columns that should be factors based on their data type and unique value count. Default is \code{NULL}.
 #' @param exclude A character vector specifying the names of the columns NOT to convert into factors. If \code{NULL}, no columns are excluded. Default is \code{NULL}.
 #' @param force_factors Logical. If \code{TRUE} all columns in the data.frame will be converted to factors except for the excluded columns using \code{exclude}.
-#' @param console Logical. If \code{TRUE}, prints a detailed table about the properties of the new data frame to the console. Default is \code{TRUE}, if \code{FALSE} no property table will be printed to the console.
+#' @param properties Logical. If \code{TRUE}, prints a detailed table about the properties of the new data frame to the console. If \code{FALSE} no property table will be printed to the console. Default is \code{FALSE}.
 #' @param unique_num_treshold  Numeric. A threshold of the amount of unique numbers a numeric column should have to keep it numeric, i.e. omit factor conversion. Default \code{8}.
 #' @param repeats_threshold  Numeric. A threshold of the minimal number of repeats a numeric cols should have to keep convert it to a factor. Default \code{2}.
 #' @param ... Additional arguments passed to the \code{factor()} function of baseR.
@@ -18,7 +18,7 @@
 #' \item Converts specified columns into factors, applying any additional arguments provided.
 #' \item Outputs a summary data frame with details about each column, including its type, class, number of observations, missing values, factor levels, and labels.
 #'}
-#' @return Returns the modified data frame with the specified (or all suitable) columns converted to factors. Can also force a print of a summary of the data frame's structure to the console (console = TRUE).
+#' @return Returns the modified data frame with the specified (or all suitable) columns converted to factors. Can also force a print of a summary of the data frame's structure to the console (properties = TRUE).
 #'
 #' @author
 #' Sander H. van Delden  \email{plantmind@proton.me} \cr
@@ -68,7 +68,7 @@
 f_factors <- function(data,
                       select = NULL,
                       exclude = NULL,
-                      console = FALSE,
+                      properties = FALSE,
                       force_factors = FALSE,
                       unique_num_treshold = 8,
                       repeats_threshold = 2,
@@ -102,7 +102,7 @@ f_factors <- function(data,
   data[select] <- lapply(data[select], function(col) factor(col, ...))
 
 
-  if(console == TRUE){
+  if(properties == TRUE){
   # Create a data frame summarizing column names, classes, types, observations, and missing values
     summary <- data.frame(
       Column = names(data),
@@ -130,5 +130,5 @@ f_factors <- function(data,
   cat("\n   \n")
   }
 
-  return(invisible(data))
+  return(data)
 }

@@ -622,7 +622,7 @@ DHARMa residuals are simulation-based, scaled (quantile) residuals designed to m
     return(output_list)
 
   } else if(output_type %in% c("off")){
-       return(invisible(output_list))
+       return(output_list)
 
   } else {
     warning("Invalid output format specified. No file generated.")
