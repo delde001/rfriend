@@ -77,7 +77,7 @@
 #'   0           \tab \eqn{log(x)}                 \cr \cr
 #'   0.5         \tab \eqn{\sqrt{x}}               \cr \cr
 #'   1           \tab \eqn{x}                      \cr \cr
-#'   2           \tab \eqn{x^2}                    \cr \cr
+#'   2           \tab \eqn{x^2}                    \cr
 #'   \strong{-----------------------}\tab\strong{-----------------------}\cr
 #' }
 #'
