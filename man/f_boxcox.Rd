@@ -79,12 +79,12 @@ where (\eqn{y}) is the data being transformed, and (\eqn{\lambda}) the transform
   \strong{\eqn{\lambda}-Value} \tab \strong{Transformation} \cr
   \strong{-----------------------}\tab\strong{-----------------------}\cr
   -2          \tab \eqn{\frac{1}{x^2}}          \cr \cr
-  -1          \tab \eqn{\frac{1}{x}  }       \cr \cr
-  -0.5        \tab \eqn{\frac{1}{\sqrt{x}}}         \cr \cr
-  0           \tab \eqn{log(x)}         \cr \cr
-  0.5        \tab \eqn{\sqrt{x}}         \cr \cr
-  1          \tab \eqn{x}         \cr \cr
-  2          \tab \eqn{x^2}    \cr
+  -1          \tab \eqn{\frac{1}{x}  }          \cr \cr
+  -0.5        \tab \eqn{\frac{1}{\sqrt{x}}}     \cr \cr
+  0           \tab \eqn{log(x)}                 \cr \cr
+  0.5         \tab \eqn{\sqrt{x}}               \cr \cr
+  1           \tab \eqn{x}                      \cr \cr
+  2           \tab \eqn{x^2}                    \cr \cr
   \strong{-----------------------}\tab\strong{-----------------------}\cr
 }
 
