@@ -69,8 +69,12 @@
 #'   "Species" = "Cultivar"
 #' )
 #'
-#' # Use the whole data.frame to generate a pdf report and don't open the pdf.
-#' f_boxplot(iris, fancy_names = new_names, output_type = "pdf", open_generated_files = FALSE) #
+#' # Use the whole data.frame to generate an MS Word report and don't open it.
+#' f_boxplot(iris,
+#'            fancy_names = new_names,
+#'            output_type = "word",
+#'            open_generated_files = FALSE
+#'            )
 #'
 #' # Use a formula to plot several response parameters (response 1 + response 2 etc)
 #' # and generate a rmd output without boxplot_explanation.
