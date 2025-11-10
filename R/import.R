@@ -5,7 +5,7 @@
 #' @importFrom multcompView multcompLetters
 #' @importFrom pander pander panderOptions
 #' @importFrom rstudioapi getActiveDocumentContext documentId documentPath
-#' @importFrom stats ppoints qnorm quantile dnorm setNames family pchisq
+#' @importFrom stats ppoints qnorm quantile dnorm setNames family pchisq complete.cases predict
 #' @importFrom rstatix levene_test dunn_test
 #' @importFrom nortest ad.test
 #' @importFrom writexl write_xlsx

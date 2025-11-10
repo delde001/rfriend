@@ -10,10 +10,9 @@ f_kruskal_test(
   plot = TRUE,
   alpha = 0.05,
   output_type = "off",
-  output_file = NULL,
-  output_dir = NULL,
+  save_as = NULL,
   save_in_wdir = FALSE,
-  kruskal_assumptions_text = TRUE,
+  intro_text = TRUE,
   adjust = "bonferroni",
   close_generated_files = FALSE,
   open_generated_files = TRUE
@@ -31,22 +30,24 @@ in the output files. Default is \code{TRUE}.}
 \item{alpha}{Numeric. The significance level for the Kruskal-Wallis test and Dunn's
 test. Default is  \code{0.05}.}
 
-\item{output_type}{Character string. Specifies the output format: \code{"pdf"}, \code{"word"}, \code{"excel"}, \code{"rmd"}, \code{"off"} (no file generated) or \code{"console"}. The option \code{"console"} forces output to be printed. Default is \code{"off"}.}
+\item{output_type}{Character string specifying the output format: \code{"pdf"}, \code{"word"}, \code{"excel"}, \code{"rmd"}, \code{"console"} or \code{"off"} (no file generated). The option \code{"console"} forces output to be printed, the option \code{"rmd"} saves rmd code in the output object not in a file. Default is \code{"off"}.}
 
-\item{output_file}{Character string. The name of the output file (without extension).
-If \code{NULL}, a default name is generated based on the dataset name. Default is \code{NULL}.}
+\item{save_as}{Character string specifying the output file path (without extension).
+If a full path is provided, output is saved to that location.
+If only a filename is given, the file is saved in \code{tempdir()}.
+If only a directory is specified (providing an existing directory with trailing slash),
+the file is named "dataname_Kruskal_Wallis_output" in that directory. If an extension is provided the output format specified with option "output_type" will be overruled.
+Defaults to \code{file.path(tempdir(), "dataname_summary.pdf")}.}
 
-\item{output_dir}{Character string specifying the name of the directory of the output file. Default is  \code{tempdir()}. If the \code{output_file} already contains a directory name \code{output_dir} can be omitted, if used it overwrites the dir specified in \code{output_file}.}
+\item{save_in_wdir}{Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.}
 
-\item{save_in_wdir}{Logical. If \code{TRUE}, saves the file in the working directory Default is \code{FALSE}, to avoid unintended changes to the global environment. If the \code{output_dir} is specified \code{save_in_wdir} is overwritten with \code{output_dir}.}
-
-\item{kruskal_assumptions_text}{Logical. If \code{TRUE}, includes a section about Kruskal-Wallis test assumptions in the output document. Default is \code{TRUE}.}
+\item{intro_text}{Logical. If \code{TRUE}, includes a section about Kruskal-Wallis test assumptions in the output document. Default is \code{TRUE}.}
 
 \item{adjust}{Character string. Adjustment method for pairwise comparisons in Dunn's test. Options include \code{"holm", "hommel", "bonferroni", "sidak", "hs", "hochberg", "bh", "by", "fdr"} or \code{"none"}. Default is \code{"bonferroni"}, if you don't want to adjust the p value (not recommended), use  \code{p.adjust.method = "none"}.}
 
-\item{close_generated_files}{Logical. If \code{TRUE}, closes open 'Excel' or 'Word' files depending on the output format. This to be able to save the newly generated files. 'Pdf' files should also be closed before using the function and cannot be automatically closed. Default is \code{FALSE}.}
+\item{close_generated_files}{Logical. If \code{TRUE}, closes open 'Excel' or 'Word' files depending on the output format. This to be able to save the newly generated file by the \code{f_aov()} function. 'Pdf' files should also be closed before using the function and cannot be automatically closed. Default is \code{FALSE}.}
 
-\item{open_generated_files}{Logical. If \code{TRUE}, opens the generated output files ('pdf', 'Word' or 'Excel') files depending on the output format. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.}
+\item{open_generated_files}{Logical. If \code{TRUE}, Opens the generated output files ('pdf', 'Word' or 'Excel') files depending on the output format. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.}
 }
 \value{
 An object of class 'f_kruskal_test' containing:

@@ -4,7 +4,7 @@
 #'
 #' @param data A 'data.frame', 'data.table' or 'tibble', i.e. input data to be summarized.
 #' @param data.column A character string, vector or list with characters. The name of the column(s) in \code{data} for which summary statistics will be calculated.
-#' @param ... One or more character strings specifying the grouping variables in \code{data}. At least one grouping variable must be provided.
+#' @param ... One or more character strings specifying the grouping variables in \code{data}.
 #' @param show_n Logical. If \code{TRUE}, the summary results \code{n} will be included in the output.
 #' @param show_mean Logical. If \code{TRUE}, the summary results \code{mean} will be included in the output.
 #' @param show_sd Logical. If \code{TRUE}, the summary results \code{sd} will be included in the output.
@@ -16,10 +16,13 @@
 #' @param show_Q3 Logical. If \code{TRUE}, the summary results \code{Q3} will be included in the output.
 #' @param digits Integer. Round to the number of digits specified. If \code{digits = NULL} no rounding is applied (default is \code{digits = 2}). Note that this rounding is independent of the rounding in the exported excel file.
 #' @param export_to_excel Logical. If \code{TRUE}, the (unrounded values) summary results will be exported to an 'Excel' file. Default is \code{FALSE}.
-#' @param open_excel Logical. If \code{TRUE} and \code{export_to_excel} is also \code{TRUE}, the generated 'Excel' file will be opened automatically. Default is \code{TRUE}.
-#' @param output_file Character string specifying the name of the output file. Default is "dataname_summary.xlsx".
-#' @param output_dir Character string specifying the name of the directory of the output file. Default is  \code{tempdir()}. If the \code{output_file} already contains a directory name \code{output_dir} can be omitted, if used it overwrites the dir specified in \code{output_file}.
-#' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory Default is \code{FALSE}, to avoid unintended changes to the global environment. If the \code{output_dir} is specified \code{save_in_wdir} is overwritten with \code{output_dir}.
+#' @param save_as Character string specifying the output file path (without extension).
+#'   If a full path is provided, output is saved to that location.
+#'   If only a filename is given, the file is saved in \code{tempdir()}.
+#'   If only a directory is specified (providing an existing directory with trailing slash),
+#'   the file is named "dataname_summary.xlsx" in that directory.
+#'   Defaults to \code{file.path(tempdir(), "dataname_summary.xlsx")}.
+#' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, to avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.
 #' @param close_generated_files Logical. If \code{TRUE}, closes open 'Excel' files. This to be able to save the newly generated file. Default is \code{FALSE}.
 #' @param open_generated_files Logical. If \code{TRUE}, Opens the generated 'Excel' files. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.
 #' @param check_input If \code{TRUE}, checks the input and stops the function if the input is incorrect (default is \code{TRUE}).
@@ -41,6 +44,8 @@
 #' \item \code{Q3}: third quartile
 #'}
 #' Each of these summary statistics can be removed by setting e.g. \code{show_n = FALSE}, The results are grouped by the specified grouping variables and returned as a data frame. If \code{export_to_excel} is set to \code{TRUE}, the results are saved as an 'Excel' file in the working directory with a dynamically generated filename.
+#'
+#' When only \code{data} and \code{data.column} is provided the function defaults to base:summary(data).
 #'
 #' @return A data frame containing the computed summary statistics, grouped by the specified variables. This data frame can be automatically saved as an 'Excel' file using \code{export_to_excel = TRUE}.
 #'
@@ -77,23 +82,45 @@ f_summary <- function(data, data.column, ...,
                       export_to_excel = FALSE,
                       close_generated_files = FALSE,
                       open_generated_files = TRUE,
-                      output_file = NULL,
-                      output_dir = NULL,
+                      save_as = NULL,
                       save_in_wdir = FALSE,
-                      open_excel = TRUE,
                       check_input = TRUE,
                       eval_input = FALSE,
                       digits_excel = NULL,
                       detect_int_col = TRUE
                       ) {
 
-  # Check if exactly 3 arguments were supplied
-  if (nargs() < 3) {
-    stop("f_summary requires at least 3 arguments:
+
+  # List of known arguments to exclude if named
+  excluded_options <- c(
+    "show_n", "show_mean", "show_sd", "show_se", "show_min", "show_max",
+    "show_median", "show_Q1", "show_Q3", "digits", "export_to_excel",
+    "close_generated_files", "save_as", "save_in_wdir",
+    "open_excel", "check_input", "digits_excel"
+  )
+
+  # 1. Get the names of ALL arguments passed to the function
+  # [-1] removes the function name itself ("f_summary")
+  all_arg_names <- names(match.call()[-1])
+
+  # 2. Filter out the excluded options
+  user_supplied_args <- all_arg_names[
+    !all_arg_names %in% excluded_options
+  ]
+
+  # 3. Count the remaining arguments
+  n_args <- length(user_supplied_args)
+
+  # Check if at least 2 arguments were supplied
+  if (n_args < 2) {
+    message(paste0("f_summary requires at least 2 arguments:
          data        = data.frame,
          data.column = data column to summarize,
-         and one or more grouping variables (data columns within the data.frame)
-         ")
+         and if desired one or more grouping variables (data columns within the data.frame)
+
+        Therefore, the default output of base::summary(",deparse(substitute(data)),").")
+                   )
+    return(base::summary(data))
   }
 
 
@@ -147,13 +174,6 @@ f_summary <- function(data, data.column, ...,
 
 
   # Collect grouping columns from the ... argument
-  # List of known options to exclude if named
-  excluded_options <- c(
-    "show_n", "show_mean", "show_sd", "show_se", "show_min", "show_max",
-    "show_median", "show_Q1", "show_Q3", "digits", "export_to_excel",
-    "close_generated_files", "output_file", "output_dir", "save_in_wdir",
-    "open_excel", "check_input", "digits_excel"
-  )
 
   if(eval_input == TRUE){
     # Collect grouping columns from the ... argument
@@ -216,7 +236,7 @@ f_summary <- function(data, data.column, ...,
 
     # Check if at least one grouping variable is provided
     if (length(group_vars) == 0) {
-      stop("At least one grouping variable must be provided.")
+      message("No grouping variable provided")
     }
 
     # Check if the data column is provided
@@ -267,8 +287,8 @@ f_summary <- function(data, data.column, ...,
 
   # If export_to_excel is TRUE, save the result to an Excel file
 
-
-  if (!is.null(output_file) || !is.null(digits_excel) ) {
+  # If the user specifies a path or digits assume that an excel file should be created
+  if (!is.null(save_as) || !is.null(digits_excel) || save_in_wdir == TRUE) {
     export_to_excel = TRUE
   }
 
@@ -281,60 +301,37 @@ f_summary <- function(data, data.column, ...,
                                                    detect_int_col = detect_int_col)
     }
 
-    # If there is not output_file name specified use the data_name
-    if (is.null(output_file)) {
-    # Construct the file name dynamically using deparse(substitute())
-    data_name <- deparse(substitute(data))  # Get the name of the data frame
-    output_file <- paste(data_name, "summary.xlsx", sep = "_")  # Construct the file name
-    }
-
-   if(close_generated_files == TRUE){
+    if(close_generated_files == TRUE){
      # Close all MS Excel files to avoid conflicts (so save your work first)
      system("taskkill /im EXCEL.EXE /f")
-
-   }
-
-    # If there is no output_dir specified and user setting is to save in working directory
-    if(is.null(output_dir) && save_in_wdir == TRUE){
-      # set the working dir to the location the file is saved
-      output_dir <- getwd()
-
-    } else if(is.null(output_dir) && save_in_wdir == FALSE){
-      # Get the dirname of output_file
-      output_dir <- dirname(output_file)
-
-      # Check if there is a dir (path) in the output file, if not use tempdir()
-      if(output_dir == "."){
-        output_dir <- tempdir()
-      }
-
     }
 
-    # Stop if the output directory does not exist
-    if (!dir_exists(output_dir)) {
-      stop("The directory '", output_dir, "' does not exist.")
+
+    # Construct the file name dynamically using deparse(substitute())
+    data_name <- deparse(substitute(data))  # Get the name of the data frame
+
+
+    if(save_in_wdir == TRUE){
+      save_dir <- getwd()
+    }else{
+      save_dir <- tempdir()
     }
 
-    # dir_name is already extracted so rename file to basename.
-    output_file <- basename(output_file)
+    # use helper get_save_path() to create output_path
+    output_path <- get_save_path(save_as = save_as,
+                                 default_name = paste(data_name, "summary.xlsx", sep = "_"),
+                                 default_dir = save_dir,
+                                 file.ext = ".xlsx"
+                                 )
 
-    ensure_xlsx <- function(filename) {
-      if (!grepl("\\.xlsx$", filename, ignore.case = TRUE)) {
-        filename <- paste0(filename, ".xlsx")
-      }
-      return(filename)
-    }
-
-    output_file <- ensure_xlsx(output_file)
-
-    message(paste0("Saved output in: ", output_dir, "\\", output_file))
+    message(paste0("Saved output in: ", output_path))
 
     # Write to an Excel file with each table in its own sheet
-    write_xlsx(output_df_no_rounding, path = paste0(output_dir, "/", output_file))
+    write_xlsx(output_df_no_rounding, path = output_path)
 
     # Open files after creation
     if(open_generated_files == TRUE){
-    f_open_file(paste0(output_dir, "/", output_file))
+    f_open_file(output_path)
     }
   }
 
@@ -352,7 +349,7 @@ f_summary <- function(data, data.column, ...,
 #' This function prints \code{f_summary} objects.
 #'
 #' @param x Object of class f_summary
-#' @param col_width Integer. Specifies the maximum number of characters allowed in table header columns before a line break is inserted. Defaults to \code{10}.
+#' @param col_width Integer. Specifies the maximum number of characters allowed in table header columns before a line break is inserted. Defaults to \code{6}.
 #' @param table_width Integer or \code{NULL}. Defines the number of characters after which the table is split into separate sections. Defaults to \code{NULL}, meaning no break is applied.
 #' @param ... Additional arguments passed to the \code{pander} function.
 #' @return This function is called for its side effect of printing a formatted output to the console

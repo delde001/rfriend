@@ -54,20 +54,19 @@ f_clear <- function(env = TRUE, gc = TRUE, console = TRUE, graph = TRUE, restart
       cat("Closed all graphs...\n")
     }
 
-    # Restart session
-    if (restart) {
-      # Restarting R session
-      rstudioapi::restartSession()
-      cat("Restarting R session...\n")
-    }
-
+    # Delete all objects from data environment
     if (env) {
       cat("Deleted all objects from data environment...\n")
       # Remove all objects
       rm(list = ls(envir = .GlobalEnv), envir = .GlobalEnv)
     }
 
+    # Restart session
+    if (restart) {
+      # Restarting R session
+      rstudioapi::restartSession()
+      } else {
   message("To also restart R use: f_clear(restart = TRUE)")
-
+    }
   }
 

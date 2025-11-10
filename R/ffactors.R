@@ -8,7 +8,7 @@
 #' @param force_factors Logical. If \code{TRUE} all columns in the data.frame will be converted to factors except for the excluded columns using \code{exclude}.
 #' @param properties Logical. If \code{TRUE}, prints a detailed table about the properties of the new data frame to the console. If \code{FALSE} no property table will be printed to the console. Default is \code{FALSE}.
 #' @param unique_num_treshold  Numeric. A threshold of the amount of unique numbers a numeric column should have to keep it numeric, i.e. omit factor conversion. Default \code{8}.
-#' @param repeats_threshold  Numeric. A threshold of the minimal number of repeats a numeric cols should have to keep convert it to a factor. Default \code{2}.
+#' @param repeats_threshold  Numeric. A threshold of the minimal number of repeats a numeric column should have to convert it to a factor. Default \code{2}.
 #' @param ... Additional arguments passed to the \code{factor()} function of baseR.
 #'
 #' @details
@@ -31,7 +31,7 @@
 #'                  c = c("apple", "kiwi", "banana", "apple", "kiwi",
 #'                         "banana", "apple", "kiwi", "banana"),
 #'                  d = c(1.1, 1.1, 3.4, 4.5, 5.4, 6.7, 7.8, 8.1, 9.8)
-#' )
+#'                  )
 #' str(df)
 #'
 #' # Convert specified columns to factors:
@@ -48,8 +48,7 @@
 #' str(df3)
 #'
 #' # Or automatically detect and convert suitable columns to factors.
-#' # In this example obtaining the same results as above automatically
-#' # and storing it in df2:
+#' # Thus obtaining the same results as above automatically:
 #' df4 <- f_factors(df)
 #' str(df4)
 #'
@@ -58,6 +57,10 @@
 #' # adjust the unique_num_treshold and/or repeats_threshold:
 #' df5 <- f_factors(df, unique_num_treshold = 2)
 #' str(df5)
+#'
+#' # Use `properties = TRUE` to view the data frame's structure.
+#' # This forces a printed output which is more insight than standard str() output.
+#' df6 <- f_factors(df, properties = TRUE)
 #'
 #' @seealso
 #'  \href{https://stat.ethz.ch/R-manual/R-devel/library/base/html/factor.html}{\code{factor}}

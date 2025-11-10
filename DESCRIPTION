@@ -2,7 +2,7 @@ Package: rfriend
 Type: Package
 Title: Provides Batch Functions and Visualisation for Basic Statistical
         Procedures
-Version: 1.0.0
+Version: 2.0.0
 Authors@R: c(person("Sander H.", "van Delden", role = c("aut", "cre"), email = "plantmind@proton.me"))
 Description: Designed to streamline data analysis and statistical testing, reducing the length of R 
     scripts while generating well-formatted outputs in 'pdf', 'Microsoft Word', and 'Microsoft Excel' 
@@ -35,7 +35,7 @@ Imports: bestNormalize, crayon, DHARMa, emmeans, ggplot2, grDevices,
         knitr, magick, multcomp, multcompView, MuMIn, nortest, pander,
         rmarkdown, rstatix, rstudioapi, stringr, this.path, writexl,
         xfun
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
 Roxygen: list(markdown = FALSE)
 SystemRequirements: Pandoc (>= 3.2)
 NeedsCompilation: no

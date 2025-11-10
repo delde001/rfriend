@@ -14,8 +14,7 @@ f_qqnorm(
   cex = NULL,
   save_png = FALSE,
   open_png = TRUE,
-  output_file = NULL,
-  output_dir = NULL,
+  save_as = NULL,
   save_in_wdir = FALSE,
   width = 8,
   height = 7,
@@ -43,11 +42,14 @@ f_qqnorm(
 
 \item{open_png}{Logical. If \code{TRUE}, opens generated png files.}
 
-\item{output_file}{Character string specifying the name of the output file (without extension). Default is the name of the vector or dataframe followed by "_histogram.png".}
+\item{save_as}{Character string specifying the output file path (without extension).
+If a full path is provided, output is saved to that location.
+If only a filename is given, the file is saved in \code{tempdir()}.
+If only a directory is specified (providing an existing directory with trailing slash),
+the file is named "data_name_QQplot.png" in that directory.
+Defaults to \code{file.path(tempdir(), "data_name_histogram.png")}.}
 
-\item{output_dir}{Character string specifying the name of the directory of the output file. Default is  \code{tempdir()}. If the \code{output_file} already contains a directory name \code{output_dir} can be omitted, if used it overwrites the dir specified in \code{output_file}.}
-
-\item{save_in_wdir}{Logical. If \code{TRUE}, saves the file in the working directory Default is \code{FALSE}, to avoid unintended changes to the global environment. If the \code{output_dir} is specified \code{save_in_wdir} is overwritten with \code{output_dir}.}
+\item{save_in_wdir}{Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.}
 
 \item{width}{Numeric, png figure width default \code{8} inch.}
 

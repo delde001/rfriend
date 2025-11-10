@@ -176,7 +176,7 @@ f_model_comparison <- function(model1, model2, nested = NULL, digits = 3) {
       fitted_vals     <- fitted(model)
       residuals_vals  <- residuals(model)
       y_reconstructed <- fitted_vals + residuals_vals
-      mean_y_reconstructed <- mean(y_reconstructed)
+      mean_y_reconstructed <- mean(y_reconstructed,na.rm = TRUE)
       SST <- sum((y_reconstructed - mean_y_reconstructed)^2) # Total sum of squares
       SSR <- sum(residuals(model)^2)    # Sum of squares residuals
 

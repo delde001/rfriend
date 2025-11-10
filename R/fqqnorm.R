@@ -10,9 +10,13 @@
 #' @param col Numeric, optional parameter for color of point with default 'black'.
 #' @param save_png A logical value default \code{FALSE}, if \code{TRUE} a png file is saved under the name of the data of under the specified file name.
 #' @param open_png Logical. If \code{TRUE}, opens generated png files.
-#' @param output_file Character string specifying the name of the output file (without extension). Default is the name of the vector or dataframe followed by "_histogram.png".
-#' @param output_dir Character string specifying the name of the directory of the output file. Default is  \code{tempdir()}. If the \code{output_file} already contains a directory name \code{output_dir} can be omitted, if used it overwrites the dir specified in \code{output_file}.
-#' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory Default is \code{FALSE}, to avoid unintended changes to the global environment. If the \code{output_dir} is specified \code{save_in_wdir} is overwritten with \code{output_dir}.
+#' @param save_as Character string specifying the output file path (without extension).
+#'   If a full path is provided, output is saved to that location.
+#'   If only a filename is given, the file is saved in \code{tempdir()}.
+#'   If only a directory is specified (providing an existing directory with trailing slash),
+#'   the file is named "data_name_QQplot.png" in that directory.
+#'   Defaults to \code{file.path(tempdir(), "data_name_histogram.png")}.
+#' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.
 #' @param width Numeric, png figure width default \code{8} inch.
 #' @param height Numeric, png figure height default \code{7} inch.
 #' @param units Numeric, png figure units default inch.
@@ -56,8 +60,7 @@ f_qqnorm <- function(x,
                     cex = NULL,
                     save_png = FALSE,
                     open_png = TRUE,
-                    output_file = NULL, #Specify the name of the output dir to save the file in.
-                    output_dir = NULL,  #Save file output in the working directory.
+                    save_as = NULL,
                     save_in_wdir = FALSE,
                     width = 8,
                     height = 7,
@@ -78,13 +81,13 @@ f_qqnorm <- function(x,
   if (is.null(ylab)) ylab <- paste0("Quantiles of: ", data_name)  # Set y-axis label if not provided
 
   # Calculate theoretical quantiles
-  n <- length(x)
+  n <- sum(!is.na(x))
   p <- ppoints(n)
   theoretical_q <- qnorm(p)
 
   # Parameters for the reference line
-  q1_x <- quantile(x, 0.25)
-  q3_x <- quantile(x, 0.75)
+  q1_x <- quantile(x, 0.25, na.rm = TRUE)
+  q3_x <- quantile(x, 0.75, na.rm = TRUE)
   q1_t <- qnorm(0.25)
   q3_t <- qnorm(0.75)
   slope <- (q3_x - q1_x) / (q3_t - q1_t)
@@ -126,37 +129,25 @@ f_qqnorm <- function(x,
   points(theoretical_q, sort(x), col = col, pch = pch, cex = cex,...)
   saved_plot <- recordPlot()
 
-  if (save_png == TRUE){
+  if (save_png == TRUE || !is.null(save_as) || save_in_wdir == TRUE){
 
-    if(is.null(output_file)){
-      # Define the new file name
-      output_file <- paste0(data_name, "_QQplot.png")
+    #### Handle option "save_as = " ###
+    if(save_in_wdir == TRUE){
+      save_dir <- getwd()
+    }else{
+      save_dir <- tempdir()
     }
 
-    # If there is no output_dir specified and user setting is to save in working directory
-    if(is.null(output_dir) && save_in_wdir == TRUE){
-      # set the working dir to the location the file is saved
-      output_dir <- getwd()
+    output_path <- get_save_path(save_as = save_as,
+                                 default_name = paste(data_name, "QQplot.png", sep = "_"),
+                                 default_dir = save_dir,
+                                 file.ext = ".png"
+    )
 
-    } else if(is.null(output_dir) && save_in_wdir == FALSE){
-      # Get the dirname of output_file
-      output_dir <- dirname(output_file)
-
-      # Check if there is a dir (path) in the output file, if not use tempdir()
-      if(output_dir == "."){
-        output_dir <- tempdir()
-      }
-
-    }
-
-    # Stop if the output directory does not exist
-    if (!dir_exists(output_dir)) {
-      stop("The directory '", output_dir, "' does not exist.")
-    }
 
 
     png(
-      paste0(output_dir, "/", output_file),
+      paste0(output_path),
       width = width,
       height = height,
       units = units,
@@ -169,7 +160,7 @@ f_qqnorm <- function(x,
     dev.off()
 
     if (open_png == TRUE){
-      f_open_file(paste0(output_dir, "/",output_file))
+      f_open_file(output_path)
     }
   }
 

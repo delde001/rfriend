@@ -4,10 +4,14 @@
 #' @param formula A formula specifying the factor to be plotted. More response variables can be added using \code{-} or \code{+} (e.g., \code{response1 + response2 ~ predictor}) to generate multiple boxplots. If the formula is omitted and only \code{data} is provided all data will be used for creating boxplots.
 #' @param data A \code{data.frame} containing the data to be used for creating boxplots.
 #' @param fancy_names An optional named vector mapping column names in \code{data} to more readable names for display in plots (name map). Defaults to \code{NULL}.
-#' @param output_type Character string, specifying the output format: \code{"pdf"}, \code{"word"}, \code{"rmd"} or \code{"png"}. Default is \code{"pdf"}.
-#' @param output_file A character string, specifying the name of the output file (without extension). If \code{NULL}, a default name based on the dataset is generated.
-#' @param output_dir Character string specifying the name of the directory of the output file. Default is  \code{tempdir()}. If the \code{output_file} already contains a directory name \code{output_dir} can be omitted, if used it overwrites the dir specified in \code{output_file}.
-#' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory Default is \code{FALSE}, to avoid unintended changes to the global environment. If the \code{output_dir} is specified \code{save_in_wdir} is overwritten with \code{output_dir}.
+#' @param output_type Character string, specifying the output format: \code{"pdf"}, \code{"word"}, \code{"rmd"} or \code{"png"}. The option \code{"rmd"} saves rmd code in the output object not in a file. Default is \code{"pdf"}.
+#' @param save_as Character string specifying the output file path (without extension).
+#'   If a full path is provided, output is saved to that location.
+#'   If only a filename is given, the file is saved in \code{tempdir()}.
+#'   If only a directory is specified (providing an existing directory with trailing slash),
+#'   the file is named "dataname_BoxPlot" in that directory. If an extension is provided the output format specified with option "output_type" will be overruled.
+#'   Defaults to \code{file.path(tempdir(), "dataname_BoxPlot.pdf")}.
+#' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.
 #' @param close_generated_files Logical. If \code{TRUE}, closes open 'Word' files depending on the output format. This to be able to save the newly generated files. 'Pdf' files should also be closed before using the function and cannot be automatically closed.
 #' @param open_generated_files Logical. If \code{TRUE}, Opens the generated output files ('pdf', 'Word' or 'png') files depending on the output format. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.
 #' @param boxplot_explanation A logical value indicating whether to include an explanation of how to interpret boxplots in the report. Defaults to \code{TRUE}.
@@ -85,8 +89,7 @@ f_boxplot <- function(
   formula = NULL,      # function formula
   fancy_names = NULL,  # Optional mapping of column names to more readable names in plots (name_map).
   output_type = "pdf", # Output type can be word, pdf, rmd, console
-  output_file = NULL,  # Specify the name of the file.
-  output_dir = NULL,   # Specify the name of the output dir to save the file in.
+  save_as = NULL,      # Specify the name of the output dir and file (name and type).
   save_in_wdir = FALSE,# Save file output in the working directory.
   close_generated_files = FALSE,# Closes either open word files depending on the output format.
   open_generated_files = TRUE,  # Open files after creation
@@ -168,32 +171,86 @@ f_boxplot <- function(
     formula <- clean_formula(formula)
 
   }
-  if(is.null(output_file)){
-    output_file  <- paste0(data_name,"_box_plot")
+
+  #### Handle option "save_as = " ###
+  if(save_in_wdir == TRUE){
+    save_dir <- getwd()
+  }else{
+    save_dir <- tempdir()
   }
 
-  # If there is no output_dir specified and user setting is to save in working directory
-  if(is.null(output_dir) && save_in_wdir == TRUE){
-    # set the working dir to the location the file is saved
-    output_dir <- getwd()
+  #map the output type to extensions
+  output_type_map <- c(
+    "pdf"  = ".pdf",
+    "word" = ".docx",
+    "excel"= ".xlsx",
+    "png"  = ".png"
+  )
 
-  } else if(is.null(output_dir) && save_in_wdir == FALSE){
-    # Get the dirname of output_file
-    output_dir <- dirname(output_file)
+  # If the user specifies a path, filename or save_in_wdir == TRUE an output_file should be created
+  if (!is.null(save_as) || save_in_wdir == TRUE) {
 
-    # Check if there is a dir (path) in the output file, if not use tempdir()
-    if(output_dir == "."){
-      output_dir <- temp_output_dir
+    if (!is.null(save_as)) {
+      #Remove backslash in save_as if needed
+      save_as <- gsub(pattern = "\\\\", replacement = "/", x = save_as)
+      file_extension_save_as <- unname(extract_extension(save_as))
+      if(file_extension_save_as[1] != FALSE){
+        file_extension <- file_extension_save_as
+      }
     }
-  }
 
-  # Stop if the output directory does not exist
-  if (!dir_exists(output_dir)) {
-    stop("The directory '", output_dir, "' does not exist.")
-  }
+    if(!exists("file_extension") && output_type == "word"){
+      # use helper get_save_path() to create output_path
+      output_path <- get_save_path(save_as = save_as,
+                                   default_name = paste(data_name, "BoxPlot", sep = "_"),
+                                   default_dir = save_dir,
+                                   file.ext = ".docx"
+      )
 
-  # dir_name is already extracted so rename file to basename.
-  output_file <- basename(output_file)
+      #set output_type to default
+      output_type <- "word"
+
+    }
+    else if(!exists("file_extension") && output_type %in% c("pdf", "word", "excel", "rmd", "png")){
+
+      #create extension based on input_type
+      file.ext <- unname(output_type_map[output_type])
+
+      # use helper get_save_path() to create output_path
+      output_path <- get_save_path(save_as = save_as,
+                                   default_name = paste(data_name, "BoxPlot", sep = "_"),
+                                   default_dir  = save_dir,
+                                   file.ext     = file.ext
+      )
+
+
+
+    }
+    else if(exists("file_extension")) {
+
+      # use helper get_save_path() to create output_path
+      output_path <- get_save_path(save_as = save_as,
+                                   default_name = paste(data_name, "BoxPlot", sep = "_"),
+                                   default_dir  = save_dir,
+                                   file.ext     = file_extension[1]
+      )
+
+      # reset the output type to match the user input extention in save_as
+      output_type <- file_extension[2]
+    }
+  } else {
+
+    #create extension based on input_type
+    file.ext <- unname(output_type_map[output_type])
+
+    # use helper get_save_path() to create output_path
+    output_path <- get_save_path(save_as = save_as,
+                                 default_name = paste(data_name, "BoxPlot", sep = "_"),
+                                 default_dir  = save_dir,
+                                 file.ext     = file.ext
+    )
+
+  }
 
   # Do not run explanation code when output is png
   if(output_type == "png"){
@@ -218,7 +275,7 @@ f_boxplot <- function(
 
   # Automatically detect factor variables
   if (detect_factors == TRUE) {
-    data <- f_factors(data, console = FALSE)
+    data <- f_factors(data)
   }
 
   # Rename the data.frame with fancy names if fancy_names are provided.
@@ -433,7 +490,7 @@ Boxplots are particularly valuable when comparing distributions across multiple 
         if (output_type == "png"){
 
           # Define the new file name
-          new_file_name <- paste0(output_dir,"/",response_name,".png")
+          new_file_name <- paste0(dirname(output_path),"/",response_name,".png")
 
           # Rename the temporary file
           file.rename(temp_file, new_file_name)
@@ -543,7 +600,7 @@ Boxplots are particularly valuable when comparing distributions across multiple 
 
       if (output_type == "png"){
       # Define the new file name
-      new_file_name <- paste0(output_dir,"/",response_name,"_", factor_name, ".png")
+      new_file_name <- paste0(dirname(output_path),"/",response_name,"_", factor_name, ".png")
 
       # Rename the temporary file
       file.rename(temp_file, new_file_name)
@@ -562,8 +619,7 @@ Boxplots are particularly valuable when comparing distributions across multiple 
 
 # Here the documents are constructed.
 if (output_type %in% c("word", "pdf")) {
-  if (output_type == "word") { file.ext <- ".docx" }
-  if (output_type == "pdf")  { file.ext <- ".pdf"  }
+
 
   # Create a temporary R Markdown file
   word_pdf_preamble <- function(){ paste0( # Create a temporary R Markdown file
@@ -585,8 +641,8 @@ header-includes:
   # Prevent ## before printed output
   knitr::opts_chunk$set(comment = "")
 
-  # Show save location before knitting else it will not display in console.
-  message(paste0("Saving output in: ", output_dir, "\\", output_file, file.ext))
+  # show the location were the file is saved
+  message(paste0("Saving output in: ", output_path))
 
   # re-run generate_report, but this time capture its output to a string
   generated_markdown <- capture.output(generate_report())
@@ -605,8 +661,7 @@ header-includes:
   # Create the RMarkdown file
   rmarkdown::render(
     temp_output_file,
-    output_file = output_file,
-    output_dir = output_dir,
+    output_file = output_path,
     intermediates_dir = temp_output_dir,
     knit_root_dir = temp_output_dir,
     quiet = TRUE,
@@ -615,7 +670,7 @@ header-includes:
 
   if(open_generated_files == TRUE){
   # Open the file with default program
-  f_open_file(paste0(output_dir, "/", output_file, file.ext))
+    f_open_file(output_path)
   }
 
   # Remove the temporary R Markdown file
@@ -629,7 +684,7 @@ header-includes:
     }
 
     # Re-capture the markdown text for the rmd output
-    generated_markdown <- capture.output(generate_report(output = FALSE))
+    generated_markdown <- capture.output(generate_report())
 
     clean_rmd_output <- paste(generated_markdown, collapse = "\n")
 
@@ -639,7 +694,9 @@ header-includes:
   else if (output_type == "png"){
 
     invisible(generate_report())
-    message(paste0("PNG files saved in: ", output_dir))
+
+    message(paste0("PNG files saved in: ", dirname(output_path), "\n   \n"))
+
     return(invisible(NULL))
   }
 }

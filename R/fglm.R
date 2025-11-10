@@ -23,13 +23,18 @@
 #'     \item{"none"}{No adjustment}
 #'     \item{"fdr"}{False Discovery Rate adjustment}
 #'   } Default is \code{"sidak"}.
-#' @param show_assumptions_text Logical. If \code{TRUE}, includes a short explanation about GLM assumptions in the output file.
+#' @param intro_text Logical. If \code{TRUE}, includes a short explanation about GLM assumptions in the output file.
 #' @param type specifying the scale on which the emmeans posthoc results are presented, e.g. "link" to show results on the scale for which the variables are linear and "response" when you want to back transform the data to interpret results in the units of your original data (e.g., probabilities, counts, or untransformed measurements). Default is \code{"response"}.
 #' @param close_generated_files Logical. If \code{TRUE}, closes open 'Excel' or 'Word' files depending on the output format. This to be able to save the newly generated file by the \code{f_aov()} function. 'Pdf' files should also be closed before using the function and cannot be automatically closed. Default is \code{FALSE}.
 #' @param open_generated_files Logical. If \code{TRUE}, Opens the generated output files ('pdf', 'Word' or 'Excel') files depending on the output format. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.
-#' @param output_type Character string specifying the output format: \code{"pdf"}, \code{"word"}, \code{"excel"}, \code{"rmd"}, \code{"off"} (no file generated) or \code{"console"}. The option \code{"console"} forces output to be printed. Default is \code{"off"}.
-#' @param output_file Character string specifying the name of the output file. Default is "dataname_glm_output".
-#' @param output_dir Character string specifying the name of the directory of the output file. Default is \code{tempdir()}.
+#' @param output_type Character string specifying the output format: \code{"pdf"}, \code{"word"}, \code{"excel"}, \code{"rmd"}, \code{"console"} or \code{"off"} (no file generated). The option \code{"console"} forces output to be printed, the option \code{"rmd"} saves rmd code in the output object not in a file. Default is \code{"off"}.
+#' @param save_as Character string specifying the output file path (without extension).
+#'   If a full path is provided, output is saved to that location.
+#'   If only a filename is given, the file is saved in \code{tempdir()}.
+#'   If only a directory is specified (providing an existing directory with trailing slash),
+#'   the file is named "dataname_glm_output" in that directory. If an extension is provided the output format specified with option "output_type" will be overruled.
+#'   Defaults to \code{file.path(tempdir(), "dataname_summary.pdf")}.
+#' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.
 #' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory.
 #' @param dispersion_test Logical for overdispersion test (default: TRUE).
 #' @param influence_threshold Leverage threshold (default: 2).
@@ -80,7 +85,7 @@
 #' glm_pos <- f_glm(breaks ~ wool + tension,
 #'                  data = warpbreaks,
 #'                  family = poisson(link = "log"),
-#'                  show_assumptions_text = FALSE,
+#'                  intro_text = FALSE,
 #'                  output_type = "rmd")
 #' cat(cat(glm_pos$rmd))
 #' }
@@ -95,11 +100,10 @@ f_glm <- function(
           alpha = 0.05,                  # Significance level for tests
           adjust = "sidak",              # Method used to adjust p-values
           type = "response",             # Scale of emmeans posthoc results
-          show_assumptions_text = TRUE,  # Print explanation about GLM assumptions
+          intro_text = TRUE,  # Print explanation about GLM assumptions
           dispersion_test = TRUE,        # Print dispersion test
           output_type = "off",           # Output type
-          output_file = NULL,            # Output file name
-          output_dir = NULL,             # Output directory
+          save_as = NULL,                # name of the output dir and file (name and type)
           save_in_wdir = FALSE,          # Save in working directory
           close_generated_files = FALSE, # Close open files
           open_generated_files = TRUE,   # Open files after creation
@@ -176,7 +180,12 @@ f_glm <- function(
   # Output file handling
   temp_output_dir  <- tempdir()
   temp_output_file <- file.path(temp_output_dir, "glm_output.Rmd")
+
+  # Create the output file "output.Rmd" in tempdir()
   file.create(temp_output_file)
+
+  # Create a list to store all outputs in this function
+  output_list <- list()
 
 
   ##### Error checking, converting input, closing files #####
@@ -185,10 +194,90 @@ f_glm <- function(
     stop("Character string specifying the output format (output_type = ) should be either: 'pdf', 'word', 'excel', 'console','rmd', 'off'")
   }
 
-  # If there is not output_file name specified use the data_name
-  if (output_type %in% c("pdf", "word", "excel") ){
+  ##### Handle option "save_as = " #####
+  if(save_in_wdir == TRUE){
+    save_dir <- getwd()
+  }else{
+    save_dir <- tempdir()
+  }
 
-    # close_generated_files if user wants to
+  #map the output type to extensions
+  output_type_map <- c(
+    "pdf"  = ".pdf",
+    "word" = ".docx",
+    "excel"= ".xlsx",
+    "rmd"  = ".rmd"
+  )
+
+  # If the user specifies a path, filename or save_in_wdir == TRUE an output file should be created
+  if (!is.null(save_as) || save_in_wdir == TRUE) {
+
+    if (!is.null(save_as)) {
+      #Remove backslash in save_as if needed
+      save_as <- gsub(pattern = "\\\\", replacement = "/", x = save_as)
+      file_extension_save_as <- unname(extract_extension(save_as))
+      if(file_extension_save_as[1] != FALSE){
+        file_extension <- file_extension_save_as
+      }
+    }
+
+    if(!exists("file_extension") && output_type %in% c("console", "off")){
+      # use helper get_save_path() to create output_path
+      output_path <- get_save_path(save_as = save_as,
+                                   default_name = paste(data_name, "glm_output", sep = "_"),
+                                   default_dir = save_dir,
+                                   file.ext = ".pdf"
+      )
+      #set output_type to default
+      output_type <- "pdf"
+
+    }
+    else if(!exists("file_extension") && output_type %in% c("pdf", "word", "excel", "rmd")){
+
+      #create extension based on input_type
+      file.ext <- unname(output_type_map[output_type])
+
+      # use helper get_save_path() to create output_path
+      output_path <- get_save_path(save_as = save_as,
+                                   default_name = paste(data_name, "glm_output", sep = "_"),
+                                   default_dir = save_dir,
+                                   file.ext = file.ext
+      )
+
+
+    }
+    else if(exists("file_extension")) {
+
+      # use helper get_save_path() to create output_path
+      output_path <- get_save_path(save_as = save_as,
+                                   default_name = paste(data_name, "glm_output", sep = "_"),
+                                   default_dir = save_dir,
+                                   file.ext = file_extension[1]
+      )
+      # reset the output type to match the user input extention in save_as
+      output_type <- file_extension[2]
+    }
+  } else {
+
+    #create extension based on input_type
+    file.ext <- unname(output_type_map[output_type])
+
+    # use helper get_save_path() to create output_path
+    output_path <- get_save_path(save_as = save_as,
+                                 default_name = paste(data_name, "glm_output", sep = "_"),
+                                 default_dir = save_dir,
+                                 file.ext = file.ext
+    )
+  }
+
+
+  # Prevent output to console and keep files open when output is "rmd" format
+  if(output_type == "rmd"){
+    close_generated_files <- FALSE
+  }
+
+  if(output_type != "rmd"){
+
     if(close_generated_files == TRUE && output_type == "word"){
       # Close all MS Word files to avoid conflicts (so save your work first)
       system("taskkill /im WINWORD.EXE /f")
@@ -199,37 +288,8 @@ f_glm <- function(
       system("taskkill /im EXCEL.EXE /f")
     }
 
-
-    if (is.null(output_file) ) {
-      # Set the file name
-      output_file  <- paste0(data_name,"_glm_output")
-    }
-
-    # If there is no output_dir specified and user setting is to save in working directory
-    if(is.null(output_dir) && save_in_wdir == TRUE){
-      # set the working dir to the location the file is saved
-      output_dir <- getwd()
-
-    }
-    else if(is.null(output_dir) && save_in_wdir == FALSE){
-      # Get the dirname of output_file
-      output_dir <- dirname(output_file)
-
-      # Check if there is a dir (path) in the output file, if not use tempdir()
-      if(output_dir == "."){
-        output_dir <- temp_output_dir
-      }
-    }
-
-    # Stop if the output directory does not exist
-    if (!dir_exists(output_dir)) {
-      stop("The directory '", output_dir, "' does not exist.")
-    }
-
-    # dir_name is already extracted so rename file to basename.
-    output_file <- basename(output_file)
-
   }
+
 
 
   ##### Evaluate family choice and Extract response variables #####
@@ -260,14 +320,16 @@ f_glm <- function(
   rhs <- deparse(formula[[3]])  # Preserve the RHS structure
 
   # Ensure response and predictors are in the data
-  for (response in lhs) {
+  for (response in response_names) {
+
     if (!(response %in% names(data))) {
       stop(paste("Response variable", response, "not found in the data."))
-      # Ensure the response variable is numeric
-      response_var <- data[[response]]
-      if (!is.numeric(response_var)) {
-        stop("The response variable must be numeric.")
-      }
+    }
+    # Ensure the response variable is numeric
+    response_var <- data[[response]]
+
+    if (!is.numeric(response_var)) {
+      stop("The response variable must be numeric.")
     }
   }
 
@@ -305,7 +367,7 @@ f_glm <- function(
    check_influence <- function(model) {
 
       hat_values  <- stats::hatvalues(model)
-      avg_hat     <- mean(hat_values)
+      avg_hat     <- mean(hat_values, na.rm = TRUE)
       influential <- which(hat_values > influence_threshold * avg_hat)
 
       return(list(
@@ -530,14 +592,11 @@ DHARMa residuals are simulation-based, scaled (quantile) residuals designed to m
   # Here the documents are constructed.
   if(output_type %in% c("word", "pdf")) {
 
-    if (output_type == "word") { file.ext <- ".docx" }
-    if (output_type == "pdf")  { file.ext <- ".pdf"  }
+    # Show save location before knitting else it will not display in console.
+    message(paste0("Saving output in: ", output_path))
 
     # Prevent ## before printed output
     knitr::opts_chunk$set(comment = "")
-
-    # Show save location before knitting else it will not display in console.
-    message(paste0("Saving output in: ", output_dir, "\\", output_file, file.ext))
 
     # re-run generate_report, but this time capture its output to a string
     generated_markdown <- capture.output(generate_report(output = FALSE))
@@ -545,7 +604,7 @@ DHARMa residuals are simulation-based, scaled (quantile) residuals designed to m
     # Combine the preamble, assumptions, and the captured report into one string
     rmd_content <- paste(
       word_pdf_preamble(),
-      if (show_assumptions_text) glm_assumptions_text() else "",
+      if (intro_text) glm_assumptions_text() else "",
       # The captured output already contains the necessary markdown formatting and image links
       paste(generated_markdown, collapse = "\n"),
       sep = "\n"
@@ -557,8 +616,7 @@ DHARMa residuals are simulation-based, scaled (quantile) residuals designed to m
     # Create the RMarkdown file
     rmarkdown::render(
       temp_output_file,
-      output_file = output_file,
-      output_dir = output_dir,
+      output_file = output_path,
       intermediates_dir = temp_output_dir,
       knit_root_dir = temp_output_dir,
       quiet = TRUE,
@@ -568,16 +626,15 @@ DHARMa residuals are simulation-based, scaled (quantile) residuals designed to m
     # Open files after creation
     if(open_generated_files == TRUE){
     # Open the file with default program
-    f_open_file(paste0(output_dir, "/", output_file, file.ext))
+    f_open_file(output_path)
     }
 
     return(invisible(output_list))
 
   } else if(output_type == "excel") {
-    # set the wd to the location the file is saved
-    file.ext <- ".xlsx"
-    # Show save location before knitting else it will not display in console.
-    message(paste0("Saving output in: ", output_dir, "\\", output_file, file.ext))
+
+    # show the location were the file is saved
+    message(paste0("Saving output in: ", output_path))
 
     # Extract all post_hoc_summary_table tables and keep their names
     post_hoc_tables <- lapply(output_list, function(obj)
@@ -587,11 +644,11 @@ DHARMa residuals are simulation-based, scaled (quantile) residuals designed to m
     names(post_hoc_tables) <- response_names
 
     # Write to an Excel file with each table in its own sheet
-    write_xlsx(post_hoc_tables, path = paste0(output_dir, "/", output_file, file.ext))
+    write_xlsx(post_hoc_tables, path = output_path)
 
     # Open files after creation
     if(open_generated_files == TRUE){
-    f_open_file(paste0(output_dir, "/", output_file, file.ext))
+      f_open_file(output_path)
     }
 
     return(invisible(output_list))
@@ -607,7 +664,7 @@ DHARMa residuals are simulation-based, scaled (quantile) residuals designed to m
     generated_markdown <- capture.output(generate_report(output = FALSE))
 
     clean_rmd_output <- paste(
-      if (show_assumptions_text) glm_assumptions_text() else "",
+      if (intro_text) glm_assumptions_text() else "",
       paste(generated_markdown, collapse = "\n"),
       sep = "\n"
     )

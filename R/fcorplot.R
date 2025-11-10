@@ -14,12 +14,15 @@
 #' @param res Numeric. The resolution (in dots per inch) for the output plot image (defaults 1000 dpi).
 #' @param pointsize Numeric. The base font size for text in the plot image. Defaults to 8.
 #' @param output_type Character string specifying the output format: "pdf", "word", "png" or "rmd". Default is "word".
-#' @param output_file Character string or \code{NULL}. The name of the file (omit extension) where the cor_plot will be saved. If \code{NULL}, a default filename is generated based on the dataset name (dataname_correlation_plot). Defaults to \code{NULL}.
-#' @param output_dir Character string specifying the name of the directory of the output file. Default is  \code{tempdir()}. If the \code{output_file} already contains a directory name \code{output_dir} can be omitted, if used it overwrites the dir specified in \code{output_file}.
-#' @param legendname Character string or \code{NULL}. The name of the file (omit extension) where the legend will be saved. If \code{NULL}, a default filename is generated based on the dataset name (dataname_legend_correlation_plot). Defaults to \code{NULL}.
+#' @param save_as Character string specifying the output file path (without extension).
+#'   If a full path is provided, output is saved to that location.
+#'   If only a filename is given, the file is saved in \code{tempdir()}.
+#'   If only a directory is specified (providing an existing directory with trailing slash),
+#'   the file is named "dataname_CorPlot" in that directory. If an extension is provided the output format specified with option "output_type" will be overruled.
+#'   Defaults to \code{file.path(tempdir(), "dataname_CorPlot.docx")}.
 #' @param close_generated_files Logical. If \code{TRUE}, closes open 'Word' files depending on the output format. This to be able to save the newly generated files. 'Pdf' files should also be closed before using the function and cannot be automatically closed. Default is \code{FALSE}.
 #' @param open_generated_files Logical. If \code{TRUE}, Opens the generated 'Word' output files. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.
-#' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory Default is \code{FALSE}, to avoid unintended changes to the global environment. If the \code{output_dir} is specified \code{save_in_wdir} is overwritten with \code{output_dir}.
+#' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.
 
 #' @details
 #' \itemize{
@@ -41,8 +44,8 @@
 #' @return
 #' Output is a 'Word' document with:
 #' \itemize{
-#' \item A correlation plot (\code{output_file}).
-#' \item A legend (\code{legendname}) if applicable.
+#' \item A correlation plot.
+#' \item A legend if applicable.
 #'}
 #' Using the option "output_type", it can also generate output in the form of: R Markdown code, 'pdf', or 'PNG' files. No value is returned to the R environment; instead, files are saved, and they are opened automatically if running on Windows.
 #'
@@ -93,14 +96,11 @@ f_corplot <- function(data,
                              height = 15,
                              res = 600,
                              pointsize = 8,
-                             legendname = NULL,
                              close_generated_files = FALSE,
                              open_generated_files = TRUE,
                              output_type = "word",
-                             output_file = NULL,
-                             output_dir = NULL,
+                             save_as = NULL,
                              save_in_wdir = FALSE
-
                       ) {
   ########## Reset initial settings on exit ##################################
   # Save initial settings at the start
@@ -133,6 +133,94 @@ f_corplot <- function(data,
   }, add = TRUE)
 
 
+  # Error if wrong output_type
+  if( !(output_type %in% c("pdf", "word", "png", "rmd")) ){
+    stop("Character string specifying the output format (output_type = ) should be either: \"pdf\", \"word\", \"png\" or \"rmd\"")
+  }
+
+  # Extract dataframe name
+  data_name <- deparse(substitute(data))
+
+
+  #### Handle option "save_as = " ###
+  if(save_in_wdir == TRUE){
+    save_dir <- getwd()
+  }else{
+    save_dir <- tempdir()
+  }
+
+  #map the output type to extensions
+  output_type_map <- c(
+    "pdf"  = ".pdf",
+    "word" = ".docx",
+    "png"  = ".png"
+  )
+
+  # If the user specifies a path, filename or save_in_wdir == TRUE an output file should be created
+  if (!is.null(save_as) || save_in_wdir == TRUE) {
+
+    if (!is.null(save_as)) {
+      #Remove backslash in save_as if needed
+      save_as <- gsub(pattern = "\\\\", replacement = "/", x = save_as)
+      file_extension_save_as <- unname(extract_extension(save_as))
+      if(file_extension_save_as[1] != FALSE){
+        file_extension <- file_extension_save_as
+      }
+    }
+
+    if(!exists("file_extension") && output_type == "word"){
+      # use helper get_save_path() to create output_path
+      output_path <- get_save_path(save_as = save_as,
+                                   default_name = paste(data_name, "CorPlot", sep = "_"),
+                                   default_dir = save_dir,
+                                   file.ext = ".docx"
+                                   )
+
+      #set output_type to default
+      output_type <- "word"
+
+    }
+    else if(!exists("file_extension") && output_type %in% c("pdf", "word", "rmd", "png")){
+
+      #create extension based on input_type
+      file.ext <- unname(output_type_map[output_type])
+
+      # use helper get_save_path() to create output_path
+      output_path <- get_save_path(save_as = save_as,
+                                   default_name = paste(data_name, "CorPlot", sep = "_"),
+                                   default_dir  = save_dir,
+                                   file.ext     = file.ext
+      )
+
+
+
+    }
+    else if(exists("file_extension")) {
+
+      # use helper get_save_path() to create output_path
+      output_path <- get_save_path(save_as = save_as,
+                                   default_name = paste(data_name, "CorPlot", sep = "_"),
+                                   default_dir  = save_dir,
+                                   file.ext     = file_extension[1]
+      )
+
+      # reset the output type to match the user input extention in save_as
+      output_type <- file_extension[2]
+    }
+  } else {
+
+    #create extension based on input_type
+    file.ext <- unname(output_type_map[output_type])
+
+    # use helper get_save_path() to create output_path
+    output_path <- get_save_path(save_as = save_as,
+                                 default_name = paste(data_name, "CorPlot", sep = "_"),
+                                 default_dir  = save_dir,
+                                 file.ext     = file.ext
+    )
+
+  }
+
   if(close_generated_files == TRUE && output_type == "word"){
     # Close all MS Word files to avoid conflicts (so save your work first)
     system("taskkill /im WINWORD.EXE /f")
@@ -147,66 +235,13 @@ f_corplot <- function(data,
   # Container for output plots
   output_list <- list()
 
-  if( !(output_type %in% c("pdf", "word", "png", "rmd")) ){
-    stop("Character string specifying the output format (output_type = ) should be either: \"pdf\", \"word\", \"png\" or \"rmd\"")
-    }
 
   # Generate a temporary file path for "output.Rmd"
-  temp_output_dir <- tempdir()
+  temp_output_dir  <- tempdir()
   temp_output_file <- file.path(temp_output_dir, "output.Rmd")
 
   # Create the output file "output.Rmd" in tempdir()
   file.create(temp_output_file)
-
-
-  # set the wd to the location the file is saved and set the file name
-  if(is.null(output_file)){
-  # Get the name of the data.frame and include it in the name of the plot.png
-  dataframe_name <- deparse(substitute(data))
-  output_file    <- paste0(dataframe_name,"_correlation_plot")
-  }
-
-
-  if(is.null(legendname)){
-    # Get the name of the data.frame and include it in the name of the plot.png
-    dataframe_name    <- deparse(substitute(data))
-    legendname <- paste0(dataframe_name,"_legend_correlation_plot")
-    }
-
-  # If there is no output_dir specified and user setting is to save in working directory
-  if(is.null(output_dir) && save_in_wdir == TRUE){
-  # set the working dir to the location the file is saved
-      output_dir <- getwd()
-
-  } else if(is.null(output_dir) && save_in_wdir == FALSE){
-     # Get the dirname of output_file
-     output_dir <- dirname(output_file)
-
-     # Check if there is a dir (path) in the output file, if not use tempdir()
-     if(output_dir == "."){
-       output_dir <- temp_output_dir
-     }
-  }
-
-    # Stop if the output directory does not exist
-    if (!dir_exists(output_dir)) {
-      stop("The directory '", output_dir, "' does not exist.")
-    }
-
-    # dir_name is already extracted so rename file to basename.
-    output_file <- basename(output_file)
-
-
-
-
-  # Set extension names, extenstion of png is set while making the png()
-  if (output_type == "word") {
-    file.ext <- ".docx"
-  }
-  if (output_type == "pdf") {
-    file.ext <- ".pdf"
-  }
-
 
   # Rename the data.frame with fancy names if fancy_names are provided.
   # Also check if the color and shape factor need renaming.
@@ -474,8 +509,8 @@ f_corplot <- function(data,
     ylim <- par("usr")[3:4]
 
     # Bereken het middenpunt
-    horizontal <- mean(xlim)
-    vertical   <- mean(ylim)
+    horizontal <- mean(xlim, na.rm = TRUE)
+    vertical   <- mean(ylim, na.rm = TRUE)
 
     # Voeg de tekst toe
     text(horizontal, vertical,
@@ -485,12 +520,40 @@ f_corplot <- function(data,
 
 
   # Open a PNG device to save the plot
-  png(paste0(output_dir, "/", output_file,".png"),
+  if(output_type != "png"){
+    png_path_corplot <- paste(temp_output_dir, "CorPlot.png", sep = "_")
+    # Use sub() to replace _CorPlot.png with _Legend.png
+    png_path_legend <- sub("_CorPlot\\.png", "_Legend.png", png_path_corplot)
+  }
+  else if (output_type == "png"){
+    png_path_corplot <- output_path
+
+    # Check if png_path_corplot *DOES NOT* contain "_CorPlot.png"
+    # grepl() returns TRUE if the pattern is found. Hence !
+    if (!grepl("_CorPlot\\.png", png_path_corplot)) {
+      png_path_legend <- sub("\\.png$", "_Legend.png", png_path_corplot)
+    }
+    else {
+      #If "_CorPlot.png" IS present, replace with _Legend.png:
+      png_path_legend <- sub("_CorPlot\\.png", "_Legend.png", png_path_corplot)
+    }
+
+    #use / instead of \
+
+
+    message(paste0("Saving output in: ", png_path_corplot, " and ", png_path_legend))
+  }
+
+  png_path_corplot <- gsub(pattern = "\\\\", replacement = "/", x = png_path_corplot)
+  png_path_legend  <- gsub(pattern = "\\\\", replacement = "/", x = png_path_legend)
+
+  png(png_path_corplot,
       width = width,
       height = height,
       units = "cm",
       res = res,
-      pointsize = pointsize)
+      pointsize = pointsize
+      )
 
   # Create the pairs plot
   pairs(
@@ -510,16 +573,13 @@ f_corplot <- function(data,
   grDevices::dev.off()
 
   if(output_type == "png"){
-
-    message(paste0("Saving output in: ", output_dir, "\\",output_file,".png"))
-
     if(open_generated_files == TRUE){
       # Open the plot file in windows
-      f_open_file(paste0(output_dir, "/",output_file,".png"))
+      f_open_file(png_path_corplot)
     }
   }
 
-  # Print legend when factor_count > 0 or print legend = TRUE
+  # Print legend when factor_count > 0 and print legend = TRUE
   if(factor_count > 0 && print_legend == TRUE){
     print_legend <- TRUE
   } else {
@@ -529,7 +589,12 @@ f_corplot <- function(data,
   if(print_legend == TRUE){
 
     # Open a PNG device for the legend
-    png(paste0(output_dir, "/",legendname,".png"), width = 8, height = 8, units = "in", res = res)
+    png(png_path_legend,
+        width  = 8,
+        height = 8,
+        units = "in",
+        res = res
+        )
 
     # Create an empty plot
     plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 1), ylim = c(0, 1), axes = FALSE)
@@ -563,18 +628,15 @@ f_corplot <- function(data,
 
 
     if(output_type == "png"){
-
-    message(paste0("Saving output in: ", output_dir, "\\",legendname,".png"))
-
       # Open the legend file in windows
       if(open_generated_files == TRUE){
-      f_open_file(paste0(output_dir, "/",legendname,".png"))
+      f_open_file(png_path_legend)
       }
     }
   }
 
-  if(output_type != "rmd" || output_type != "png"){
-  # Create a temporary R Markdown file
+  if (output_type %in% c("word", "pdf")){
+  # Create a temporary R Markdown file for pdf and word
   cat("
 ---
 title: \"Correlation Plots\"
@@ -593,7 +655,7 @@ header-includes:
 
 
 ```{r, results='asis', fig.align = 'center', echo=FALSE}
-cat(paste0('![](', output_dir, '/',output_file, '.png)'), '   \n  \n')
+cat(paste0('![](', png_path_corplot, ')'), '   \n  \n')
 cat('   \n    \n&nbsp;  \n  \n')
 
 ```
@@ -601,22 +663,40 @@ cat('   \n    \n&nbsp;  \n  \n')
 
 ```{r, results='asis', fig.align = 'center', echo=FALSE}
 
-cat(paste0('![](', output_dir, '/', legendname, '.png)'), '   \n  \n')
+cat(paste0('![](', png_path_legend, ')'), '   \n  \n')
 
 ```
 ", file = temp_output_file)
   }
+  else if (output_type == "rmd"){
+    # Create rmd output
+    rmd_output <- sprintf(
+      "
+\`\`\`{r, results='asis', fig.align = 'center', echo=FALSE}
+cat(paste0('![](%s)'), '    \\n  \\n')
+cat('    \\n    \\n&nbsp;  \\n \\n')
+\`\`\`
+
+
+\`\`\`{r, results='asis', fig.align = 'center', echo=FALSE}
+cat(paste0('![](%s)'), '    \\n  \\n')
+\`\`\`
+",
+      png_path_corplot, # Value for the first %s
+      png_path_legend   # Value for the second %s
+    )
+
+    # Print the resulting R Markdown code
+    cat(rmd_output)
+  }
 
 
   if(output_type == "pdf" || output_type == "word"){
-    # Show save location before knitting else it will not display in console.
-    message(paste0("Saving output in: ", output_dir, "\\", output_file, file.ext))
 
     # Create the RMarkdown file
     rmarkdown::render(
       temp_output_file,
-      output_file = output_file,
-      output_dir = output_dir,
+      output_file = output_path,
       intermediates_dir = temp_output_dir,
       knit_root_dir = temp_output_dir,
       quiet = TRUE,
@@ -625,12 +705,16 @@ cat(paste0('![](', output_dir, '/', legendname, '.png)'), '   \n  \n')
 
     if(open_generated_files == TRUE){
     # Open the file with default program
-    f_open_file(paste0(output_dir, "/", output_file, file.ext))
+    f_open_file(output_path)
     }
+
+    # Show save location before knitting else it will not display in console.
+    message(paste0("Saving output in: ", output_path))
 
     # Remove the temporary R Markdown file
     invisible(suppressWarnings(file.remove(temp_output_file)))
+    invisible(suppressWarnings(file.remove(png_path_corplot)))
+    invisible(suppressWarnings(file.remove(png_path_legend)))
   }
-
 
 }
