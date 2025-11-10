@@ -67,16 +67,16 @@
 #'}
 #'
 #' where (\eqn{y}) is the data being transformed, and (\eqn{\lambda}) the transformation parameter, which is estimated from the data using maximum likelihood. The function computes the Box-Cox transformation for a range of \eqn{\lambda} values and identifies the \eqn{\lambda} that maximizes the log-likelihood function. The beauty of this transformation is that, it checks suitability of many of the common transformations in one run. Examples of most common transformations and their \eqn{\lambda} value is given below:
-#'\renewcommand{\arraystretch}{1.5} % Adjusts row height (default is 1)
+#'\renewcommand{\arraystretch}{3} % Adjusts row height (default is 1)
 #' \tabular{cc}{
 #'   \strong{\eqn{\lambda}-Value} \tab \strong{Transformation} \cr
 #'   \strong{-----------------------}\tab\strong{-----------------------}\cr
-#'   -2          \tab \eqn{\frac{1}{x^2}}          \cr \cr
-#'   -1          \tab \eqn{\frac{1}{x}  }          \cr \cr
-#'   -0.5        \tab \eqn{\frac{1}{\sqrt{x}}}     \cr \cr
-#'   0           \tab \eqn{log(x)}                 \cr \cr
-#'   0.5         \tab \eqn{\sqrt{x}}               \cr \cr
-#'   1           \tab \eqn{x}                      \cr \cr
+#'   -2          \tab \eqn{\frac{1}{x^2}}          \cr
+#'   -1          \tab \eqn{\frac{1}{x}  }          \cr
+#'   -0.5        \tab \eqn{\frac{1}{\sqrt{x}}}     \cr
+#'   0           \tab \eqn{log(x)}                 \cr
+#'   0.5         \tab \eqn{\sqrt{x}}               \cr
+#'   1           \tab \eqn{x}                      \cr
 #'   2           \tab \eqn{x^2}                    \cr
 #'   \strong{-----------------------}\tab\strong{-----------------------}\cr
 #' }
