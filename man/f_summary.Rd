@@ -21,10 +21,8 @@ f_summary(
   export_to_excel = FALSE,
   close_generated_files = FALSE,
   open_generated_files = TRUE,
-  output_file = NULL,
-  output_dir = NULL,
+  save_as = NULL,
   save_in_wdir = FALSE,
-  open_excel = TRUE,
   check_input = TRUE,
   eval_input = FALSE,
   digits_excel = NULL,
@@ -36,7 +34,7 @@ f_summary(
 
 \item{data.column}{A character string, vector or list with characters. The name of the column(s) in \code{data} for which summary statistics will be calculated.}
 
-\item{...}{One or more character strings specifying the grouping variables in \code{data}. At least one grouping variable must be provided.}
+\item{...}{One or more character strings specifying the grouping variables in \code{data}.}
 
 \item{show_n}{Logical. If \code{TRUE}, the summary results \code{n} will be included in the output.}
 
@@ -64,13 +62,14 @@ f_summary(
 
 \item{open_generated_files}{Logical. If \code{TRUE}, Opens the generated 'Excel' files. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.}
 
-\item{output_file}{Character string specifying the name of the output file. Default is "dataname_summary.xlsx".}
+\item{save_as}{Character string specifying the output file path (without extension).
+If a full path is provided, output is saved to that location.
+If only a filename is given, the file is saved in \code{tempdir()}.
+If only a directory is specified (providing an existing directory with trailing slash),
+the file is named "dataname_summary.xlsx" in that directory.
+Defaults to \code{file.path(tempdir(), "dataname_summary.xlsx")}.}
 
-\item{output_dir}{Character string specifying the name of the directory of the output file. Default is  \code{tempdir()}. If the \code{output_file} already contains a directory name \code{output_dir} can be omitted, if used it overwrites the dir specified in \code{output_file}.}
-
-\item{save_in_wdir}{Logical. If \code{TRUE}, saves the file in the working directory Default is \code{FALSE}, to avoid unintended changes to the global environment. If the \code{output_dir} is specified \code{save_in_wdir} is overwritten with \code{output_dir}.}
-
-\item{open_excel}{Logical. If \code{TRUE} and \code{export_to_excel} is also \code{TRUE}, the generated 'Excel' file will be opened automatically. Default is \code{TRUE}.}
+\item{save_in_wdir}{Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, to avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.}
 
 \item{check_input}{If \code{TRUE}, checks the input and stops the function if the input is incorrect (default is \code{TRUE}).}
 
@@ -100,6 +99,8 @@ The function computes the following summary statistics for the specified column:
 \item \code{Q3}: third quartile
 }
 Each of these summary statistics can be removed by setting e.g. \code{show_n = FALSE}, The results are grouped by the specified grouping variables and returned as a data frame. If \code{export_to_excel} is set to \code{TRUE}, the results are saved as an 'Excel' file in the working directory with a dynamically generated filename.
+
+When only \code{data} and \code{data.column} is provided the function defaults to base:summary(data).
 }
 \examples{
 # Example usage:

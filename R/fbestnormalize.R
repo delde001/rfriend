@@ -7,11 +7,14 @@
 #' @param alpha Numeric. Significance level for normality tests (default = \code{0.05}).
 #' @param data_name A character string to manually set the name of the data for plot axis and reporting. Default extracts name from input object. \code{data}.
 #' @param plots Logical. If \code{TRUE}, plots Q-Q plots and Histograms of the original and transformed data. Default is \code{FALSE}.
-#' @param output_type Character. Output format:\code{"console"}, \code{"pdf"}, \code{"word"},
-#'        \code{"rmd"}, or \code{"off"}. The option \code{"console"} forces output to be printed. Default is \code{"off"}.
-#' @param output_file Character. Custom output filename (optional).
-#' @param output_dir Character. Output directory (default = \code{tempdir()}).
-#' @param save_in_wdir Logical. Save in working directory (default = \code{FALSE}).
+#' @param output_type Character string specifying the output format: \code{"pdf"}, \code{"word"}, \code{"rmd"}, \code{"off"} (no file generated) or \code{"console"}. The option \code{"console"} forces output to be printed. Default is \code{"off"}.
+#' @param save_as Character string specifying the output file path (without extension).
+#'   If a full path is provided, output is saved to that location.
+#'   If only a filename is given, the file is saved in \code{tempdir()}.
+#'   If only a directory is specified (providing an existing directory with trailing slash),
+#'   the file is named "data_name_transformed" in that directory. If an extension is provided the output format specified with option "output_type" will be overruled.
+#'   Defaults to \code{file.path(tempdir(), "data_name_transformed.pdf")}.
+#' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.
 #' @param close_generated_files Logical. If \code{TRUE}, closes open 'Word' files. This to be able to save the newly generated file by the \code{f_bestNormalize()} function. 'Pdf' files should also be closed before using the function and cannot be automatically closed. Default is \code{FALSE}.
 #' @param open_generated_files Logical. If \code{TRUE}, Opens the generated output file, this to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.
 #' @param ... Additional arguments passed to bestNormalize.
@@ -89,8 +92,7 @@ f_bestNormalize <- function(data,
                             plots = FALSE,
                             data_name = NULL,
                             output_type = "off",
-                            output_file = NULL,
-                            output_dir = NULL,
+                            save_as = NULL,
                             save_in_wdir = FALSE,
                             close_generated_files = FALSE,
                             open_generated_files = TRUE,
@@ -131,7 +133,6 @@ f_bestNormalize <- function(data,
     stop("Character string specifying the output format (output_type = ) should be either: 'pdf', 'word', 'rmd', 'off', or 'console'")
   }
 
-
   ##############################################################################
 
   # Create object with transformed data as primary element
@@ -160,39 +161,145 @@ f_bestNormalize <- function(data,
 
 
   if (!is.numeric(y)) stop("Data must be numeric")
-  n <- length(y)
 
-  # Normality check
-  shapiro_original <- shapiro.test(y)
-  if (shapiro_original$p.value >= alpha) {
-    message("Data is already normal (p = ", round(shapiro_original$p.value, 4), ")")
-    return(invisible())
+  #### Handle option "save_as = " ###
+  if(save_in_wdir == TRUE){
+    save_dir <- getwd()
+  }else{
+    save_dir <- tempdir()
   }
+
+  #map the output type to extensions
+  output_type_map <- c(
+    "pdf"  = ".pdf",
+    "word" = ".docx",
+    "rmd"  = ".rmd"
+  )
+
+  # If the user specifies a path, filename or save_in_wdir == TRUE an output file should be created
+  if (!is.null(save_as) || save_in_wdir == TRUE) {
+
+    if (!is.null(save_as)) {
+      #Remove backslash in save_as if needed
+      save_as <- gsub(pattern = "\\\\", replacement = "/", x = save_as)
+      file_extension_save_as <- unname(extract_extension(save_as))
+      if(file_extension_save_as[1] != FALSE){
+        file_extension <- file_extension_save_as
+      }
+    }
+
+    if(!exists("file_extension") && output_type %in% c("console", "off")){
+      # use helper get_save_path() to create output_path
+      output_path <- get_save_path(save_as = save_as,
+                                   default_name = paste(data_name, "transformed", sep = "_"),
+                                   default_dir = save_dir,
+                                   file.ext = ".pdf"
+      )
+      #set output_type to default
+      output_type <- "pdf"
+
+    }
+    else if(!exists("file_extension") && output_type %in% c("pdf", "word", "excel", "rmd")){
+
+      #create extension based on input_type
+      file.ext <- unname(output_type_map[output_type])
+
+      # use helper get_save_path() to create output_path
+      output_path <- get_save_path(save_as = save_as,
+                                   default_name = paste(data_name, "transformed", sep = "_"),
+                                   default_dir = save_dir,
+                                   file.ext = file.ext
+      )
+
+
+    }
+    else if(exists("file_extension")) {
+
+      # use helper get_save_path() to create output_path
+      output_path <- get_save_path(save_as = save_as,
+                                   default_name = paste(data_name, "transformed", sep = "_"),
+                                   default_dir = save_dir,
+                                   file.ext = file_extension[1]
+      )
+      # reset the output type to match the user input extention in save_as
+      output_type <- file_extension[2]
+    }
+  } else {
+
+    #create extension based on input_type
+    file.ext <- unname(output_type_map[output_type])
+
+    # use helper get_save_path() to create output_path
+    output_path <- get_save_path(save_as = save_as,
+                                 default_name = paste(data_name, "transformed", sep = "_"),
+                                 default_dir = save_dir,
+                                 file.ext = file.ext
+    )
+  }
+
+
+  # Prevent output to console and keep files open when output is "rmd" format
+  if(output_type == "rmd"){
+    close_generated_files <- FALSE
+  }
+
+  # Create clean data for stable tuning
+  y_clean <- y[!is.na(y)]
+  n <- length(y_clean)
+
+  # Normality check on original data
+
+  andersonD_original <- nortest::ad.test(y)
+
+  if (n <= 5000) {
+    shapiro_original <- shapiro.test(y)
+  } else {
+    shapiro_original <- list(statistic = NA, p.value = NA)
+  }
+
 
   # Tune setting of bestNormalize based on sample size. Can be overwritten by user options.
-  if(n < 100){
-      if(!exists("loo")) loo <- TRUE
-      if(!exists("allow_orderNorm")) allow_orderNorm <- FALSE
-      if(!exists("r")) r <- 50 # doesnt matter as Loo is TRUE
 
-  } else if (n >= 100 && n < 200){
-      if(!exists("loo")) loo <- FALSE
-      if(!exists("allow_orderNorm")) allow_orderNorm <- TRUE
-      if(!exists("r")) r <- 50 # doesnt matter as Loo is TRUE
+  # Tune bestNormalize settings based on valid sample size 'n'
+  if (n < 500) {
+    # LOO is generally faster and more stable than Boot(50) for N < 500
+    if(!exists("loo")) loo <- TRUE
+    # Keep orderNorm disabled for very small N if you prefer stability
+    if(!exists("allow_orderNorm")) allow_orderNorm <- n >= 100
+    # r is irrelevant when loo = TRUE
 
-  } else if (n >= 200){
-      if(!exists("loo")) loo <- FALSE
-      if(!exists("allow_orderNorm")) allow_orderNorm <- TRUE
-      if(!exists("r")) r <- 10 # doesnt matter as Loo is TRUE
+  } else {
+    # For N >= 500, switch to fast bootstrapping
+    if(!exists("loo")) loo <- FALSE
+    if(!exists("allow_orderNorm")) allow_orderNorm <- TRUE
+    # r = 10 is usually sufficient for large N
+    if(!exists("r")) r <- 10
   }
 
-  # Apply bestNormalize
-  bn_obj <- bestNormalize::bestNormalize(y,
+  # Train bestNormalize on CLEAN data
+  # This avoids crashes/instability and speeds up bestNormalize
+  bn_obj <- bestNormalize::bestNormalize(y_clean,
                                          loo = loo,
                                          allow_orderNorm = allow_orderNorm,
                                          r = r,
                                          ...)
-  transformed <- bn_obj$x.t
+
+  # Get final vector matching original 'y' length using predict()
+  # to automatically handle the NAs in 'newdata'
+  transformed <- predict(bn_obj, newdata = y)
+
+  # Patch the internal bn_obj with the full dataset
+  # This ensures bn_obj$x.t matches the length of the input data 'y'
+  bn_obj$x.t <- transformed
+  # Patch the input data stored in the bestNormalize object for full consistency
+  bn_obj$x <- y
+
+  bn_obj$chosen_transform$x.t <- transformed
+  bn_obj$chosen_transform$x   <- y
+
+  #Do not patch the whole bn_obj as this will slow down the function.
+  #leaving bn_obj$other_transforms alone, data will be without NAs
+
 
   # start code copy from bestNormalize.R
   prettynames <- c(
@@ -223,10 +330,22 @@ f_bestNormalize <- function(data,
   Transf_name <- class(bn_obj$chosen_transform)[1]
   Transf_name <- f_rename_vector(Transf_name, prettynames)
 
-  # Normality check transformed data
-  shapiro_transformed <- shapiro.test(transformed)
 
-  if(output_type != "console"){
+  # Normality check on transformed data
+  andersonD_transformed <- nortest::ad.test(transformed)
+
+  if (n <= 5000) {
+    shapiro_transformed <- shapiro.test(transformed)
+  } else {
+    shapiro_transformed <- list(statistic = NA, p.value = NA)
+  }
+
+
+
+
+
+
+  if(output_type %in% c("word", "pdf", "rmd")){
     # png output mode
     temp_png <- tempfile(fileext = ".png")
     png(temp_png, width = 7.8, height = 7.8, units = "in", res = 600)
@@ -267,13 +386,13 @@ f_bestNormalize <- function(data,
     cat("**Table.** All considered transformations: [Pearson P / df, lower => more normal]",
         paste0("  (n=", bn_obj$chosen_transform$n, ")\n"))
     f_pander(output)
+
+    if(plots == TRUE){
     cat("&nbsp;\n   \n")
     cat("\nCheck the plots in the figure below to assess normality.  \n")
 
-
-
     cat(paste0("![](", temp_png, ")"), "   \n  \n")
-
+    }
   } # Close generate report function
 
 
@@ -290,8 +409,10 @@ f_bestNormalize <- function(data,
   output_list[["transformed_data"]]    <- transformed
   output_list[["shapiro_original"]]    <- shapiro_original
   output_list[["shapiro_transformed"]] <- shapiro_transformed
+  output_list[["andersonD_original"]]    <- andersonD_original
+  output_list[["andersonD_transformed"]] <- andersonD_transformed
   output_list[["norm_stats"]]          <- output
-  if(output_type != "console" && output_type != "off"){
+  if(output_type %in% c("word", "pdf", "rmd")){
     output_list[["normality_plots"]]  <- magick::image_scale(image_read(temp_png), "600")
   }
   # Set class
@@ -300,45 +421,16 @@ f_bestNormalize <- function(data,
   # Generate the pdf or word report, set save location and create markdown document
   if (output_type %in% c("word", "pdf")) {
 
-    if (output_type == "word") { file.ext <- ".docx" }
-    if (output_type == "pdf")  { file.ext <- ".pdf"  }
-
     if(close_generated_files == TRUE && output_type == "word"){
         # Close all MS Word files to avoid conflicts (so save your work first)
         system("taskkill /im WINWORD.EXE /f")
       }
 
-    # If there is no output_file name specified use the data_name
-    if (is.null(output_file)) {
-        # Set the file name
-        output_file  <- paste0(data_name,"_transformed_output")
-      }
-
-    # If there is no output_dir specified and user setting is to save in working directory
-    if(is.null(output_dir) && save_in_wdir == TRUE){
-        # set the working dir to the location the file is saved
-        output_dir <- getwd()
-
-     } else if(is.null(output_dir) && save_in_wdir == FALSE){
-        # Get the dirname of output_file
-        output_dir <- dirname(output_file)
-
-        # Check if there is a dir (path) in the output file, if not use tempdir()
-        if(output_dir == "."){
-          output_dir <- temp_output_dir
-        }
-      }
-
-      # Stop if the output directory does not exist
-      if (!dir_exists(output_dir)) {
-        stop("The directory '", output_dir, "' does not exist.")
-      }
-
-      # dir_name is already extracted so rename file to basename.
-      output_file <- basename(output_file)
+    # Show save location before knitting else it will not display in console.
+    message(paste0("Saving output in: ", output_path))
 
 
-      # Create a temporary R Markdown file
+          # Create a temporary R Markdown file
       word_pdf_preamble <- function(){ paste0("
 ---
 title: \"f_bestNormalize Transformation Report\"
@@ -360,9 +452,6 @@ header-includes:
       # Prevent ## before printed output
       knitr::opts_chunk$set(comment = "")
 
-      # Show save location before knitting else it will not display in console.
-      message(paste0("Saving output in: ", output_dir, "\\", output_file, file.ext))
-
       # re-run generate_report, but this time capture its output to a string
       generated_markdown <- capture.output(generate_report())
 
@@ -380,8 +469,7 @@ header-includes:
       # Create the RMarkdown file
       rmarkdown::render(
         temp_output_file,
-        output_file = output_file,
-        output_dir = output_dir,
+        output_file = output_path,
         intermediates_dir = temp_output_dir,
         knit_root_dir = temp_output_dir,
         quiet = TRUE,
@@ -390,7 +478,7 @@ header-includes:
 
       if(open_generated_files == TRUE){
       # Open the file with default program
-      f_open_file(paste0(output_dir, "/", output_file, file.ext))
+      f_open_file(output_path)
       }
 
       return(invisible(output_list))

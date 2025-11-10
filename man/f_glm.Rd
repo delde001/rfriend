@@ -12,11 +12,10 @@ f_glm(
   alpha = 0.05,
   adjust = "sidak",
   type = "response",
-  show_assumptions_text = TRUE,
+  intro_text = TRUE,
   dispersion_test = TRUE,
   output_type = "off",
-  output_file = NULL,
-  output_dir = NULL,
+  save_as = NULL,
   save_in_wdir = FALSE,
   close_generated_files = FALSE,
   open_generated_files = TRUE,
@@ -51,15 +50,18 @@ for multiple comparisons. Available methods include:
 
 \item{type}{specifying the scale on which the emmeans posthoc results are presented, e.g. "link" to show results on the scale for which the variables are linear and "response" when you want to back transform the data to interpret results in the units of your original data (e.g., probabilities, counts, or untransformed measurements). Default is \code{"response"}.}
 
-\item{show_assumptions_text}{Logical. If \code{TRUE}, includes a short explanation about GLM assumptions in the output file.}
+\item{intro_text}{Logical. If \code{TRUE}, includes a short explanation about GLM assumptions in the output file.}
 
 \item{dispersion_test}{Logical for overdispersion test (default: TRUE).}
 
-\item{output_type}{Character string specifying the output format: \code{"pdf"}, \code{"word"}, \code{"excel"}, \code{"rmd"}, \code{"off"} (no file generated) or \code{"console"}. The option \code{"console"} forces output to be printed. Default is \code{"off"}.}
+\item{output_type}{Character string specifying the output format: \code{"pdf"}, \code{"word"}, \code{"excel"}, \code{"rmd"}, \code{"console"} or \code{"off"} (no file generated). The option \code{"console"} forces output to be printed, the option \code{"rmd"} saves rmd code in the output object not in a file. Default is \code{"off"}.}
 
-\item{output_file}{Character string specifying the name of the output file. Default is "dataname_glm_output".}
-
-\item{output_dir}{Character string specifying the name of the directory of the output file. Default is \code{tempdir()}.}
+\item{save_as}{Character string specifying the output file path (without extension).
+If a full path is provided, output is saved to that location.
+If only a filename is given, the file is saved in \code{tempdir()}.
+If only a directory is specified (providing an existing directory with trailing slash),
+the file is named "dataname_glm_output" in that directory. If an extension is provided the output format specified with option "output_type" will be overruled.
+Defaults to \code{file.path(tempdir(), "dataname_summary.pdf")}.}
 
 \item{save_in_wdir}{Logical. If \code{TRUE}, saves the file in the working directory.}
 
@@ -120,7 +122,7 @@ data(warpbreaks)
 glm_pos <- f_glm(breaks ~ wool + tension,
                  data = warpbreaks,
                  family = poisson(link = "log"),
-                 show_assumptions_text = FALSE,
+                 intro_text = FALSE,
                  output_type = "rmd")
 cat(cat(glm_pos$rmd))
 }

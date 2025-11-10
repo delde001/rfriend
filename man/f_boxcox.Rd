@@ -6,10 +6,10 @@
 \usage{
 f_boxcox(
   data = data,
-  lambda = seq(-2, 2, 1/10),
+  digits = 3,
+  range = c(-2, 2),
   plots = FALSE,
   transform.data = TRUE,
-  interp = (plots && (length(lambda) < 100)),
   eps = 1/50,
   xlab = expression(lambda),
   ylab = "log-Likelihood",
@@ -17,8 +17,7 @@ f_boxcox(
   open_generated_files = TRUE,
   close_generated_files = FALSE,
   output_type = "off",
-  output_file = NULL,
-  output_dir = NULL,
+  save_as = NULL,
   save_in_wdir = FALSE,
   ...
 )
@@ -26,13 +25,13 @@ f_boxcox(
 \arguments{
 \item{data}{A numeric vector or a data frame with a single numeric column. The data to be transformed.}
 
-\item{lambda}{A numeric vector of \eqn{\lambda} values to evaluate for the Box-Cox transformation. Default is \code{seq(-2, 2, 0.1)}.}
+\item{digits}{Numeric. Determines the accuracy of the estimate for lambda. Higher values increase computation time. Defaults to \code{3}.}
+
+\item{range}{A numeric vector of length 2 defining the search interval for lambda. Defaults to \code{c(-2, 2)}.}
 
 \item{plots}{Logical. If \code{TRUE}, plots log-likelihood of the Box-Cox transformation, Histograms and Q-Q plots of the original and transformed data. Default is \code{FALSE}.}
 
 \item{transform.data}{Logical. If \code{TRUE}, returns the transformed data. Default is \code{TRUE}.}
-
-\item{interp}{Logical. If \code{TRUE} and fewer than 100 \eqn{\lambda} values are provided, interpolates for smooth plotting. Default is determined by log-likelihood of the Box-Cox transformation and the length of \eqn{\lambda}.}
 
 \item{eps}{A small positive value used to determine when to switch from the power transformation to the log transformation for numerical stability. Default is \code{1/50}.}
 
@@ -48,11 +47,14 @@ f_boxcox(
 
 \item{output_type}{Character string specifying the output format: \code{"pdf"}, \code{"word"}, \code{"rmd"}, \code{"off"} (no file generated) or \code{"console"}. The option \code{"console"} forces output to be printed. Default is \code{"off"}.}
 
-\item{output_file}{A character string specifying the name of the output file (without extension). If \code{NULL}, a default name based on the dataset name is generated.}
+\item{save_as}{Character string specifying the output file path (without extension).
+If a full path is provided, output is saved to that location.
+If only a filename is given, the file is saved in \code{tempdir()}.
+If only a directory is specified (providing an existing directory with trailing slash),
+the file is named "data_name_aov_output" in that directory. If an extension is provided the output format specified with option "output_type" will be overruled.
+Defaults to \code{file.path(tempdir(), "data_name_summary.pdf")}.}
 
-\item{output_dir}{Character string specifying the name of the directory of the output file. Default is  \code{tempdir()}. If the \code{output_file} already contains a directory name \code{output_dir} can be omitted, if used it overwrites the dir specified in \code{output_file}.}
-
-\item{save_in_wdir}{Logical. If \code{TRUE}, saves the file in the working directory Default is \code{FALSE}, to avoid unintended changes to the global environment. If the \code{output_dir} is specified \code{save_in_wdir} is overwritten with \code{output_dir}.}
+\item{save_in_wdir}{Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.}
 
 \item{...}{Additional arguments passed to plotting functions.}
 }

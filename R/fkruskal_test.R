@@ -9,15 +9,18 @@
 #'   in the output files. Default is \code{TRUE}.
 #' @param alpha Numeric. The significance level for the Kruskal-Wallis test and Dunn's
 #'   test. Default is  \code{0.05}.
-#' @param kruskal_assumptions_text Logical. If \code{TRUE}, includes a section about Kruskal-Wallis test assumptions in the output document. Default is \code{TRUE}.
 #' @param adjust Character string. Adjustment method for pairwise comparisons in Dunn's test. Options include \code{"holm", "hommel", "bonferroni", "sidak", "hs", "hochberg", "bh", "by", "fdr"} or \code{"none"}. Default is \code{"bonferroni"}, if you don't want to adjust the p value (not recommended), use  \code{p.adjust.method = "none"}.
-#' @param output_type Character string. Specifies the output format: \code{"pdf"}, \code{"word"}, \code{"excel"}, \code{"rmd"}, \code{"off"} (no file generated) or \code{"console"}. The option \code{"console"} forces output to be printed. Default is \code{"off"}.
-#' @param output_file Character string. The name of the output file (without extension).
-#'   If \code{NULL}, a default name is generated based on the dataset name. Default is \code{NULL}.
-#' @param output_dir Character string specifying the name of the directory of the output file. Default is  \code{tempdir()}. If the \code{output_file} already contains a directory name \code{output_dir} can be omitted, if used it overwrites the dir specified in \code{output_file}.
-#' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory Default is \code{FALSE}, to avoid unintended changes to the global environment. If the \code{output_dir} is specified \code{save_in_wdir} is overwritten with \code{output_dir}.
-#' @param close_generated_files Logical. If \code{TRUE}, closes open 'Excel' or 'Word' files depending on the output format. This to be able to save the newly generated files. 'Pdf' files should also be closed before using the function and cannot be automatically closed. Default is \code{FALSE}.
-#' @param open_generated_files Logical. If \code{TRUE}, opens the generated output files ('pdf', 'Word' or 'Excel') files depending on the output format. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.
+#' @param intro_text Logical. If \code{TRUE}, includes a section about Kruskal-Wallis test assumptions in the output document. Default is \code{TRUE}.
+#' @param close_generated_files Logical. If \code{TRUE}, closes open 'Excel' or 'Word' files depending on the output format. This to be able to save the newly generated file by the \code{f_aov()} function. 'Pdf' files should also be closed before using the function and cannot be automatically closed. Default is \code{FALSE}.
+#' @param open_generated_files Logical. If \code{TRUE}, Opens the generated output files ('pdf', 'Word' or 'Excel') files depending on the output format. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.
+#' @param output_type Character string specifying the output format: \code{"pdf"}, \code{"word"}, \code{"excel"}, \code{"rmd"}, \code{"console"} or \code{"off"} (no file generated). The option \code{"console"} forces output to be printed, the option \code{"rmd"} saves rmd code in the output object not in a file. Default is \code{"off"}.
+#' @param save_as Character string specifying the output file path (without extension).
+#'   If a full path is provided, output is saved to that location.
+#'   If only a filename is given, the file is saved in \code{tempdir()}.
+#'   If only a directory is specified (providing an existing directory with trailing slash),
+#'   the file is named "dataname_Kruskal_Wallis_output" in that directory. If an extension is provided the output format specified with option "output_type" will be overruled.
+#'   Defaults to \code{file.path(tempdir(), "dataname_summary.pdf")}.
+#' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.
 
 #' @return An object of class 'f_kruskal_test' containing:
 #' \itemize{
@@ -83,10 +86,9 @@ f_kruskal_test <- function(
   plot = TRUE,          # Show plots in output files
   alpha = 0.05,         # Set significance level alpha for Kruskall and dunn_test
   output_type = "off",
-  output_file = NULL,   # Specify the name of the file.
-  output_dir = NULL,    # Specify the name of the output dir to save the file in.
+  save_as = NULL,       # Specify the name of the file.
   save_in_wdir = FALSE, # Save file output in the working directory.
-  kruskal_assumptions_text = TRUE, # Print a short explanation about Kruskall-Wallis assumptions in the pdf or word output file
+  intro_text = TRUE, # Print a short explanation about Kruskall-Wallis assumptions in the pdf or word output file
   adjust = "bonferroni",           # Correction Method for pairwise comparisson in dunn_test.
   close_generated_files = FALSE,   # Closes either open excel or word files depending on the output format.
   open_generated_files = TRUE      # Open files after creation
@@ -150,7 +152,7 @@ f_kruskal_test <- function(
   }
 
   # Generate a temporary file path for "output.Rmd"
-  temp_output_dir <- tempdir()
+  temp_output_dir  <- tempdir()
   temp_output_file <- file.path(temp_output_dir, "output.Rmd")
 
   # Create the output file "output.Rmd" in tempdir()
@@ -162,6 +164,89 @@ f_kruskal_test <- function(
   if( !(output_type %in% c("pdf", "word", "excel", "rmd", "console" , "off")) ){
     stop("Character string specifying the output format (output_type = ) should be either: 'pdf', 'word', 'excel', 'console','rmd', 'off'")
   }
+
+  ##### Handle option "save_as = " #####
+  if(save_in_wdir == TRUE){
+    save_dir <- getwd()
+  }else{
+    save_dir <- tempdir()
+  }
+
+  #map the output type to extensions
+  output_type_map <- c(
+    "pdf"  = ".pdf",
+    "word" = ".docx",
+    "excel"= ".xlsx",
+    "rmd"  = ".rmd"
+  )
+
+  # If the user specifies a path, filename or save_in_wdir == TRUE an output file should be created
+  if (!is.null(save_as) || save_in_wdir == TRUE) {
+
+    if (!is.null(save_as)) {
+      #Remove backslash in save_as if needed
+      save_as <- gsub(pattern = "\\\\", replacement = "/", x = save_as)
+      file_extension_save_as <- unname(extract_extension(save_as))
+      if(file_extension_save_as[1] != FALSE){
+        file_extension <- file_extension_save_as
+      }
+    }
+
+    if(!exists("file_extension") && output_type %in% c("console", "off")){
+      # use helper get_save_path() to create output_path
+      output_path <- get_save_path(save_as = save_as,
+                                   default_name = paste(data_name, "Kruskal_Wallis_output", sep = "_"),
+                                   default_dir = save_dir,
+                                   file.ext = ".pdf"
+      )
+      #set output_type to default
+      output_type <- "pdf"
+
+    }
+    else if(!exists("file_extension") && output_type %in% c("pdf", "word", "excel", "rmd")){
+
+      #create extension based on input_type
+      file.ext <- unname(output_type_map[output_type])
+
+      # use helper get_save_path() to create output_path
+      output_path <- get_save_path(save_as = save_as,
+                                   default_name = paste(data_name,
+                                                        "Kruskal_Wallis_output",
+                                                        sep = "_"),
+                                   default_dir = save_dir,
+                                   file.ext = file.ext
+      )
+
+
+    }
+    else if(exists("file_extension")) {
+
+      # use helper get_save_path() to create output_path
+      output_path <- get_save_path(save_as = save_as,
+                                   default_name = paste(data_name,
+                                                        "Kruskal_Wallis_output",
+                                                        sep = "_"),
+                                   default_dir = save_dir,
+                                   file.ext = file_extension[1]
+      )
+      # reset the output type to match the user input extention in save_as
+      output_type <- file_extension[2]
+    }
+  } else {
+
+    #create extension based on input_type
+    file.ext <- unname(output_type_map[output_type])
+
+    # use helper get_save_path() to create output_path
+    output_path <- get_save_path(save_as = save_as,
+                                 default_name = paste(data_name,
+                                                      "Kruskal_Wallis_output",
+                                                      sep = "_"),
+                                 default_dir = save_dir,
+                                 file.ext = file.ext
+    )
+  }
+
 
   # Prevent output to console and keep files open when output is "rmd" format
   if(output_type == "rmd"){
@@ -180,39 +265,9 @@ f_kruskal_test <- function(
       system("taskkill /im EXCEL.EXE /f")
     }
 
-    # If there is not output_file name specified use the data_name
-    if (is.null(output_file)) {
-      # Set the file name
-      output_file  <- paste0(data_name,"_Kruskal_Wallis_output")
-    }
-
-    # If there is no output_dir specified and user setting is to save in working directory
-    if(is.null(output_dir) && save_in_wdir == TRUE){
-      # set the working dir to the location the file is saved
-      output_dir <- getwd()
-
-    } else if(is.null(output_dir) && save_in_wdir == FALSE){
-      # Get the dirname of output_file
-      output_dir <- dirname(output_file)
-
-      # Check if there is a dir (path) in the output file, if not use tempdir()
-      if(output_dir == "."){
-        output_dir <- temp_output_dir
-      }
-
-    }
-
-    # Stop if the output directory does not exist
-    if (!dir_exists(output_dir)) {
-      stop("The directory '", output_dir, "' does not exist.")
-    }
-
-    # dir_name is already extracted so rename file to basename.
-    output_file <- basename(output_file)
-
   }
 
-  # Create a list to store all outputs in this function and make it a class
+  # Create a list to store all outputs in this function
   output_list <- list()
 
 
@@ -245,9 +300,9 @@ f_kruskal_test <- function(
 
   generate_report <- function(output = TRUE) {
 
-  # This text reminds the user of the assumptions of an kruskal_assumptions_text it its show by default
+  # This text reminds the user of the assumptions of an intro_text it its show by default
   # but can be hidden.
-    if(kruskal_assumptions_text == TRUE){
+    if(intro_text == TRUE){
 
       cat("
 # Assumptions of the Kruskal-Wallis Test
@@ -313,7 +368,14 @@ Each group should ideally include at least five observations for reliable result
       output_list[[paste0(response_name,"_",predictor_name)]][["alpha"]]          <- alpha
       output_list[[paste0(response_name,"_",predictor_name)]][["DunnTest_adjust"]]<- adjust
 
-      cat("   \n     \n&nbsp;  \n   \n ")
+      # cat("   \n     \n&nbsp;  \n   \n ")
+      if(output_type != "rmd"){
+        # Pagebreak
+        cat("
+<div style=\"page-break-after: always;\"></div>
+\\newpage")
+      }
+
       cat("
 \n## Result of Kruskal-Wallis rank sum test  \n  \n")
       # Perform the Kruskal-Wallis test
@@ -358,6 +420,13 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 rep
 - A **positive Z** value indicates that the first group in the comparison has higher ranks (on average) than the second group.
 - A **negative Z** value indicates that the second group has higher ranks (on average) than the first group.    \n   \n")
 
+      if(output_type != "rmd"){
+        # Pagebreak
+        cat("
+<div style=\"page-break-after: always;\"></div>
+\\newpage")
+      }
+
       # Store dunn_test_result in ouput
       output_list[[paste0(response_name,"_",predictor_name)]][["dunn_test"]] <- dunn_test_result
 
@@ -374,6 +443,8 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 rep
       letter_df[[predictor_name]] <- row.names(letter_df)
       colnames(letter_df)[colnames(letter_df) == "cld$Letters"] <- "cld_letters"
 
+
+
       if(plot == TRUE){
 
       cat("  \n## Boxplot of: ", response_name, " by ", predictor_name,"  and Dunn's test post-hoc test  \n  \n")
@@ -381,8 +452,8 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 rep
       data2 <- merge(data, letter_df, by = predictor_name, all.x = TRUE)
 
       # Set the location for the letters in the boxplot.
-      y_max <- max(data[[response_name]])
-      y_min <- min(data[[response_name]])
+      y_max <- max(data[[response_name]], na.rm = TRUE)
+      y_min <- min(data[[response_name]], na.rm = TRUE)
 
       # Calculate a proportional position above the top of the plot
       y_position <- y_max + 0.08 * (y_max - y_min)  # 5% above ymax
@@ -423,9 +494,11 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 rep
       }
 
       if(output_type != "rmd"){
-      cat("   \n     \n&nbsp;  \n   \n ")
+        # Pagebreak
+        cat("
+<div style=\"page-break-after: always;\"></div>
+\\newpage")
       }
-      cat("   \n     \n&nbsp;  \n   \n ")
 
       cat("  \n## Data summary table  \n")
       f_pander(f_conditional_round(summary_table, digits = 2), line_break = 9)
@@ -433,8 +506,6 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 rep
       cat("**NOTE 1:** Dunn's test does not assume normality but requires similar distribution shapes, differing only in location or median. If distributions vary in shape or spread, the results may be less reliable.   \n")
       cat("**NOTE 2:** Dunn's tests compares medians not means. If two or more medians share the same grouping letter, we cannot show them to be different($\\alpha$ =", alpha,"). Yet, we also did not show them to be the same.   \n")
 
-      # Pagebreak
-      i <- i + 1
 
       if(output_type != "rmd" &&  i < length(lhs)){
         # Pagebreak
@@ -460,8 +531,10 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 rep
 
   # Here the documents are constructed.
   if (output_type %in% c("word", "pdf")) {
-    if (output_type == "word") { file.ext <- ".docx" }
-    if (output_type == "pdf")  { file.ext <- ".pdf"  }
+
+    # Show save location before knitting else it will not display in console.
+    message(paste0("Saving output in: ", output_path))
+
 
     # Create a temporary R Markdown file
     word_pdf_preamble <- function(){ paste0("
@@ -483,9 +556,6 @@ header-includes:
     # Prevent ## before printed output
     knitr::opts_chunk$set(comment = "")
 
-    # Show save location before knitting else it will not display in console.
-    message(paste0("Saving output in: ", output_dir, "\\", output_file, file.ext))
-
     # re-run generate_report, but this time capture its output to a string
     generated_markdown <- capture.output(generate_report(output = FALSE))
 
@@ -503,8 +573,7 @@ header-includes:
     # Create the RMarkdown file
     rmarkdown::render(
       temp_output_file,
-      output_file = output_file,
-      output_dir = output_dir,
+      output_file = output_path,
       intermediates_dir = temp_output_dir,
       knit_root_dir = temp_output_dir,
       quiet = TRUE,
@@ -513,16 +582,15 @@ header-includes:
 
     if(open_generated_files == TRUE){
     # Open the file with default program
-    f_open_file(paste0(output_dir, "/", output_file, file.ext))
+    f_open_file(output_path)
     }
 
     return(invisible(output_list))
 
   } else if (output_type == "excel") {
-    # set the wd to the location the file is saved
-    file.ext <- ".xlsx"
-    # Show save location before knitting else it will not display in console.
-    message(paste0("Saving output in: ", output_dir, "\\", output_file, file.ext))
+
+    # show the location were the file is saved
+    message(paste0("Saving output in: ", output_path))
 
     # Extract all post_hoc_summary_table tables and keep their names
     post_hoc_tables <- lapply(output_list, function(obj)
@@ -532,10 +600,11 @@ header-includes:
     names(post_hoc_tables) <- response_names
 
     # Write to an Excel file with each table in its own sheet
-    write_xlsx(post_hoc_tables, path = paste0(output_dir, "/", output_file, file.ext))
+    write_xlsx(post_hoc_tables, path = output_path)
 
+    # Open files after creation
     if(open_generated_files == TRUE){
-    f_open_file(paste0(output_dir, "/", output_file, file.ext))
+      f_open_file(output_path)
     }
 
     return(invisible(output_list))

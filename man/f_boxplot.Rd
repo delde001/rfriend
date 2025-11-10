@@ -9,8 +9,7 @@ f_boxplot(
   formula = NULL,
   fancy_names = NULL,
   output_type = "pdf",
-  output_file = NULL,
-  output_dir = NULL,
+  save_as = NULL,
   save_in_wdir = FALSE,
   close_generated_files = FALSE,
   open_generated_files = TRUE,
@@ -31,13 +30,16 @@ f_boxplot(
 
 \item{fancy_names}{An optional named vector mapping column names in \code{data} to more readable names for display in plots (name map). Defaults to \code{NULL}.}
 
-\item{output_type}{Character string, specifying the output format: \code{"pdf"}, \code{"word"}, \code{"rmd"} or \code{"png"}. Default is \code{"pdf"}.}
+\item{output_type}{Character string, specifying the output format: \code{"pdf"}, \code{"word"}, \code{"rmd"} or \code{"png"}. The option \code{"rmd"} saves rmd code in the output object not in a file. Default is \code{"pdf"}.}
 
-\item{output_file}{A character string, specifying the name of the output file (without extension). If \code{NULL}, a default name based on the dataset is generated.}
+\item{save_as}{Character string specifying the output file path (without extension).
+If a full path is provided, output is saved to that location.
+If only a filename is given, the file is saved in \code{tempdir()}.
+If only a directory is specified (providing an existing directory with trailing slash),
+the file is named "dataname_BoxPlot" in that directory. If an extension is provided the output format specified with option "output_type" will be overruled.
+Defaults to \code{file.path(tempdir(), "dataname_BoxPlot.pdf")}.}
 
-\item{output_dir}{Character string specifying the name of the directory of the output file. Default is  \code{tempdir()}. If the \code{output_file} already contains a directory name \code{output_dir} can be omitted, if used it overwrites the dir specified in \code{output_file}.}
-
-\item{save_in_wdir}{Logical. If \code{TRUE}, saves the file in the working directory Default is \code{FALSE}, to avoid unintended changes to the global environment. If the \code{output_dir} is specified \code{save_in_wdir} is overwritten with \code{output_dir}.}
+\item{save_in_wdir}{Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.}
 
 \item{close_generated_files}{Logical. If \code{TRUE}, closes open 'Word' files depending on the output format. This to be able to save the newly generated files. 'Pdf' files should also be closed before using the function and cannot be automatically closed.}
 

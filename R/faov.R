@@ -8,6 +8,7 @@
 #' @param norm_plots Logical. If \code{TRUE}, plots are included in the output files. Default is \code{TRUE}.
 #' @param ANCOVA Logical. If \code{TRUE}, prevents automatic conversion of predictors to factors, allowing for Analysis of Covariance (ANCOVA). Default is \code{FALSE}.
 #' @param transformation Logical or character string. If \code{TRUE}, or if \code{"bestnormalize"}, applies \code{bestNormalize()} transformation if residuals are not normal. If \code{"boxcox"} applies a boxcox transformation. If \code{FALSE} no transformation will be applied. Default is \code{TRUE}.
+#' @param force_transformation Character string. A vector containing the names of response variables that should be transformed regardless of the normality test. Default is \code{NULL}
 #' @param alpha Numeric. Significance level for ANOVA, post hoc tests, and Shapiro-Wilk test. Default is \code{0.05}.
 #' @param adjust Character string specifying the method used to adjust p-values
 #'   for multiple comparisons. Available methods include:
@@ -22,13 +23,17 @@
 #'     \item{"fdr"}{False Discovery Rate adjustment, controls the expected proportion
 #'                 of false positives among significant results.}
 #'   } Default is \code{"sidak"}.
-#' @param aov_assumptions_text Logical. If \code{TRUE}, includes a short explanation about ANOVA assumptions in the output file. Default is \code{TRUE}.
+#' @param intro_text Logical. If \code{TRUE}, includes a short explanation about ANOVA assumptions in the output file. Default is \code{TRUE}.
 #' @param close_generated_files Logical. If \code{TRUE}, closes open 'Excel' or 'Word' files depending on the output format. This to be able to save the newly generated file by the \code{f_aov()} function. 'Pdf' files should also be closed before using the function and cannot be automatically closed. Default is \code{FALSE}.
 #' @param open_generated_files Logical. If \code{TRUE}, Opens the generated output files ('pdf', 'Word' or 'Excel') files depending on the output format. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.
-#' @param output_type Character string specifying the output format: \code{"pdf"}, \code{"word"}, \code{"excel"}, \code{"rmd"}, \code{"console"} or \code{"off"} (no file generated). The option \code{"console"} forces output to be printed. Default is \code{"off"}.
-#' @param output_file Character string specifying the name of the output file. Default is "dataname_aov_output".
-#' @param output_dir Character string specifying the name of the directory of the output file. Default is  \code{tempdir()}. If the \code{output_file} already contains a directory name \code{output_dir} can be omitted, if used it overwrites the dir specified in \code{output_file}.
-#' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory Default is \code{FALSE}, to avoid unintended changes to the global environment. If the \code{output_dir} is specified \code{save_in_wdir} is overwritten with \code{output_dir}.
+#' @param output_type Character string specifying the output format: \code{"pdf"}, \code{"word"}, \code{"excel"}, \code{"rmd"}, \code{"console"} or \code{"off"} (no file generated). The option \code{"console"} forces output to be printed, the option \code{"rmd"} saves rmd code in the output object not in a file. Default is \code{"off"}.
+#' @param save_as Character string specifying the output file path (without extension).
+#'   If a full path is provided, output is saved to that location.
+#'   If only a filename is given, the file is saved in \code{tempdir()}.
+#'   If only a directory is specified (providing an existing directory with trailing slash),
+#'   the file is named "dataname_aov_output" in that directory. If an extension is provided the output format specified with option "output_type" will be overruled.
+#'   Defaults to \code{file.path(tempdir(), "dataname_summary.pdf")}.
+#' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.
 
 #' @return An object of class 'f_aov' containing results from \code{aov()}, normality tests, transformations, and post hoc tests. Using the option "output_type", it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and plot methods for 'f_aov' objects.
 
@@ -95,14 +100,14 @@ f_aov <- function(
     norm_plots = TRUE,            # Show plots in output files
     ANCOVA = FALSE,               # Prevent automatic conversion to factors of all predictors for ANCOVA
     transformation = TRUE,        # Preform transformation
+    force_transformation = NULL,  # force transformation for response var regardless of normality.
     alpha = 0.05,                 # Significance level for both aov, posthoc and Shapiro-Wilk Test
     adjust = "sidak",             # Specifying the method used to adjust p-values
-    aov_assumptions_text = TRUE,  # Print short explanation about aov assumptions in output file
+    intro_text = TRUE,  # Print short explanation about aov assumptions in output file
     close_generated_files = FALSE,# Closes either open excel or word files depending on the output format.
     open_generated_files = TRUE,  # Open files after creation
     output_type = "off",          # Output type can be excel, word, pdf, rmd, console, off
-    output_file = NULL,           # Specify the name of the file.
-    output_dir = NULL,            # Specify the name of the output dir to save the file in.
+    save_as = NULL,               # Specify the name of the output dir and file (name and type).
     save_in_wdir = FALSE          # Save file output in the working directory.
     )
 {
@@ -176,10 +181,91 @@ f_aov <- function(
   # Wrap lines in rmd output document
   f_wrap_lines()
 
+  # Create a list to store all outputs in this function
+  output_list <- list()
+
   # Parameter validation
   if( !(output_type %in% c("pdf", "word", "excel", "rmd", "console" , "off")) ){
     stop("Character string specifying the output format (output_type = ) should be either: 'pdf', 'word', 'excel', 'console','rmd', 'off'")
   }
+
+
+  #### Handle option "save_as = " ###
+  if(save_in_wdir == TRUE){
+    save_dir <- getwd()
+  }else{
+    save_dir <- tempdir()
+  }
+
+  #map the output type to extensions
+  output_type_map <- c(
+    "pdf"  = ".pdf",
+    "word" = ".docx",
+    "excel"= ".xlsx",
+    "rmd"  = ".rmd"
+  )
+
+  # If the user specifies a path, filename or save_in_wdir == TRUE an output file should be created
+  if (!is.null(save_as) || save_in_wdir == TRUE) {
+
+    if (!is.null(save_as)) {
+     #Remove backslash in save_as if needed
+     save_as <- gsub(pattern = "\\\\", replacement = "/", x = save_as)
+     file_extension_save_as <- unname(extract_extension(save_as))
+     if(file_extension_save_as[1] != FALSE){
+       file_extension <- file_extension_save_as
+     }
+    }
+
+    if(!exists("file_extension") && output_type %in% c("console", "off")){
+      # use helper get_save_path() to create output_path
+      output_path <- get_save_path(save_as = save_as,
+                                   default_name = paste(data_name, "aov_output", sep = "_"),
+                                   default_dir = save_dir,
+                                   file.ext = ".pdf"
+                                   )
+      #set output_type to default
+      output_type <- "pdf"
+
+    }
+    else if(!exists("file_extension") && output_type %in% c("pdf", "word", "excel", "rmd")){
+
+      #create extension based on input_type
+      file.ext <- unname(output_type_map[output_type])
+
+      # use helper get_save_path() to create output_path
+       output_path <- get_save_path(save_as = save_as,
+                                   default_name = paste(data_name, "aov_output", sep = "_"),
+                                   default_dir = save_dir,
+                                   file.ext = file.ext
+      )
+
+
+    }
+    else if(exists("file_extension")) {
+
+      # use helper get_save_path() to create output_path
+      output_path <- get_save_path(save_as = save_as,
+                                   default_name = paste(data_name, "aov_output", sep = "_"),
+                                   default_dir = save_dir,
+                                   file.ext = file_extension[1]
+                                   )
+      # reset the output type to match the user input extention in save_as
+      output_type <- file_extension[2]
+    }
+  } else {
+
+    #create extension based on input_type
+    file.ext <- unname(output_type_map[output_type])
+
+    # use helper get_save_path() to create output_path
+    output_path <- get_save_path(save_as = save_as,
+                                 default_name = paste(data_name, "aov_output", sep = "_"),
+                                 default_dir = save_dir,
+                                 file.ext = file.ext
+    )
+  }
+
 
   # Prevent output to console and keep files open when output is "rmd" format
     if(output_type == "rmd"){
@@ -198,40 +284,9 @@ f_aov <- function(
         system("taskkill /im EXCEL.EXE /f")
       }
 
-      # If there is not output_file name specified use the data_name
-      if (is.null(output_file)) {
-      # Set the file name
-      output_file  <- paste0(data_name,"_aov_output")
-      }
-
-      # If there is no output_dir specified and user setting is to save in working directory
-      if(is.null(output_dir) && save_in_wdir == TRUE){
-        # set the working dir to the location the file is saved
-        output_dir <- getwd()
-
-      } else if(is.null(output_dir) && save_in_wdir == FALSE){
-        # Get the dirname of output_file
-        output_dir <- dirname(output_file)
-
-        # Check if there is a dir (path) in the output file, if not use tempdir()
-        if(output_dir == "."){
-        output_dir <- temp_output_dir
-        }
-
-      }
-
-      # Stop if the output directory does not exist
-      if (!dir_exists(output_dir)) {
-        stop("The directory '", output_dir, "' does not exist.")
-      }
-
-      # dir_name is already extracted so rename file to basename.
-      output_file <- basename(output_file)
-
     }
 
-  # Create a list to store all outputs in this function
-  output_list <- list()
+
 
   # Convert the input to a character string and force lowercase for case‐insensitive matching
     if(is.character(transformation)){
@@ -271,15 +326,17 @@ f_aov <- function(
 
     # Ensure response and predictors are in the data
     for (response in response_names) {
+
       if (!(response %in% names(data))) {
         stop(paste("Response variable", response, "not found in the data."))
-        # Ensure the response variable is numeric
-        response_var <- data[[response]]
-        if (!is.numeric(response_var)) {
-          stop("The response variable must be numeric.")
-        }
-       }
-     }
+      }
+      # Ensure the response variable is numeric
+      response_var <- data[[response]]
+
+      if (!is.numeric(response_var)) {
+        stop("The response variable must be numeric.")
+      }
+    }
 
     for (predictor in predictor_names) {
       if (!(predictor %in% names(data))) {
@@ -301,7 +358,7 @@ generate_report <- function(output = TRUE) {
 
     # This text reminds the user of the assumptions of an aov
     # it its show by default but can be hidden.
-    if(aov_assumptions_text == TRUE){
+    if(intro_text == TRUE){
 
       cat("
 # Assumptions of ANOVA
@@ -354,16 +411,26 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
     # Create a new formula for each response, preserving interactions
     current_formula <- as.formula(paste0(response_name, "~", rhs))
 
+    # Document the data loss
+    n_before <- NULL
+    n_after  <- NULL
+
+    n_before <- nrow(data)
+    complete_idx  <- complete.cases(data[c(response_name, predictor_names)])
+    data_complete <- data[complete_idx, ]
+    n_after <- sum(complete_idx)
+
     cat("   \n  \n# Analysis of: ", response_name, "  \n")
     cat("  \n## Normality and homoscedasticity of residuals of: ", response_name, "  \n")
 
 
     # Perform ANOVA
-    aov_test <- aov(current_formula, data = data)
+    aov_test <- aov(current_formula, data = data_complete)
     output_list[[response_name]][["aov_test"]] <- aov_test
     res_aov <- residuals(aov_test)
     aov_summary <- summary(aov_test)
     output_list[[response_name]][["aov_summary"]] <- aov_summary
+    output_list[[response_name]][["aov_call"]] <- deparse(current_formula)
 
 
       # Perform levene test on residuals
@@ -371,7 +438,7 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
         "res_aov~interaction(",
         paste(predictor_names, collapse = ", "),
         ")"
-      )), data = data) #residuals(aov_test)~predictor_names
+      )), data = data_complete) #residuals(aov_test)~predictor_names
 
       # Generate text for interpretation of levene output
       if (levene_res$p > alpha) {
@@ -432,7 +499,7 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
       )
 
       # Perform Anderson-Darling normality test on
-      adt_res <- ad.test(res_aov)
+      adt_res <- nortest::ad.test(res_aov)
 
       if (as.numeric(adt_res$p.value) > alpha) {
         adt_res_intp_text <- paste0(
@@ -506,10 +573,8 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
   \\newpage")
       }
 
-    # If not normal, apply transformation
-
-
-    if (shapiro_res$p.value <  alpha || levene_res$p <  alpha) {
+  # If not normal or force_transformation directs to: apply transformation
+  if (shapiro_res$p.value <  alpha || levene_res$p <  alpha || response_name %in% force_transformation) {
       if (transformation == FALSE) {
           if (shapiro_res$p.value <  alpha){
           cat("   \n  \n**WARNING !!!**   \nBased on the Shapiro-Wilk Test on the aov residuals the response variable is **NOT** normal.   \n  \nPlease enable the transformation function (transformation == TRUE) in the f_aov function.   \n  \n")
@@ -522,24 +587,22 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
       if (transformation == "boxcox") {
           cat("\n   \n## Box-Cox transformation of: ", response_name, "  \n  \n")
 
-        capture.output(transformed_var <- f_boxcox(data[[response_name]],
+        capture.output(transformed_var <- f_boxcox(data_complete[[response_name]],
                                                    output_type = "rmd",
-                                                   alpha = alpha,
-                                                   plots = TRUE
+                                                   alpha = alpha
                                                    )
                             )
         cat(transformed_var$rmd)
 
         output_list[[response_name]][["boxcox"]] <-  transformed_var$transformed_data
-        data[[response_name]] <- transformed_var$transformed_data# Update the response variable in the data
+        data_complete[[response_name]] <- transformed_var$transformed_data# Update the response variable in the data
 
       }
 
-      if (transformation == "bestnormalize" ||
-          (transformation == TRUE)) {
+      if (transformation == "bestnormalize" || (transformation == TRUE)) {
 
           # Apply the f_bestNormalize function
-          transformed_var <- f_bestNormalize(data[[response_name]],
+          transformed_var <- f_bestNormalize(data_complete[[response_name]],
                                              data_name = response_name,
                                              output_type = "rmd",
                                              alpha = alpha
@@ -549,7 +612,7 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
           output_list[[response_name]][["bestNormalize"]] <-  transformed_var
 
           # Save the transformed data
-          data[[response_name]] <- transformed_var$transformed_data  # Update the response variable in the data
+          data_complete[[response_name]] <- transformed_var$transformed_data  # Update the response variable in the data
 
           # Print the ouput of f_bestNormalize
             cat(transformed_var$rmd)
@@ -558,7 +621,7 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
 
       if (transformation != FALSE) {
         # Perform ANOVA on transformed data
-        aov_test_transformed <- aov(current_formula, data = data)
+        aov_test_transformed <- aov(current_formula, data = data_complete)
         transformed_aov_res  <- residuals(aov_test_transformed)
         aov_summary_transformed <- summary(aov_test_transformed)
 
@@ -566,14 +629,14 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
         shapiro_res_transformed <- shapiro.test(transformed_aov_res)
 
         # Perform Anderson-Darling normality test on transformed aov residuals
-        adt_res_transformed <- ad.test(transformed_aov_res)
+        adt_res_transformed <- nortest::ad.test(transformed_aov_res)
 
         # Perform Levene's test on transformed aov residuals
         levene_res_transformed <- rstatix::levene_test(
           as.formula(
             paste0("transformed_aov_res~interaction(",
                    paste(predictor_names, collapse = ", "),
-                   ")")), data = data) #residuals(aov_test)~predictor_names
+                   ")")), data = data_complete) #residuals(aov_test)~predictor_names
 
         cat("
    \n## Normality and homoscedasticity of **TRANSFORMED residuals** of : ",
@@ -673,7 +736,7 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
         output_list[[response_name]][["transformed_adt_test"]]     <- adt_res_transformed
         output_list[[response_name]][["transformed_levene_test"]]  <- levene_res_transformed
 
-        cat("Check the plots in the figure below to assess normality.  \n")
+        cat("  \nCheck the **residual** plots of the **transformed data** in the figure below to assess normality.  \n")
 
         temp_file <- tempfile(fileext = ".png")
         png(temp_file, width = 7.8, height = 7.8, units = "in", res = 300)
@@ -711,14 +774,16 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
        }
     }
 
-    if(!is.null(aov_summary_transformed)){
+  if(!is.null(aov_summary_transformed)){
       #Overwrite earlier object with transformed output
       aov_test_out <- aov_test_transformed
       aov_summary  <- aov_summary_transformed
-      output_list[[response_name]][["Response_Transformed"]] <- TRUE
+      Response_Transformed <- TRUE
+      output_list[[response_name]][["Response_Transformed"]] <- Response_Transformed
     } else {
       aov_test_out <- aov_test
-      output_list[[response_name]][["Response_Transformed"]] <- FALSE
+      Response_Transformed <- FALSE
+      output_list[[response_name]][["Response_Transformed"]] <- Response_Transformed
     }
 
     # Extract p-values for the model terms
@@ -728,7 +793,7 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
     if (overall_p_value < alpha) {
 
       # Estimated Marginal Means for post hoc test
-      emm <- emmeans::emmeans(aov_test, specs = predictor_names)
+      emm <- emmeans::emmeans(aov_test_out, specs = predictor_names)
 
       # Perform post hoc test with adjustment
       mult_cld <- multcomp::cld(emm, alpha = alpha, Letters = letters, adjust = adjust)
@@ -751,27 +816,60 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
       summary_table <- capture.output(cat("No significant differences found based on ANOVA.\n"))
     }
 
-    if (Response_Transformed == TRUE){
-      # Print the output of the aov and cld summary table
-      if (shapiro_res_transformed$p.value <  alpha){
-        cat(
-          "  \n**WARNING !!!**   \nBased on the Shapiro-Wilk Test the transformed residuals are **NOT** normally distributed. Thus, **ANOVA results can be misleading, resort to other statistical tests.**   \n  \n"
-        )
+
+    #Show WARNING when assumptions of aov() are violated
+    if(Response_Transformed == TRUE){
+      if (levene_res_transformed$p <= alpha) {
+        cat("\n   \n**WARNING**   \n*Based on the 'Levene's Test' (",
+                round(levene_res_transformed$p, digits = 4), " < ", alpha, ") the transformed\n residuals do NOT have equal variance (heteroskedasticity). \nANOVA results can be misleading, resort to other statistical tests.*")
       }
-      if (levene_res_transformed$p <  alpha){
-        cat(
-          "  \n**WARNING !!!**   \nBased on the Levene's Test the transformed residuals do **NOT** have equal variance (Heteroskedasticity). Thus, **ANOVA results can be misleading, resort to other statistical tests.**  \n  \n"
-        )
+
+      if (shapiro_res_transformed$p.value <= alpha) {
+        cat("\n   \n**WARNING**   \n*Based on the Shapiro-Wilk Test (",
+                round(shapiro_res_transformed$p.value, digits = 4), " > ", alpha,") the transformed\n residuals are **NOT** normally distributed. \nANOVA results can be misleading, resort to other statistical tests.*")
+      }
+
+    } else {
+      if (levene_res$p <= alpha) {
+        cat("\n   \n**WARNING**   \n*Based on the 'Levene's Test' (",
+                round(levene_res$p, digits = 4), " < ", alpha, ")\nthe residuals do NOT have equal variance (heteroskedasticity).\nANOVA results can be misleading. \nENABLE the transformation option or resort to other statistical tests.*")
+      }
+      if (shapiro_res$p.value <= alpha) {
+        cat("\n   \n**WARNING**   \n*Based on the Shapiro-Wilk Test (",
+                round(shapiro_res$p.value, digits = 4), " > ", alpha,")\n the residuals are **NOT** normally distributed. \nANOVA results can be misleading. \nENABLE the transformation option or resort to other statistical tests.*")
       }
     }
 
+    if(n_before != n_after) {
+cat("\n   \n**WARNING**   \n *Removed ", n_before - n_after, " rows (",
+                     round((n_before - n_after)/n_before * 100, 1),
+                     "%) with missing values in ", response_name,".*", sep = "")
+    }
+
+
+    if(Response_Transformed == TRUE){
+      if(transformation == "bestnormalize" ||
+         transformation == TRUE){
     cat("
-   \n## ANOVA Summary ", response_name, "  \n")
+   \n## ANOVA Summary of '",transformed_var$transformation_name,"TRANSFORMED' repsone variable:", response_name, "  \n")
+      }
+
+      if(transformation == "boxcox"){
+    cat("
+   \n## ANOVA Summary of 'Box-Cox TRANSFORMED' repsone variable:", response_name, "  \n")
+      }
+    } else {
+      cat("
+   \n## ANOVA Summary of ", response_name, "  \n")
+    }
+
     cat(rmd_anova_summary(aov_test_out), "  \n  \n")
+    cat(paste("aov call: ", deparse(current_formula)))
     cat("&nbsp;\n  \n&nbsp;   \n  \n")
 
+
     if (!is.null(summary_table)) {
-      cat("  \n## Post Hoc Test Results ", response_name, "  \n")
+      cat("  \n## Post Hoc Test Results of ", response_name, "  \n")
       f_pander(summary_table)
       if(exists("mult_cld")){
       cat(paste(attr(mult_cld, "mesg"), collapse = "  \n"))
@@ -807,8 +905,9 @@ sink()
 
 # Here the documents are constructed.
 if (output_type %in% c("word", "pdf")) {
-  if (output_type == "word") { file.ext <- ".docx" }
-  if (output_type == "pdf")  { file.ext <- ".pdf"  }
+
+  # Show save location before knitting else it will not display in console.
+  message(paste0("Saving output in: ", output_path))
 
 # Create a temporary R Markdown file
   word_pdf_preamble <- function(){ paste0("
@@ -831,9 +930,6 @@ header-includes:
   # Prevent ## before printed output
   knitr::opts_chunk$set(comment = "")
 
-  # Show save location before knitting else it will not display in console.
-  message(paste0("Saving output in: ", output_dir, "\\", output_file, file.ext))
-
   # re-run generate_report, but this time capture its output to a string
   generated_markdown <- capture.output(generate_report(output = FALSE))
 
@@ -851,8 +947,7 @@ header-includes:
   # Create the RMarkdown file
   rmarkdown::render(
     temp_output_file,
-    output_file = output_file,
-    output_dir = output_dir,
+    output_file = output_path,
     intermediates_dir = temp_output_dir,
     knit_root_dir = temp_output_dir,
     quiet = TRUE,
@@ -862,15 +957,16 @@ header-includes:
   # Open files after creation
   if(open_generated_files == TRUE){
   # Open the file with default program
-  f_open_file(paste0(output_dir, "/", output_file, file.ext))
+  f_open_file(output_path)
   }
 
   return(invisible(output_list))
 
-    } else if (output_type == "excel") {
-      # set the wd to the location the file is saved
-      file.ext <- ".xlsx"
-      message(paste0("Saving output in: ", output_dir, "\\", output_file, file.ext))
+    }
+    else if (output_type == "excel") {
+
+      # show the location were the file is saved
+      message(paste0("Saving output in: ", output_path))
 
       # Extract all post_hoc_summary_table tables and keep their names
       post_hoc_tables <- lapply(output_list, function(obj)
@@ -880,17 +976,17 @@ header-includes:
       names(post_hoc_tables) <- response_names
 
       # Write to an Excel file with each table in its own sheet
-      write_xlsx(post_hoc_tables, path = paste0(output_dir, "/", output_file, file.ext))
+      write_xlsx(post_hoc_tables, path = output_path)
 
       # Open files after creation
       if(open_generated_files == TRUE){
-      f_open_file(paste0(output_dir, "/", output_file, file.ext))
+      f_open_file(output_path)
       }
-
 
       return(invisible(output_list))
 
-    } else if (output_type == "rmd"){
+    }
+    else if (output_type == "rmd"){
 
       if (is.null(opts_knit$get("output.dir"))) {
         opts_knit$set(output.dir = tempdir())
@@ -951,9 +1047,11 @@ print.f_aov <- function(x, ...) {
         cat("===========================================================\n")
       }
 
+    cat(paste("\n aov call: ", sublist$aov_call, "\n"))
 
     cat("\nTRANSFORMED Summary Table:\n")
     print(sublist$aov_summary)
+
 
     cat("\nTRANSFORMED Post-Hoc Analysis:\n")
     print(sublist$post_hoc_summary_table, row.names = FALSE, quote=FALSE)
@@ -975,8 +1073,11 @@ print.f_aov <- function(x, ...) {
       cat("   ANOVA of repsone variable: ", category, "\n")
       cat("===========================================================\n")
 
+      cat(paste("\n aov call: ", sublist$aov_call, "\n"))
+
       cat("\nSummary Table:\n")
       print(sublist$aov_summary)
+
 
       cat("\nPost-Hoc Analysis:\n")
       print(sublist$post_hoc_summary_table, row.names = FALSE, quote=FALSE)

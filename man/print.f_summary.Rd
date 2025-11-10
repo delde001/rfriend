@@ -9,7 +9,7 @@
 \arguments{
 \item{x}{Object of class f_summary}
 
-\item{col_width}{Integer. Specifies the maximum number of characters allowed in table header columns before a line break is inserted. Defaults to \code{10}.}
+\item{col_width}{Integer. Specifies the maximum number of characters allowed in table header columns before a line break is inserted. Defaults to \code{6}.}
 
 \item{table_width}{Integer or \code{NULL}. Defines the number of characters after which the table is split into separate sections. Defaults to \code{NULL}, meaning no break is applied.}
 

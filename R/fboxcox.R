@@ -33,16 +33,20 @@
 #' Performs a Box-Cox transformation on a dataset to stabilize variance and make the data more normally distributed. It also provides diagnostic plots and tests for normality. The transformation is based on code of MASS/R/boxcox.R. The function prints \eqn{\lambda} to the console and returns (output) the transformed data set.
 #'
 #' @param data A numeric vector or a data frame with a single numeric column. The data to be transformed.
-#' @param lambda A numeric vector of \eqn{\lambda} values to evaluate for the Box-Cox transformation. Default is \code{seq(-2, 2, 0.1)}.
+#' @param digits Numeric. Determines the accuracy of the estimate for lambda. Higher values increase computation time. Defaults to \code{3}.
+#' @param range A numeric vector of length 2 defining the search interval for lambda. Defaults to \code{c(-2, 2)}.
 #' @param plots Logical. If \code{TRUE}, plots log-likelihood of the Box-Cox transformation, Histograms and Q-Q plots of the original and transformed data. Default is \code{FALSE}.
-#' @param output_type Character string specifying the output format: \code{"pdf"}, \code{"word"}, \code{"rmd"}, \code{"off"} (no file generated) or \code{"console"}. The option \code{"console"} forces output to be printed. Default is \code{"off"}.
 #' @param close_generated_files Logical. If \code{TRUE}, closes open 'Word' files depending on the output format. This to be able to save the newly generated files. 'Pdf' files should also be closed before using the function and cannot be automatically closed.
 #' @param open_generated_files Logical. If \code{TRUE}, opens the generated output files ('pdf', 'Word' or 'Excel') files depending on the output format. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.
-#' @param output_file A character string specifying the name of the output file (without extension). If \code{NULL}, a default name based on the dataset name is generated.
-#' @param output_dir Character string specifying the name of the directory of the output file. Default is  \code{tempdir()}. If the \code{output_file} already contains a directory name \code{output_dir} can be omitted, if used it overwrites the dir specified in \code{output_file}.
-#' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory Default is \code{FALSE}, to avoid unintended changes to the global environment. If the \code{output_dir} is specified \code{save_in_wdir} is overwritten with \code{output_dir}.
+#' @param output_type Character string specifying the output format: \code{"pdf"}, \code{"word"}, \code{"rmd"}, \code{"off"} (no file generated) or \code{"console"}. The option \code{"console"} forces output to be printed. Default is \code{"off"}.
+#' @param save_as Character string specifying the output file path (without extension).
+#'   If a full path is provided, output is saved to that location.
+#'   If only a filename is given, the file is saved in \code{tempdir()}.
+#'   If only a directory is specified (providing an existing directory with trailing slash),
+#'   the file is named "data_name_aov_output" in that directory. If an extension is provided the output format specified with option "output_type" will be overruled.
+#'   Defaults to \code{file.path(tempdir(), "data_name_summary.pdf")}.
+#' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.
 #' @param transform.data Logical. If \code{TRUE}, returns the transformed data. Default is \code{TRUE}.
-#' @param interp Logical. If \code{TRUE} and fewer than 100 \eqn{\lambda} values are provided, interpolates for smooth plotting. Default is determined by log-likelihood of the Box-Cox transformation and the length of \eqn{\lambda}.
 #' @param eps A small positive value used to determine when to switch from the power transformation to the log transformation for numerical stability. Default is \code{1/50}.
 #' @param xlab Character string. Label for the x-axis in plots. Default is an expression object representing \eqn{\lambda}.
 #' @param ylab Character string. Label for the y-axis in plots. Default is "log-Likelihood".
@@ -141,10 +145,10 @@
 #' @export
 f_boxcox <- function(
     data = data,                  # Vector or a data.frame column
-    lambda = seq(-2, 2, 1 / 10),  # Vector of values of lambda
+    digits = 3,                   # Accuracy by how many digits lambda is estimated
+    range = c(-2, 2),             # The search interval for lambda.
     plots = FALSE,                # Show lambda est.histograms and QQ plots (TRUE) or not (FALSE)
     transform.data = TRUE,        # Specify the name of the file
-    interp = (plots && (length(lambda) < 100)), # Logical. Controls if spline interpolation is used
     eps = 1 / 50,                 # Tolerance for lambda. Defaults to 0.02.
     xlab = expression(lambda),    # X-axis title of plot
     ylab = "log-Likelihood",      # Y-axis title of plot
@@ -152,8 +156,7 @@ f_boxcox <- function(
     open_generated_files = TRUE,  # Open files after creation
     close_generated_files = FALSE,# Close open files to save a new one
     output_type = "off",          # Output type can be word, pdf, rmd, console
-    output_file = NULL,           # Specify the name of the file.
-    output_dir = NULL,            # Specify the name of the output dir to save the file in.
+    save_as = NULL,               # Specify the name of the output dir and file (name and type).
     save_in_wdir = FALSE,         # Save file output in the working directory.
     ...                           # Additional arguments for model fitting
     ) {
@@ -190,18 +193,11 @@ f_boxcox <- function(
   }, add = TRUE)
 
 
-  if(output_type != "rmd"){
-
-    if(close_generated_files == TRUE && output_type == "word"){
-      # Close all MS Word files to avoid conflicts (so save your work first)
-      system("taskkill /im WINWORD.EXE /f")
-    }
-
-    if(close_generated_files == TRUE && output_type == "excel"){
-      # Close all MS Word files to avoid conflicts (so save your work first)
-      system("taskkill /im EXCEL.EXE /f")
-    }
+  # Parameter validation
+  if( !(output_type %in% c("pdf", "word", "excel", "rmd", "console" , "off")) ){
+    stop("Character string specifying the output format (output_type = ) should be either: 'pdf', 'word', 'excel', 'console','rmd', 'off'")
   }
+
 
   # Generate a temporary file path for "output.Rmd"
   temp_output_dir  <- tempdir()
@@ -232,53 +228,132 @@ f_boxcox <- function(
   if (!is.data.frame(data)) stop("Input must be a numeric vector or data frame.")
   if (!is.numeric(data$y)) stop(paste0("The ", data_name," column in the data must be numeric."))
 
-  # set the wd to the location the file is saved and set the file name
-  if(is.null(output_file)){
-    # Set the file name
-    clean_data_name <- sub(".*\\$", "", data_name)  # Remove everything before the "$" symbol
-    output_file  <- paste0(clean_data_name,"_boxcox_output")
+
+  clean_data_name <- sub(".*\\$", "", data_name)  # Remove everything before the "$" symbol
+
+
+  #### Handle option "save_as = " ###
+  if(save_in_wdir == TRUE){
+    save_dir <- getwd()
+  }else{
+    save_dir <- tempdir()
   }
 
-  # If there is no output_dir specified and user setting is to save in working directory
-  if(is.null(output_dir) && save_in_wdir == TRUE){
-    # set the working dir to the location the file is saved
-    output_dir <- getwd()
+  #map the output type to extensions
+  output_type_map <- c(
+    "pdf"  = ".pdf",
+    "word" = ".docx",
+    "rmd"  = ".rmd"
+  )
 
-  } else if(is.null(output_dir) && save_in_wdir == FALSE){
-    # Get the dirname of output_file
-    output_dir <- dirname(output_file)
+  # If the user specifies a path, filename or save_in_wdir == TRUE an output file should be created
+  if (!is.null(save_as) || save_in_wdir == TRUE) {
 
-    # Check if there is a dir (path) in the output file, if not use tempdir()
-    if(output_dir == "."){
-      output_dir <- temp_output_dir
+    if (!is.null(save_as)) {
+      #Remove backslash in save_as if needed
+      save_as <- gsub(pattern = "\\\\", replacement = "/", x = save_as)
+      file_extension_save_as <- unname(extract_extension(save_as))
+      if(file_extension_save_as[1] != FALSE){
+        file_extension <- file_extension_save_as
+      }
     }
+
+    if(!exists("file_extension") && output_type %in% c("console", "off")){
+      # use helper get_save_path() to create output_path
+      output_path <- get_save_path(save_as = save_as,
+                                   default_name = paste(clean_data_name, "BoxCox_output", sep = "_"),
+                                   default_dir = save_dir,
+                                   file.ext = ".pdf"
+      )
+      #set output_type to default
+      output_type <- "pdf"
+
+    }
+    else if(!exists("file_extension") && output_type %in% c("pdf", "word", "excel", "rmd")){
+
+      #create extension based on input_type
+      file.ext <- unname(output_type_map[output_type])
+
+      # use helper get_save_path() to create output_path
+      output_path <- get_save_path(save_as = save_as,
+                                   default_name = paste(clean_data_name, "BoxCox_output", sep = "_"),
+                                   default_dir = save_dir,
+                                   file.ext = file.ext
+      )
+
+
+    }
+    else if(exists("file_extension")) {
+
+      # use helper get_save_path() to create output_path
+      output_path <- get_save_path(save_as = save_as,
+                                   default_name = paste(clean_data_name, "BoxCox_output", sep = "_"),
+                                   default_dir = save_dir,
+                                   file.ext = file_extension[1]
+      )
+      # reset the output type to match the user input extention in save_as
+      output_type <- file_extension[2]
+    }
+  } else {
+
+    #create extension based on input_type
+    file.ext <- unname(output_type_map[output_type])
+
+    # use helper get_save_path() to create output_path
+    output_path <- get_save_path(save_as = save_as,
+                                 default_name = paste(clean_data_name, "BoxCox_output", sep = "_"),
+                                 default_dir = save_dir,
+                                 file.ext = file.ext
+    )
   }
 
-  # Stop if the output directory does not exist
-  if (!dir_exists(output_dir)) {
-    stop("The directory '", output_dir, "' does not exist.")
+
+  # Prevent output to console and keep files open when output is "rmd" format
+  if(output_type == "rmd"){
+    close_generated_files <- FALSE
   }
 
-  # dir_name is already extracted so rename file to basename.
-  output_file <- basename(output_file)
+  if(output_type != "rmd"){
 
+    if(close_generated_files == TRUE && output_type == "word"){
+      # Close all MS Word files to avoid conflicts (so save your work first)
+      system("taskkill /im WINWORD.EXE /f")
+    }
+
+    if(close_generated_files == TRUE && output_type == "excel"){
+      # Close all MS Word files to avoid conflicts (so save your work first)
+      system("taskkill /im EXCEL.EXE /f")
+    }
+
+  }
+
+  #Create a Vector of potential values for lambda
+  lambda <- seq(min(range, na.rm = TRUE), max(range, na.rm = TRUE), 1 / 10^digits)
 
   # Extract and validate the response variable
   y <- data$y
-  if (any(y <= 0)) stop("Response variable must higher than zero.")
+  y_clean <- y[!is.na(y)]
+
+
+  if (any(y_clean <= 0)) stop("Response variable must higher than zero.")
 
   # Scale y for numerical stability
-  y <- y / exp(mean(log(y)))  # Geometric mean scaling
-  logy <- log(y)
-  n <- length(y)
+  y_clean <- y_clean / exp(mean(log(y_clean)))  # Geometric mean scaling
+  logy <- log(y_clean)
+  n <- length(y_clean)
 
   # Initialize log-likelihood
   loglik <- numeric(length(lambda))
   for (i in seq_along(lambda)) {
     la <- lambda[i]
-    yt <- if (abs(la) > eps) (y^la - 1) / la else logy * (1 + la * logy / 2)
+    yt <- if (abs(la) > eps) (y_clean^la - 1) / la else logy * (1 + la * logy / 2)
     loglik[i] <- -n / 2 * log(sum((yt - mean(yt))^2))
   }
+
+
+
+  # Interp Logical. Controls if spline interpolation is used
+  interp = (plots && (length(lambda) < 100))
 
   # Interpolation for smooth plotting
   if (interp) {
@@ -307,15 +382,17 @@ f_boxcox <- function(
 
 
   n <- length(data$y)
-  if(n<=5000){
-    #Shapiro on initial data
-    W0 <- signif(shapiro.test(data[[1]])$statistic, digits=4)
-    Shapiro.p.value0  <- signif(shapiro.test(data[[1]])$p.value, digits=4)
+  if (n <= 5000) {
+    # Shapiro on initial data (run once)
+    st0 <- shapiro.test(data[[1]])
+    W0 <- signif(st0$statistic, digits = 4)
+    Shapiro.p.value0 <- signif(st0$p.value, digits = 4)
     df0 <- data.frame(W0, Shapiro.p.value0)
 
-    #Shapiro on transformed data
-    W <- signif(shapiro.test(transformed_data[[1]])$statistic, digits=4)
-    Shapiro.p.value <- signif(shapiro.test(transformed_data[[1]])$p.value, digits=4)
+    # Shapiro on transformed data (run once)
+    st1 <- shapiro.test(transformed_data[[1]])
+    W <- signif(st1$statistic, digits = 4)
+    Shapiro.p.value <- signif(st1$p.value, digits = 4)
     df <- data.frame("lambda" = lambda_out, W, Shapiro.p.value)
   }
 
@@ -326,21 +403,21 @@ f_boxcox <- function(
   message("Shapiro-Wilks cannot be used with sample sizes > 5000.")
   }
 
-  output_list[["Shapiro_original_data"]]    <- df0
-  output_list[["Shapiro_transformed_data"]] <- df[1-2]
-  output_list[["lambda"]]                   <- df["lambda"]
   output_list[["transformed_data"]]         <- transformed_data[[1]]
   output_list[["original_data"]]            <- data[[1]]
+  output_list[["lambda"]]                   <- lambda_out
   output_list[["n"]]                        <- n
+  output_list[["missing values"]]           <- sum(is.na(y))
   output_list[["xlab"]]                     <- xlab
   output_list[["ylab"]]                     <- ylab
   output_list[["alpha"]]                    <- alpha
-  output_list[["lambda"]]                   <- lambda_out
-  output_list[["lambda_est"]]               <- lambda
+  output_list[["lambda_estimates"]]         <- lambda
   output_list[["loglik"]]                   <- loglik
   output_list[["conf_limit"]]               <- conf_limit
   output_list[["ylab"]]                     <- ylab
   output_list[["ylab"]]                     <- ylab
+  output_list[["Shapiro_original_data"]]    <- df0
+  output_list[["Shapiro_transformed_data"]] <- df[1-2]
 
   # Make a class from the output to print and plot
   class(output_list) <- "f_boxcox"
@@ -406,8 +483,7 @@ f_boxcox <- function(
 
 # Here the documents are constructed.
 if (output_type %in% c("word", "pdf")) {
-  if (output_type == "word") { file.ext <- ".docx" }
-  if (output_type == "pdf")  { file.ext <- ".pdf"  }
+
 
   # Create a temporary R Markdown file
   word_pdf_preamble <- function(){ paste0("
@@ -432,7 +508,7 @@ header-includes:
   knitr::opts_chunk$set(comment = "")
 
   # Show save location before knitting else it will not display in console.
-  message(paste0("Saving output in: ", output_dir, "\\", output_file, file.ext))
+  message(paste0("Saving output in: ", output_path))
 
   # re-run generate_report, but this time capture its output to a string
   generated_markdown <- capture.output(generate_report())
@@ -451,8 +527,7 @@ header-includes:
   # Create the RMarkdown file
   rmarkdown::render(
     temp_output_file,
-    output_file = output_file,
-    output_dir = output_dir,
+    output_file = output_path,
     intermediates_dir = temp_output_dir,
     knit_root_dir = temp_output_dir,
     quiet = TRUE,
@@ -461,7 +536,7 @@ header-includes:
 
     if(open_generated_files == TRUE){
     # Open the file with default program
-    f_open_file(paste0(output_dir, "/", output_file, file.ext))
+    f_open_file(output_path)
     }
 
   }

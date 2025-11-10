@@ -10,14 +10,14 @@ f_aov(
   norm_plots = TRUE,
   ANCOVA = FALSE,
   transformation = TRUE,
+  force_transformation = NULL,
   alpha = 0.05,
   adjust = "sidak",
-  aov_assumptions_text = TRUE,
+  intro_text = TRUE,
   close_generated_files = FALSE,
   open_generated_files = TRUE,
   output_type = "off",
-  output_file = NULL,
-  output_dir = NULL,
+  save_as = NULL,
   save_in_wdir = FALSE
 )
 }
@@ -31,6 +31,8 @@ f_aov(
 \item{ANCOVA}{Logical. If \code{TRUE}, prevents automatic conversion of predictors to factors, allowing for Analysis of Covariance (ANCOVA). Default is \code{FALSE}.}
 
 \item{transformation}{Logical or character string. If \code{TRUE}, or if \code{"bestnormalize"}, applies \code{bestNormalize()} transformation if residuals are not normal. If \code{"boxcox"} applies a boxcox transformation. If \code{FALSE} no transformation will be applied. Default is \code{TRUE}.}
+
+\item{force_transformation}{Character string. A vector containing the names of response variables that should be transformed regardless of the normality test. Default is \code{NULL}}
 
 \item{alpha}{Numeric. Significance level for ANOVA, post hoc tests, and Shapiro-Wilk test. Default is \code{0.05}.}
 
@@ -48,19 +50,22 @@ for multiple comparisons. Available methods include:
               of false positives among significant results.}
 } Default is \code{"sidak"}.}
 
-\item{aov_assumptions_text}{Logical. If \code{TRUE}, includes a short explanation about ANOVA assumptions in the output file. Default is \code{TRUE}.}
+\item{intro_text}{Logical. If \code{TRUE}, includes a short explanation about ANOVA assumptions in the output file. Default is \code{TRUE}.}
 
 \item{close_generated_files}{Logical. If \code{TRUE}, closes open 'Excel' or 'Word' files depending on the output format. This to be able to save the newly generated file by the \code{f_aov()} function. 'Pdf' files should also be closed before using the function and cannot be automatically closed. Default is \code{FALSE}.}
 
 \item{open_generated_files}{Logical. If \code{TRUE}, Opens the generated output files ('pdf', 'Word' or 'Excel') files depending on the output format. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.}
 
-\item{output_type}{Character string specifying the output format: \code{"pdf"}, \code{"word"}, \code{"excel"}, \code{"rmd"}, \code{"console"} or \code{"off"} (no file generated). The option \code{"console"} forces output to be printed. Default is \code{"off"}.}
+\item{output_type}{Character string specifying the output format: \code{"pdf"}, \code{"word"}, \code{"excel"}, \code{"rmd"}, \code{"console"} or \code{"off"} (no file generated). The option \code{"console"} forces output to be printed, the option \code{"rmd"} saves rmd code in the output object not in a file. Default is \code{"off"}.}
 
-\item{output_file}{Character string specifying the name of the output file. Default is "dataname_aov_output".}
+\item{save_as}{Character string specifying the output file path (without extension).
+If a full path is provided, output is saved to that location.
+If only a filename is given, the file is saved in \code{tempdir()}.
+If only a directory is specified (providing an existing directory with trailing slash),
+the file is named "dataname_aov_output" in that directory. If an extension is provided the output format specified with option "output_type" will be overruled.
+Defaults to \code{file.path(tempdir(), "dataname_summary.pdf")}.}
 
-\item{output_dir}{Character string specifying the name of the directory of the output file. Default is  \code{tempdir()}. If the \code{output_file} already contains a directory name \code{output_dir} can be omitted, if used it overwrites the dir specified in \code{output_file}.}
-
-\item{save_in_wdir}{Logical. If \code{TRUE}, saves the file in the working directory Default is \code{FALSE}, to avoid unintended changes to the global environment. If the \code{output_dir} is specified \code{save_in_wdir} is overwritten with \code{output_dir}.}
+\item{save_in_wdir}{Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.}
 }
 \value{
 An object of class 'f_aov' containing results from \code{aov()}, normality tests, transformations, and post hoc tests. Using the option "output_type", it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and plot methods for 'f_aov' objects.
