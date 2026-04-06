@@ -1,9 +1,13 @@
-# Correlation Plots with Factor Detection and Customization
+# Correlation Plots with Factor Detection, Customization, and Multiple Correlation Coefficients
 
-Creates correlation plots for numeric variables in a data frame,
-optionally incorporating factors for coloring and shaping points. It
-supports automatic detection of factors, customization of plot
-aesthetics, and the generation of separate legend files.
+Creates correlation plots for numeric variables in a data frame. The
+upper triangle displays Pearson \\r\\, Spearman \\\rho\\, and Kendall
+\\\tau\\ simultaneously for each pair. Factor variables are
+automatically detected and used for grouping, i.e. point colouring and
+shaping. Ordinal variables are supported via `ordinal_vars`: their
+diagonal labels are italicised and Pearson \\r\\ is greyed and bracketed
+for any pair that involves them.A separate legend file documents both
+the grouping factors and the meaning of all three correlation symbols.
 
 ## Usage
 
@@ -12,14 +16,19 @@ f_corplot(
   data,
   detect_factors = TRUE,
   factor_table = FALSE,
+  factor_exclude = NULL,
+  factor_select = NULL,
+  unique_num_treshold = 8,
+  repeats_threshold = 2,
   color_factor = "auto",
   shape_factor = "auto",
   print_legend = TRUE,
   fancy_names = NULL,
+  ordinal_vars = NULL,
   width = 15,
   height = 15,
   res = 600,
-  pointsize = 8,
+  pointsize = 10,
   close_generated_files = FALSE,
   open_generated_files = TRUE,
   output_type = "word",
@@ -32,127 +41,144 @@ f_corplot(
 
 - data:
 
-  A `data.frame` containing the dataset to be visualized. Must include
-  at least two numeric variables.
+  A `data.frame` containing the dataset. Must include at least two
+  numeric variables.
 
 - detect_factors:
 
-  Logical. If `TRUE`, the function automatically detects factor
-  variables in the dataset for coloring and shaping points. Defaults to
-  `TRUE`.
+  Logical. If `TRUE`, factor variables are automatically detected for
+  colouring and shaping points. Default `TRUE`.
 
 - factor_table:
 
-  Logical. If `TRUE`, prints a detailed table about the properties of
-  the converted factors to the console. Default is FALSE, so no property
-  table will be printed to the console.
+  Logical. If `TRUE`, prints a detailed table of converted factors to
+  the console. Default `FALSE`.
+
+- factor_exclude:
+
+  A character vector specifying the names of the columns NOT to convert
+  into factors. If `NULL`, no columns are excluded. Default is `NULL`.
+
+- factor_select:
+
+  A character vector specifying the names of the columns to convert into
+  factors. If `NULL`, the function automatically detects columns that
+  should be factors based on their data type and unique value count.
+  Default is `NULL`.
+
+- unique_num_treshold:
+
+  Numeric. A threshold of the amount of unique numbers a numeric column
+  should have to keep it numeric, i.e. omit factor conversion. Default
+  `8`.
+
+- repeats_threshold:
+
+  Numeric. A threshold of the minimal number of repeats a numeric column
+  should have to convert it to a factor. Default `2`.
 
 - color_factor:
 
-  Character. The name of the factor variable to use for point colors. If
-  set to `"auto"`, it is automatically determined based on detected
-  factors. Defaults to `"auto"`.
+  Character. Name of the factor variable used for point colours;
+  `"auto"` selects automatically. Default `"auto"`.
 
 - shape_factor:
 
-  Character. The name of the factor variable to use for point shapes. If
-  set to `"auto"`, it is automatically determined based on detected
-  factors. Defaults to `"auto"`.
+  Character. Name of the factor variable used for point shapes; `"auto"`
+  selects automatically. Default `"auto"`.
 
 - print_legend:
 
-  Logical. If `TRUE`, a separate legend file is created and displayed.
-  Defaults to `TRUE`.
+  Logical. If `TRUE`, a separate legend file is created. Default `TRUE`.
 
 - fancy_names:
 
-  Named character vector or `NULL`. Optional mapping of column names to
-  more readable names for display in plots and legends.
+  Named character vector or `NULL`. Maps column names to display names
+  used in the plot and legend.
+
+- ordinal_vars:
+
+  Character vector or `NULL`. Names of variables to treat as ordinal.
+  Ordered factors are coerced to integer ranks; other non-numeric types
+  are coerced similarly. Their diagonal labels are italicised and
+  Pearson \\r\\ is greyed and bracketed for any pair that involves them.
+  Ordinal variables are included in the correlation panels but excluded
+  from aesthetic factor detection. Default `NULL`.
 
 - width:
 
-  Numeric. The width of the output plot in centimeters (default 15 cm).
+  Numeric. Plot width in centimetres. Default 15.
 
 - height:
 
-  Numeric. The height of the output plot in centimeters (default 15 cm).
+  Numeric. Plot height in centimetres. Default 15.
 
 - res:
 
-  Numeric. The resolution (in dots per inch) for the output plot image
-  (defaults 1000 dpi).
+  Numeric. Resolution in DPI. Default 600.
 
 - pointsize:
 
-  Numeric. The base font size for text in the plot image. Defaults to 8.
+  Numeric. Base font size. Default 8.
 
 - close_generated_files:
 
-  Logical. If `TRUE`, closes open 'Word' files depending on the output
-  format. This to be able to save the newly generated files. 'Pdf' files
-  should also be closed before using the function and cannot be
-  automatically closed. Default is `FALSE`.
+  Logical. Closes open Excel or Word (NOT pdf) files before writing,
+  depending on the output format. Works on Windows (taskkill), macOS
+  (pkill) and Linux (pkill/soffice). Default `FALSE`. **WARNING:**
+  Always save your work before using this option!!
 
 - open_generated_files:
 
-  Logical. If `TRUE`, Opens the generated 'Word' output files. This to
-  directly view the results after creation. Files are stored in
-  tempdir(). Default is `TRUE`.
+  Logical. If `TRUE`, opens generated output files automatically.
+  Default `TRUE`.
 
 - output_type:
 
-  Character string specifying the output format: "pdf", "word", "png" or
-  "rmd". Default is "word".
+  Character. One of `"pdf"`, `"word"`, `"png"`, or `"rmd"`. Default
+  `"word"`.
 
 - save_as:
 
-  Character string specifying the output file path (without extension).
-  If a full path is provided, output is saved to that location. If only
-  a filename is given, the file is saved in
-  [`tempdir()`](https://rdrr.io/r/base/tempfile.html). If only a
-  directory is specified (providing an existing directory with trailing
-  slash), the file is named "dataname_CorPlot" in that directory. If an
-  extension is provided the output format specified with option
-  "output_type" will be overruled. Defaults to
-  `file.path(tempdir(), "dataname_CorPlot.docx")`.
+  Character or `NULL`. Output file path without extension. A full path,
+  a filename, or a directory (with trailing slash) are all accepted.
+  Providing an extension overrides `output_type`. Default saves to
+  [`tempdir()`](https://rdrr.io/r/base/tempfile.html).
 
 - save_in_wdir:
 
-  Logical. If `TRUE`, saves the file in the working directory. Default
-  is `FALSE`, this avoid unintended changes to the global environment.
-  If `save_as` location is specified `save_in_wdir` is overwritten by
-  `save_as`.
+  Logical. If `TRUE`, saves to the working directory. Overridden by
+  `save_as`. Default `FALSE`.
 
 ## Value
 
-Output is a 'Word' document with:
-
-- A correlation plot.
-
-- A legend if applicable.
-
-Using the option "output_type", it can also generate output in the form
-of: R Markdown code, 'pdf', or 'PNG' files. No value is returned to the
-R environment; instead, files are saved, and they are opened
-automatically if running on Windows.
+No value is returned to the R environment. Output files are saved and
+opened automatically when running on Windows.
 
 ## Details
 
-- Factor Detection: If `detect_factors` is enabled, up to two factors
-  are automatically detected from the dataset and used for coloring
-  (`color_factor`) and shaping (`shape_factor`) points in the plot.
+- **Three correlations per panel:** Every upper-triangle panel shows
+  \\r\\ (Pearson), \\\rho\\ (Spearman), and \\\tau\\ (Kendall) stacked
+  vertically, so the reader can choose the most appropriate coefficient
+  for each variable pair.
 
-- Customization: Users can manually specify which factors to use by
-  setting `color_factor` and/or (`shape_factor`). Non-factor variables
-  are converted into factors automatically, with a message indicating
-  this conversion.
+- **Ordinal variables:** Specify column names with `ordinal_vars`. Those
+  variables appear in italic on the diagonal. For any pair where at
+  least one variable is ordinal, Pearson \\r\\ is shown greyed and in
+  parentheses to signal it is technically inappropriate; Spearman and
+  Kendall remain prominent.
 
-- Legend Generation: A separate legend file is created when factors are
-  used or if `print_legend` is explicitly set to `TRUE`.
+- **Factor detection:** Only unordered factors are used for colour/shape
+  aesthetics. Ordered factors
+  ([`is.ordered()`](https://rdrr.io/r/base/factor.html)) are treated as
+  ordinal data, not as grouping variables.
 
-The function uses numeric variables in the dataset for scatterplots and
-computes Pearson correlations displayed in the upper triangle of the
-correlation matrix.
+- **Legend:** The legend file documents the grouping factor levels (when
+  present) and always includes an explanation of all three correlation
+  symbols whenever a legend is generated.
+
+- **Constant columns:** Zero-variance columns produce `NA` in all
+  correlation panels rather than crashing.
 
 This function requires
 \[Pandoc\](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3
@@ -172,46 +198,33 @@ or higher), a universal document converter.
 
 - If Pandoc is not found, this function may not work as intended.
 
-## Note
-
-- At least two numeric variables are required in the dataset; otherwise,
-  an error is thrown.
-
-- If more than two factors are detected, only the first two are used
-  with a warning message.
-
 ## Author
 
-Sander H. van Delden <plantmind@proton.me>  
+Sander H. van Delden <plantmind@proton.me>
 
 ## Examples
 
 ``` r
-# Example usage:
-data("mtcars")
-
+data(mtcars)
 mtcars_sub <- subset(mtcars, select = -c(am, qsec, vs))
-# Customizing factors:
 f_corplot(mtcars_sub,
-           shape_factor = "cyl",
-           color_factor = "gear",
-           output_type = "png",
-           open_generated_files = FALSE
-           )
+          color_factor = "gear",
+          shape_factor = "cyl",
+          output_type  = "png",
+          open_generated_files = FALSE)
 #> 
-#> Variable: gear was converted to a factor
-#> Variable: cyl was converted to a factor  
-#> Saving output in: /tmp/RtmpDUIw9V/mtcars_sub_CorPlot.png and /tmp/RtmpDUIw9V/mtcars_sub_Legend.png
+#> Variable 'gear' was converted to a factor.
+#> Variable 'cyl' was converted to a factor.
+#> Saving output in: /tmp/RtmpyM0xyc/mtcars_sub_CorPlot.png and /tmp/RtmpyM0xyc/mtcars_sub_Legend.png
 
-
-# Output to MS Word and add fancy column names, only adjusting two of the four variable names.
+# With ordinal variables
 data(iris)
-fancy_names <- c(Sepal.Length = "Sepal Length (cm)", Sepal.Width = "Sepal Width (cm)")
+fancy_names <- c(Sepal.Length = "Sepal Length (cm)",
+                 Sepal.Width  = "Sepal Width (cm)")
 f_corplot(iris,
-           fancy_names = fancy_names,
-           output_type = "word",
-           open_generated_files = FALSE
-           )
-#> Saving output in: /tmp/RtmpDUIw9V/iris_CorPlot.docx
-
+          fancy_names  = fancy_names,
+          ordinal_vars = "Petal.Width",
+          output_type  = "png",
+          open_generated_files = FALSE)
+#> Saving output in: /tmp/RtmpyM0xyc/iris_CorPlot.png and /tmp/RtmpyM0xyc/iris_Legend.png
 ```

@@ -9,7 +9,7 @@ provides diagnostic checks, and generates comprehensive reports."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">rfriend</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">2.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -46,7 +46,7 @@ provides diagnostic checks, and generates comprehensive reports.</p>
 <span>  alpha <span class="op">=</span> <span class="fl">0.05</span>,</span>
 <span>  plots <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  data_name <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  output_type <span class="op">=</span> <span class="st">"off"</span>,</span>
+<span>  output_type <span class="op">=</span> <span class="st">"default"</span>,</span>
 <span>  save_as <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  save_in_wdir <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  close_generated_files <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -76,7 +76,19 @@ provides diagnostic checks, and generates comprehensive reports.</p>
 
 
 <dt id="arg-output-type">output_type<a class="anchor" aria-label="anchor" href="#arg-output-type"></a></dt>
-<dd><p>Character string specifying the output format: <code>"pdf"</code>, <code>"word"</code>, <code>"rmd"</code>, <code>"off"</code> (no file generated) or <code>"console"</code>. The option <code>"console"</code> forces output to be printed. Default is <code>"off"</code>.</p></dd>
+<dd><p>Character string specifying the output format. Default is <code>"default"</code>.</p><ul><li><p><code>"default"</code>: Returns the object and lets R decide whether
+    to print; auto-prints if unassigned, silent if assigned to a variable.
+    Use <code>print(result)</code> or <code>plot(result)</code> to display the
+    returned object.</p></li>
+<li><p><code>"console"</code>: Forces immediate printing to the console
+    regardless of object assignment.</p></li>
+<li><p><code>"pdf"</code>, <code>"word"</code>, <code>"excel"</code>: Saves results to a
+    file of the corresponding format. See <code>save_as</code>,
+    <code>save_in_wdir</code>, and <code>open_generated_files</code> for file
+    path and opening behavior.</p></li>
+<li><p><code>"rmd"</code>: Stores the raw markdown string inside the returned
+    object for use in R Markdown documents.</p></li>
+</ul></dd>
 
 
 <dt id="arg-save-as">save_as<a class="anchor" aria-label="anchor" href="#arg-save-as"></a></dt>
@@ -93,7 +105,7 @@ Defaults to <code>file.path(tempdir(), "data_name_transformed.pdf")</code>.</p><
 
 
 <dt id="arg-close-generated-files">close_generated_files<a class="anchor" aria-label="anchor" href="#arg-close-generated-files"></a></dt>
-<dd><p>Logical. If <code>TRUE</code>, closes open 'Word' files. This to be able to save the newly generated file by the <code>f_bestNormalize()</code> function. 'Pdf' files should also be closed before using the function and cannot be automatically closed. Default is <code>FALSE</code>.</p></dd>
+<dd><p>Logical. Closes open Excel or Word (NOT pdf) files before writing, depending on the output format. Works on Windows (taskkill), macOS (pkill) and Linux (pkill/soffice). Default <code>FALSE</code>. <strong>WARNING:</strong> Always save your work before using this option!!</p></dd>
 
 
 <dt id="arg-open-generated-files">open_generated_files<a class="anchor" aria-label="anchor" href="#arg-open-generated-files"></a></dt>
@@ -114,8 +126,7 @@ Defaults to <code>file.path(tempdir(), "data_name_transformed.pdf")</code>.</p><
 <li><p><code>shapiro_transformed</code> Shapiro-Wilk test results for transformed data.</p></li>
 <li><p><code>norm_stats</code> Data frame of normality statistics for all methods.</p></li>
 <li><p><code>rmd</code> Rmd code if outputype = "rmd".</p></li>
-</ul><p>Also generates reports in specified formats, when using output to console and plots = TRUE, the function prints QQ-plots, Histograms and a summary data transformation report.</p>
-<p>#' @return An object of class 'f_bestNormalize' containing results from <code>"bestNormalize"</code>, the input data, transformed data, Shapiro-Wilk test on original and transformed data. Using the option "output_type", it can also generate output in the form of: R Markdown code, 'Word', or 'pdf' files. Includes print and plot methods for objects of class 'f_bestNormalize'.</p>
+</ul><p>Also generates reports in 'Word', or 'pdf' files. When using output to console and plots = TRUE, the function prints QQ-plots, Histograms and a summary data transformation report. Includes print and plot methods for objects of class 'f_bestNormalize'.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -141,78 +152,122 @@ Available at: <a href="https://cran.r-project.org/package=bestNormalize" class="
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
-<span class="r-in"><span><span class="co"># Create some skewed data (e.g., using a log-normal distribution).</span></span></span>
-<span class="r-in"><span><span class="va">skewed_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Lognormal.html" class="external-link">rlnorm</a></span><span class="op">(</span><span class="fl">100</span>, meanlog <span class="op">=</span> <span class="fl">0</span>, sdlog <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Use set.seed to keep the outcome of bestNormalize stable.</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Transform the data and store all information in f_bestNormalize_out.</span></span></span>
-<span class="r-in"><span><span class="va">f_bestNormalize_out</span> <span class="op">&lt;-</span> <span class="fu">f_bestNormalize</span><span class="op">(</span><span class="va">skewed_data</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># Create some skewed data (e.g., using a log-normal distribution).</span></span></span>
+<span class="r-in"><span><span class="va">skewed_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Lognormal.html" class="external-link">rlnorm</a></span><span class="op">(</span><span class="fl">100</span>, meanlog <span class="op">=</span> <span class="fl">0</span>, sdlog <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Print the output.</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">f_bestNormalize_out</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># Basic usage: transform and store the full result object.</span></span></span>
+<span class="r-in"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu">f_bestNormalize</span><span class="op">(</span><span class="va">skewed_data</span>, data_name <span class="op">=</span> <span class="st">"Skewed log-normal data"</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Print a summary of the transformation.</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Data transformation of skewed_data using `bestNormalize`: Quantile Normalization (ORQ) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Original Data Shapiro-Wilk Test:    W = 0.5823   p-value = 2.009e-15 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Data transformation of Skewed log-normal data using `bestNormalize`: Quantile Normalization (ORQ) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Original Data Shapiro-Wilk Test:    W = 0.7302   p-value = 2.887e-12 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Transformed Data Shapiro-Wilk Test: W = 0.9996   p-value = 1 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Below are all considered transformations: [Pearson P / df, lower =&gt; more normal]   (n=100)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                Transformation Normality_Stat</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                    arcsinh(x)          2.324</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                       Box-Cox          2.402</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                  Center+scale         14.180</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    Double Reversed Log_b(x+a)         47.855</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                        Exp(x)        115.065</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                 Log-transform          1.674</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  Quantile Normalization (ORQ)          0.062</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                   sqrt(x + a)          3.702</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                   Yeo-Johnson          1.362</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                       Box-Cox          0.764</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                  Center+scale          8.356</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    Double Reversed Log_b(x+a)         25.308</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                        Exp(x)        102.684</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                 Log-transform          0.660</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  Quantile Normalization (ORQ)          0.036</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                   sqrt(x + a)          2.246</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                   Yeo-Johnson          0.582</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Check the normality plots, by using the plot() function or 'plots = TRUE' option</span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Show histograms and QQplots.</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">f_bestNormalize_out</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># Inspect normality statistics for all candidate transformations.</span></span></span>
+<span class="r-in"><span><span class="va">result</span><span class="op">$</span><span class="va">norm_stats</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                 Transformation Normality_Stat</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1                   arcsinh(x)          2.324</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2                      Box-Cox          0.764</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3                 Center+scale          8.356</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4   Double Reversed Log_b(x+a)         25.308</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5                       Exp(x)        102.684</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6                Log-transform          0.660</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7 Quantile Normalization (ORQ)          0.036</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8                  sqrt(x + a)          2.246</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9                  Yeo-Johnson          0.582</span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Plot histograms and QQ-plots for original vs. transformed data.</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="f_bestNormalize-1.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Directly store the transformed_data from f_bestNormalize and force to show</span></span></span>
-<span class="r-in"><span><span class="co"># plots and transformation information.</span></span></span>
-<span class="r-in"><span><span class="va">transformed_data</span> <span class="op">&lt;-</span> <span class="fu">f_bestNormalize</span><span class="op">(</span><span class="va">skewed_data</span>, output_type <span class="op">=</span> <span class="st">"console"</span><span class="op">)</span><span class="op">$</span><span class="va">transformed_data</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Data transformation of skewed_data using `bestNormalize`: Quantile Normalization (ORQ) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Original Data Shapiro-Wilk Test:    W = 0.5823   p-value = 2.009e-15 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Transformed Data Shapiro-Wilk Test: W = 0.9996   p-value = 1 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Below are all considered transformations: [Pearson P / df, lower =&gt; more normal]   (n=100)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                Transformation Normality_Stat</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                    arcsinh(x)          2.324</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                       Box-Cox          2.402</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                  Center+scale         14.180</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    Double Reversed Log_b(x+a)         47.855</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                        Exp(x)        115.065</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                 Log-transform          1.674</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  Quantile Normalization (ORQ)          0.062</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                   sqrt(x + a)          3.702</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                   Yeo-Johnson          1.362</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Check the normality plots, by using the plot() function or 'plots = TRUE' option</span>
+<span class="r-in"><span><span class="co"># Use plots = TRUE to auto-plot when output_type = "default" (default).</span></span></span>
+<span class="r-in"><span><span class="va">result2</span> <span class="op">&lt;-</span> <span class="fu">f_bestNormalize</span><span class="op">(</span><span class="va">skewed_data</span>, plots <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="f_bestNormalize-2.png" alt="" width="700" height="433"></span>
 <span class="r-plt img"><img src="f_bestNormalize-3.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Any other transformation can be choosen by using:</span></span></span>
-<span class="r-in"><span><span class="va">boxcox_transformed_data</span> <span class="op">&lt;-</span> <span class="fu">f_bestNormalize</span><span class="op">(</span><span class="va">skewed_data</span><span class="op">)</span><span class="op">$</span><span class="va">bestNormalize</span><span class="op">$</span><span class="va">other_transforms</span><span class="op">$</span><span class="va">boxcox</span><span class="op">$</span><span class="va">x.t</span></span></span>
-<span class="r-in"><span><span class="co"># and substituting '$boxcox' with the transformation of choice.</span></span></span>
+<span class="r-in"><span><span class="co"># Extract only the transformed (data) vector directly.</span></span></span>
+<span class="r-in"><span><span class="va">transformed_data</span> <span class="op">&lt;-</span> <span class="fu">f_bestNormalize</span><span class="op">(</span><span class="va">skewed_data</span><span class="op">)</span><span class="op">$</span><span class="va">transformed_data</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co">#To print rmd output set chunck option to results = 'asis' and use:</span></span></span>
-<span class="r-in"><span><span class="va">f_bestNormalize_rmd_out</span> <span class="op">&lt;-</span> <span class="fu">f_bestNormalize</span><span class="op">(</span><span class="va">skewed_data</span>, output_type <span class="op">=</span> <span class="st">"rmd"</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">f_bestNormalize_rmd_out</span><span class="op">$</span><span class="va">rmd</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># data.frame input: column name is used as data_name automatically.</span></span></span>
+<span class="r-in"><span><span class="va">df</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>measurement <span class="op">=</span> <span class="va">skewed_data</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">result_df</span> <span class="op">&lt;-</span> <span class="fu">f_bestNormalize</span><span class="op">(</span><span class="va">df</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Data with NAs: NAs are preserved at their original positions.</span></span></span>
+<span class="r-in"><span><span class="va">skewed_na</span> <span class="op">&lt;-</span> <span class="va">skewed_data</span></span></span>
+<span class="r-in"><span><span class="va">skewed_na</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">20</span><span class="op">)</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="cn">NA</span></span></span>
+<span class="r-in"><span><span class="va">result_na</span> <span class="op">&lt;-</span> <span class="fu">f_bestNormalize</span><span class="op">(</span><span class="va">skewed_na</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Access a specific alternative transformation (first check what is available).</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">bestNormalize</span><span class="op">$</span><span class="va">other_transforms</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "arcsinh_x"          "boxcox"             "center_scale"      </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4] "double_reverse_log" "exp_x"              "log_x"             </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [7] "sqrt_x"             "yeojohnson"        </span>
+<span class="r-in"><span><span class="co"># Then extract the one you want, e.g.:</span></span></span>
+<span class="r-in"><span><span class="co"># result$bestNormalize$other_transforms$yeojohnson$x.t</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Force output to console (prints report + plots automatically).</span></span></span>
+<span class="r-in"><span><span class="fu">f_bestNormalize</span><span class="op">(</span><span class="va">skewed_data</span>, output_type <span class="op">=</span> <span class="st">"console"</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Data transformation of skewed_data using `bestNormalize`: Quantile Normalization (ORQ) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Original Data Shapiro-Wilk Test:    W = 0.7302   p-value = 2.887e-12 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Transformed Data Shapiro-Wilk Test: W = 0.9996   p-value = 1 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Below are all considered transformations: [Pearson P / df, lower =&gt; more normal]   (n=100)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                Transformation Normality_Stat</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                    arcsinh(x)          2.324</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                       Box-Cox          0.764</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                  Center+scale          8.356</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    Double Reversed Log_b(x+a)         25.308</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                        Exp(x)        102.684</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                 Log-transform          0.660</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  Quantile Normalization (ORQ)          0.036</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                   sqrt(x + a)          2.246</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                   Yeo-Johnson          0.582</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Check the normality plots, by using the plot() function or 'plots = TRUE' option</span>
+<span class="r-plt img"><img src="f_bestNormalize-4.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="f_bestNormalize-5.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Generate a PDF report saved to a custom path.</span></span></span>
+<span class="r-in"><span><span class="fu">f_bestNormalize</span><span class="op">(</span><span class="va">skewed_data</span>,</span></span>
+<span class="r-in"><span>                output_type          <span class="op">=</span> <span class="st">"pdf"</span>,</span></span>
+<span class="r-in"><span>                save_as              <span class="op">=</span> <span class="st">"my_report"</span>,</span></span>
+<span class="r-in"><span>                open_generated_files <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Saving output in: /tmp/RtmpyM0xyc/my_report.pdf</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>error in running command</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> ! sh: 1: pdflatex: not found</span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error:</span> LaTeX failed to compile /tmp/RtmpyM0xyc/my_report.tex. See https://yihui.org/tinytex/r/#debugging for debugging tips. See my_report.log for more info.</span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Generate R Markdown output for use inside a .Rmd chunk</span></span></span>
+<span class="r-in"><span><span class="co"># (set chunk option results = 'asis').</span></span></span>
+<span class="r-in"><span><span class="va">rmd_result</span> <span class="op">&lt;-</span> <span class="fu">f_bestNormalize</span><span class="op">(</span><span class="va">skewed_data</span>, output_type <span class="op">=</span> <span class="st">"rmd"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">rmd_result</span><span class="op">$</span><span class="va">rmd</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ##  Data transformation of  skewed_data using `bestNormalize`: Quantile Normalization (ORQ) .  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> **Original Data Shapiro-Wilk Test:**&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;W = 0.5823&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;p-value = 2.0093e-15 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> **Original Data Shapiro-Wilk Test:**&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;W = 0.7302&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;p-value = 2.8867e-12 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> **Transformed Data Shapiro-Wilk Test:** W = 0.9996&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;p-value = 1 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
@@ -220,31 +275,36 @@ Available at: <a href="https://cran.r-project.org/package=bestNormalize" class="
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> **Table.** All considered transformations: [Pearson P / df, lower =&gt; more normal]   (n=100)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> -------------------------------------------</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Transforma                     Normality_  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> tion                           Stat        </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ------------------------------ ------------</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> arcsinh(x)                     2.324       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ----------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Transforma      Normality_  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> tion            Stat        </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> --------------- ------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> arcsinh(x)      2.324       </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Box-Cox                        2.402       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Box-Cox         0.764       </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Center+scale                   14.180      </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Center+scale    8.356       </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Double Reversed Log_b(x+a)     47.855      </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Double          25.308      </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Reversed                    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Log_b(x+a)                  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Exp(x)                         115.065     </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Exp(x)          102.684     </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Log-transform                  1.674       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Log-transform   0.660       </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Quantile Normalization (ORQ)   0.062       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Quantile        0.036       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Normalization               </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (ORQ)                       </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sqrt(x + a)                    3.702       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sqrt(x +        2.246       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> a)                          </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Yeo-Johnson                    1.362       </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> -------------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Yeo-Johnson     0.582       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ----------------------------</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-plt img"><img src="f_bestNormalize-4.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="f_bestNormalize-6.png" alt="" width="700" height="433"></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

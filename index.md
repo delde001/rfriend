@@ -50,7 +50,7 @@ data transformations, assumption checking, and post hoc testing.
   - Chi-square Tests:
     [`f_chisq_test()`](https://delde001.github.io/rfriend/reference/f_chisq_test.md)
 - **Model Comparison:** Compare models easily with
-  [`f_model_comparison()`](https://delde001.github.io/rfriend/reference/f_model_comparison.md).
+  `f_model_comparison()`.
 - **Utilities:**
   - [`f_clear()`](https://delde001.github.io/rfriend/reference/f_clear.md)
     clears the workspace and restarts R.  

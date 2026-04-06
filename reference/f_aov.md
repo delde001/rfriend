@@ -1,7 +1,7 @@
 # Perform multiple `aov()` functions with optional data transformation, inspection and Post Hoc test.
 
 Performs an Analysis of Variance (ANOVA) on a given dataset with options
-for (Box-Cox) transformations, normality tests, and post-hoc analysis.
+for (Box-Cox) transformations, normality tests, and post hoc analysis.
 Several response parameters can be analysed in sequence and the
 generated output can be in various formats ('Word', 'pdf', 'Excel').
 
@@ -12,15 +12,17 @@ f_aov(
   formula,
   data = NULL,
   norm_plots = TRUE,
+  interaction_plots = TRUE,
   ANCOVA = FALSE,
   transformation = TRUE,
   force_transformation = NULL,
+  force_aov = FALSE,
   alpha = 0.05,
   adjust = "sidak",
   intro_text = TRUE,
   close_generated_files = FALSE,
   open_generated_files = TRUE,
-  output_type = "off",
+  output_type = "default",
   save_as = NULL,
   save_in_wdir = FALSE
 )
@@ -42,8 +44,13 @@ f_aov(
 
 - norm_plots:
 
-  Logical. If `TRUE`, plots are included in the output files. Default is
-  `TRUE`.
+  Logical. If `TRUE`, diagnostic residual plots are included in the
+  output files. Default is `TRUE`.
+
+- interaction_plots:
+
+  Logical. If `TRUE`, estimated means / interaction plots are included
+  in the output files after the post hoc table. Default is `TRUE`.
 
 - ANCOVA:
 
@@ -53,16 +60,28 @@ f_aov(
 
 - transformation:
 
-  Logical or character string. If `TRUE`, or if `"bestnormalize"`,
-  applies `bestNormalize()` transformation if residuals are not normal.
-  If `"boxcox"` applies a boxcox transformation. If `FALSE` no
-  transformation will be applied. Default is `TRUE`.
+  Logical or character string. If `TRUE`, or if `"boxcox"` applies a
+  [`f_boxcox()`](https://delde001.github.io/rfriend/reference/f_boxcox.md)
+  transformation if residuals are not normal. If `"bestnormalize"`,
+  applies
+  [`f_bestNormalize()`](https://delde001.github.io/rfriend/reference/f_bestNormalize.md)
+  transformation. If `FALSE` no transformation will be applied. Default
+  is `TRUE`.
 
 - force_transformation:
 
   Character string. A vector containing the names of response variables
   that should be transformed regardless of the normality test. Default
   is `NULL`
+
+- force_aov:
+
+  Logical. If `TRUE`, runs the ANOVA even when at least one cell has \\n
+  = 1\\ (saturated model). By default (`FALSE`), such responses are
+  skipped with a warning because F-statistics and p-values are undefined
+  for saturated models. Set to `TRUE` only for diagnostic purposes —
+  results should **not** be reported or interpreted as valid. Default is
+  `FALSE`.
 
 - alpha:
 
@@ -107,10 +126,10 @@ f_aov(
 
 - close_generated_files:
 
-  Logical. If `TRUE`, closes open 'Excel' or 'Word' files depending on
-  the output format. This to be able to save the newly generated file by
-  the `f_aov()` function. 'Pdf' files should also be closed before using
-  the function and cannot be automatically closed. Default is `FALSE`.
+  Logical. Closes open Excel or Word (NOT pdf) files before writing,
+  depending on the output format. Works on Windows (taskkill), macOS
+  (pkill) and Linux (pkill/soffice). Default `FALSE`. **WARNING:**
+  Always save your work before using this option!!
 
 - open_generated_files:
 
@@ -121,10 +140,21 @@ f_aov(
 
 - output_type:
 
-  Character string specifying the output format: `"pdf"`, `"word"`,
-  `"excel"`, `"rmd"`, `"console"` or `"off"` (no file generated). The
-  option `"console"` forces output to be printed, the option `"rmd"`
-  saves rmd code in the output object not in a file. Default is `"off"`.
+  Character string specifying the output format. Default is `"default"`.
+
+  - `"default"`: Returns the object and lets R decide whether to print;
+    auto-prints if unassigned, silent if assigned to a variable. Use
+    `print(result)` or `plot(result)` to display the returned object.
+
+  - `"console"`: Forces immediate printing to the console regardless of
+    object assignment.
+
+  - `"pdf"`, `"word"`, `"excel"`: Saves results to a file of the
+    corresponding format. See `save_as`, `save_in_wdir`, and
+    `open_generated_files` for file path and opening behavior.
+
+  - `"rmd"`: Stores the raw markdown string inside the returned object
+    for use in R Markdown documents.
 
 - save_as:
 
@@ -203,6 +233,44 @@ or higher), a universal document converter.
 
 - If Pandoc is not found, this function may not work as intended.
 
+## Multiple Testing Across Response Variables
+
+When several response variables are analysed in a single call (e.g.
+`y1 + y2 + y3 ~ treatment`), each ANOVA is an independent
+null-hypothesis test at level `alpha`. The post hoc adjustments
+(`adjust = "sidak"`, `"tukey"`, etc.) only control the family-wise error
+rate **within** one ANOVA (across pairwise group comparisons for that
+response). They do **not** protect against the inflation of Type I error
+**across** the set of responses.
+
+**Practical implication:** With \\k\\ independent response variables all
+tested at \\\alpha = 0.05\\, the probability of obtaining at least one
+false positive is \\1 - (1 - 0.05)^k\\, which reaches ~40% for \\k =
+10\\.
+
+**When this matters:** The risk is highest in exploratory studies where
+many responses are screened simultaneously without a clear a priori
+hypothesis for each one. It is less of a concern when each response is a
+pre-specified primary outcome with its own biological rationale.
+
+**Possible remedies:**
+
+- **Bonferroni correction across responses:** use `alpha = 0.05 / k`
+  where `k` is the number of response variables. Conservative but
+  simple.
+
+- **False Discovery Rate (FDR):** apply
+  `p.adjust(p_values, method = "fdr")` to the vector of per-response
+  ANOVA p-values after the fact.
+
+- **MANOVA:** if the responses are correlated and you want a single
+  omnibus test across all of them, use
+  [`manova()`](https://rdrr.io/r/stats/manova.html) before interpreting
+  individual ANOVAs.
+
+- **Pre-registration:** declare primary vs. exploratory responses before
+  data collection to justify differential correction thresholds.
+
 ## Author
 
 Sander H. van Delden <plantmind@proton.me>  
@@ -220,19 +288,19 @@ f_aov_out <- f_aov(Sepal.Width + Sepal.Length ~ Species,
                    data = iris,
                    # Save output in MS Word file (Default is console)
                    output_type = "word",
-                   # Do boxcox transformation for non-normal residual (Default is bestnormalize)
-                   transformation = "boxcox",
+                   # Do bestNormalize transformation for non-normal residual (Default is boxcox)
+                   transformation = "bestnormalize",
                    # Do not automatically open the file.
                    open_generated_files = FALSE
                    )
-#> Saving output in: /tmp/RtmpDUIw9V/iris_aov_output.docx
+#> Saving output in: /tmp/RtmpyM0xyc/iris_aov_output.docx
 
 # Print output to the console.
 print(f_aov_out)
 #> 
 #>    
 #> ==========================================================
-#>    ANOVA of repsone variable:  Sepal.Width 
+#>    ANOVA of response variable:  Sepal.Width 
 #> ===========================================================
 #> 
 #>  aov call:  Sepal.Width ~ Species 
@@ -244,24 +312,16 @@ print(f_aov_out)
 #> ---
 #> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 #> 
-#> Post-Hoc Analysis:
-#>  Species    emmean        SE  df lower.CL upper.CL Letter
-#>  versicolor  2.770 0.0480391 147 2.653974 2.886026  a    
-#>  virginica   2.974 0.0480391 147 2.857974 3.090026   b   
-#>  setosa      3.428 0.0480391 147 3.311974 3.544026    c  
-#> 
-#> Confidence level used: 0.95 
-#> Conf-level adjustment: sidak method for 3 estimates 
-#> P value adjustment: sidak method for 3 tests 
-#> significance level used: alpha = 0.05 
-#> NOTE: If two or more means share the same grouping symbol,
-#>       then we cannot show them to be different.
-#>       But we also did not show them to be the same. 
+#> post hoc Analysis:
+#>     Species emmean..        SE lower.CL upper.CL Letter  n
+#>  versicolor    2.770 0.0480391 2.653974 2.886026    a   50
+#>   virginica    2.974 0.0480391 2.857974 3.090026     b  50
+#>      setosa    3.428 0.0480391 3.311974 3.544026      c 50
 #> 
 #>    
 #> ==========================================================
-#>    ANOVA of Box-Cox TRANSFORMED repsone variable: Sepal.Length 
-#> ===========================================================
+#>    ANOVA of Quantile Normalization (ORQ) TRANSFORMED response variable: Sepal.Length 
+#> ==========================================================
 #> 
 #>  aov call:  Sepal.Length ~ Species 
 #> 
@@ -272,24 +332,19 @@ print(f_aov_out)
 #> ---
 #> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 #> 
-#> TRANSFORMED Post-Hoc Analysis:
-#>  Species      emmean          SE  df lower.CL upper.CL Letter
-#>  setosa     1.434181 0.009363675 147 1.411565 1.456796  a    
-#>  versicolor 1.566352 0.009363675 147 1.543737 1.588968   b   
-#>  virginica  1.645523 0.009363675 147 1.622908 1.668139    c  
-#> 
-#> Confidence level used: 0.95 
-#> Conf-level adjustment: sidak method for 3 estimates 
-#> P value adjustment: sidak method for 3 tests 
-#> significance level used: alpha = 0.05 
-#> NOTE: If two or more means share the same grouping symbol,
-#>       then we cannot show them to be different.
-#>       But we also did not show them to be the same. 
+#> TRANSFORMED post hoc Analysis:
+#>     Species median (BT) lower.CL upper.CL Letter  n
+#>      setosa    4.961446 4.861228 5.058657    a   50
+#>  versicolor    5.944039 5.721010 6.180035     b  50
+#>   virginica    6.593552 6.393878 6.750179      c 50
+#> Note: 'median (BT)' = back-transformed estimated marginal mean. Back-transforming a mean from a transformed scale returns the MEDIAN on the original scale, not the arithmetic mean. Report these as back-transformed medians. CIs are valid; SE is omitted (asymmetric on original scale).
 #> 
 #>    
 
 # Plot residual plots.
 plot(f_aov_out)
+
+
 
 
 
@@ -304,50 +359,70 @@ cat(f_aov_rmd_out$rmd)
 #> 
 #> 
 #> ## 1. Independence
-#> - Observations must be independent both within and between groups.
-#> - This means that the value of one observation should not influence another.
+#> - Observations must be independent both within and between groups. This means that the value of one observation should not influence another.
 #> - Independence violations cannot be corrected statistically and invalidate the analysis, making proper experimental design essential.
 #> 
 #> ## 2. Normality
-#> - The residuals (errors) of the model are assumed to be normally distributed.
-#> - This assumption applies to the residuals, not necessarily the raw data.
+#> - The residuals (errors) of the model are assumed to be normally distributed. This assumption applies to the residuals, not necessarily the raw data.
 #> - ANOVA is robust to minor deviations from normality, especially with large and balanced sample sizes. For small or unbalanced samples, violations can lead to **unreliable results**, requiring a data transformation or alternative tests (Welch's ANOVA, Kruskal-Wallis Test).
-#> - Normality of the residuals can be tested using a Shapiro Wilcoxon or Anderson-Darling Test. It can also be graphically assessed using a Box Plot, Q-Q plot or Histogram (see figure below).
+#> - Normality of the residuals can be tested using a Shapiro-Wilk or Anderson-Darling Test. It can also be graphically assessed using a Box Plot, Q-Q plot or Histogram.
 #> 
 #> ## 3. Homogeneity of Variances (Homoscedasticity)
-#> - The variances within each group should be approximately equal.
-#> - Equal  variances ensure that the F-test statistic is reliable.
+#> - The variances within each group should be approximately equal (homogeneity of variances). This ensures that the F-test statistic is reliable.
 #> - Homogeneity of variances assumption in ANOVA should be tested on the residuals, not directly on the raw data.
-#> - Levene's test or Bartlett's test can be applied to check for homogeneity of variances.
-#> - If violated, a data transformation or alternative tests (Welch's ANOVA, Kruskal-Wallis Test) are required.  It can also be graphically assessed by plotting residuals vs. fitted values and checking for patterns.
+#> - Levene's test can be applied to check for homogeneity of variances.It can also be graphically assessed by plotting residuals vs. fitted values and checking for patterns.
+#> - If violated, a data transformation or alternative tests (Welch's ANOVA, Kruskal-Wallis Test) are required.
 #> 
 #> 
 #> ## 4. Additivity (No Unaccounted Systematic Effects)
 #> - For models without interaction terms, it is assumed that the effects of different factors are additive. That is, the combined effect of factors can be expressed as the sum of their individual effects.
-#> - However, if interaction terms are included in the model, this assumption does not apply because ANOVA explicitly accounts for interactions.  
+#> - However, if interaction terms are included in the model, this assumption does not apply because ANOVA then explicitly accounts for potential interactions.
+#>   
 #>   
 #>    
 #>   
 #> # Analysis of:  Sepal.Width   
 #>   
 #> ## Normality and homoscedasticity of residuals of:  Sepal.Width   
-#> Levene's test for homogeneity of residuals: F-Statisic = 0.5902 p-value = 0.5555    
-#>  According to 'Levene's Test' (0.5555 > 0.05) residuals **have equal variance** (homoscedasticity).  
+#> **Levene's test** for homogeneity of residuals: F-Statistic = 0.5902 p-value = 0.5555 .  According to 'Levene's Test' (0.5555 > 0.05) residuals **have equal variance** (homoscedasticity).  
+#> &nbsp;
 #>   
 #> &nbsp;  
-#> Shapiro-Wilk Test for Normality of residuals: W = 0.9895 p-value = 0.323    
-#>  According to 'Shapiro-Wilk Test' (0.323 > 0.05) residuals **ARE normally distributed**.  
+#> **Shapiro-Wilk Test** for Normality of residuals: W = 0.9895 p-value = 0.323 .  According to 'Shapiro-Wilk Test' (0.323 > 0.05) residuals **ARE normally distributed**.  
 #>   
 #> &nbsp;  
 #> Anderson-Darling normality test : A = 0.495  p = 0.2116    
-#> Check the plots in the figure below to assess normality.  
-#> ![](/tmp/RtmpDUIw9V/file20964b27ed1e.png)    
+#>  According to 'Anderson-Darling test' (0.2116 > 0.05) residuals **ARE normally distributed**.  
 #>   
-#> &nbsp;
-#>    
+#> Check the plots in the figure below to assess normality.  
+#> ![](/tmp/RtmpyM0xyc/file1fa8435f5678.png)    
+#>   
+#> 
+#> ## Observed Descriptives Table of:  Sepal.Width ~ Species   
+#> 
+#> ----------------------------------------------------------------------------------
+#> Species      n    mean    sd      se      min     Q1      median   Q3      max    
+#> ------------ ---- ------- ------- ------- ------- ------- -------- ------- -------
+#> setosa       50   3.428   0.379   0.054   2.300   3.200   3.400    3.675   4.400  
+#> 
+#> versicolor   50   2.770   0.314   0.044   2.000   2.525   2.800    3.000   3.400  
+#> 
+#> virginica    50   2.974   0.322   0.046   2.200   2.800   3.000    3.175   3.800  
+#> ----------------------------------------------------------------------------------
+#> 
+#> **TIP:** These values represent your actual observed sample characteristics.
+#> Use this table for *Methods* sections or Supplementary materials (to describe the sample).
+#>   
+#> 
+#> **CAUTION:** For statistical inference (significance letters and *p-values*) and reporting
+#> main findings in the *Results* section, you **must** use the Emmeans table below.
 #> 
 #>    
 #> ## ANOVA Summary of  Sepal.Width   
+#> &nbsp;
+#>   
+#> 
+#> **Table** of aov call:  Sepal.Width ~ Species   
 #> 
 #> ------------------------------------------------------------------
 #> &nbsp;          Df    Sum Sq   Mean Sq   F value   Pr(>F)         
@@ -357,31 +432,55 @@ cat(f_aov_rmd_out$rmd)
 #> **Residuals**   147   16.96    0.1154    NA        NA             
 #> ------------------------------------------------------------------
 #> 
+#> &nbsp;
+#>   
+#>   
+#> ## Post Hoc Test on Estimated Marginal Means of Sepal.Width  
+#> 
+#>         
+#> Estimated Marginal Means (emmeans) are model-based mean values of Sepal.Width for each level of the significant predictor(s), averaged over all other
+#>           factors in the model. Unlike raw data averages (see: Observed Descriptives Table),
+#>           emmeans correct for unbalanced designs and reflect the statistical
+#>           model used for pairwise comparisons (significance testing **letters**). SE values are identical for groups with equal
+#>           sample sizes and differ only to reflect variation in group size ($n$). The $n$ column corresponds to the raw observed data of Sepal.Width. If $n$ is blank, there is no observed data and
+#>           emmeans estimated the missing data point.
+#>         
+#>   
+#> &nbsp;
+#>   
+#> 
+#>         
+#> *Reporting Tips:* For main results showing significant differences, prioritize
+#>           the Emmeans table (preferably with 95% CIs).
+#>           Figures should include all individual raw data points to show the
+#>           Model Fit (Emmeans) relative to the Observed Spread (Raw Data).
+#>         
 #>    
-#>   
-#> aov call:  Sepal.Width ~ Species&nbsp;
-#>   
 #> &nbsp;   
 #>   
-#>   
-#> ## Post Hoc Test Results of  Sepal.Width   
 #> 
-#> --------------------------------------------------------------------
-#> Species      emmean   SE        df    lower.CL   upper.CL   Letter  
-#> ------------ -------- --------- ----- ---------- ---------- --------
-#> versicolor   2.770    0.04804   147   2.654      2.886      a       
+#> **Post Hoc Marginal Means Table** of aov call: Sepal.Width ~ Species  
 #> 
-#> virginica    2.974    0.04804   147   2.858      3.090      b       
+#> -----------------------------------------------------------------
+#> Species      emmean     SE      lower     upper     Letter   n   
+#>                                 CL        CL                     
+#> ------------ ---------- ------- --------- --------- -------- ----
+#> versicolor   2.770      0.048   2.654     2.886     a        50  
 #> 
-#> setosa       3.428    0.04804   147   3.312      3.544      c       
-#> --------------------------------------------------------------------
+#> virginica    2.974      0.048   2.858     3.090     b        50  
 #> 
+#> setosa       3.428      0.048   3.312     3.544     c        50  
+#> -----------------------------------------------------------------
+#> 
+#> Degrees of freedom: 147  
 #> Confidence level used: 0.95  
 #> Conf-level adjustment: sidak method for 3 estimates  
 #> P value adjustment: sidak method for 3 tests  
-#> significance level used: alpha = 0.05  
-#> NOTE: If two or more means share the same grouping symbol,
-#>       then we cannot show them to be different.
-#>       But we also did not show them to be the same.
+#> significance level used: $\alpha$ = 0.05  
+#> 
+#> **Note:** Groups sharing the same letter are not significantly different. This indicates insufficient evidence to claim a difference, but it does not prove the groups are identical.
+#> ## Estimated Means Plot of: Sepal.Width  
+#> ![](/tmp/RtmpyM0xyc/file1fa85ea7cb33.png)    
+#>   
 
 ```

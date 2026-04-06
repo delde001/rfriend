@@ -7,7 +7,15 @@ options.
 ## Usage
 
 ``` r
-f_pander(table, col_width = 10, table_width = NULL, ...)
+f_pander(
+  table,
+  col_width = 10,
+  table_width = NULL,
+  limit_columns = NULL,
+  style = "multiline",
+  console = TRUE,
+  ...
+)
 ```
 
 ## Arguments
@@ -19,13 +27,28 @@ f_pander(table, col_width = 10, table_width = NULL, ...)
 - col_width:
 
   Integer. Specifies the maximum number of characters allowed in table
-  header columns before a line break is inserted. Defaults to `10`.
+  header columns before a line break is inserted. Defaults to `10`. Note
+  that latex will not break the table header if the col with is longer
+  due to long names below the header.
 
 - table_width:
 
   Integer or `NULL`. Defines the number of characters after which the
   table is split into separate sections. Defaults to `NULL`, meaning no
   break is applied.
+
+- limit_columns:
+
+  Integer or `NULL`. Defines the number of columns shown in a table.
+
+- style:
+
+  Character. Pander table style. Defaults to `"multiline"`.
+
+- console:
+
+  Logical. Whether to process headers for console output. Defaults to
+  `TRUE`.
 
 - ...:
 
@@ -51,11 +74,16 @@ include:
 - `knitr.auto.asis`: Ensures output is not automatically treated as
   'asis'.
 
-- `table.split.table`: Prevents splitting of tables across pages or
-  slides.
-
 - `table.caption.prefix`: Removes the default "Table" prefix in
   captions.
+
+- `keep.line.breaks`: Preserves line breaks in cell content.
+
+- `table.split.table`: Controls table splitting (set to `Inf` if
+  `table_width` is `NULL` or `FALSE`).
+
+- `table.split.cells`: Inserts line breaks in headers every `col_width`
+  characters.
 
 This function requires
 \[Pandoc\](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3
@@ -67,9 +95,9 @@ or higher), a universal document converter.
 
 - **macOS:** If using Homebrew, Pandoc is typically installed in
   "/usr/local/bin". Alternatively, download the .pkg installer and
-  verify that the binary’s location is in your PATH.
+  verify that the binary's location is in your PATH.
 
-- **Linux:** Install Pandoc through your distribution’s package manager
+- **Linux:** Install Pandoc through your distribution's package manager
   (commonly installed in "/usr/bin" or "/usr/local/bin") or manually,
   and ensure the directory containing Pandoc is in your PATH.
 

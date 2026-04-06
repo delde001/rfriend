@@ -1,8 +1,8 @@
-# Chi-squared Test with Post-hoc Analysis
+# Chi-squared Test with post hoc Analysis
 
 Performs a chi-squared test
 [`chisq.test`](https://rdrr.io/r/stats/chisq.test.html), then
-automatically conducts post-hoc analysis if the test is significant. The
+automatically conducts post hoc analysis if the test is significant. The
 function provides adjusted p-values for each cell in the contingency
 table using a specified correction method.
 
@@ -27,7 +27,8 @@ f_chisq_test(
 
   A numeric vector (or factor), or a contingency table in matrix or
   table form. If a data frame is entered the function will try to
-  convert it to a table.
+  convert it to a table using
+  [`df_to_table()`](https://delde001.github.io/rfriend/reference/df_to_table.md).
 
 - y:
 
@@ -56,7 +57,7 @@ f_chisq_test(
 
 - force_posthoc:
 
-  Logical indicating whether to perform post-hoc tests even if the
+  Logical indicating whether to perform post hoc tests even if the
   chi-squared test is not significant. Default is `FALSE`.
 
 - ...:
@@ -90,17 +91,17 @@ An object of class f_chisq_test containing:
 
 The function first performs a chi-squared test using
 [`chisq.test`](https://rdrr.io/r/stats/chisq.test.html). If the test is
-significant (p \< alpha) or if `force_posthoc = TRUE`, it conducts
-post-hoc analysis by examining the standardized residuals. The p-values
-for these residuals are adjusted using the specified method to control
-for multiple comparisons.
+significant (p \< alpha) or if `force_posthoc = TRUE`, it conducts post
+hoc analysis by examining the standardized residuals. The p-values for
+these residuals are adjusted using the specified method to control for
+multiple comparisons.
 
 If the input is a data frame, the function attempts to convert it to a
 table and displays the resulting table for verification.
 
 ## References
 
-This function implements a post-hoc analysis for chi-squared tests
+This function implements a post hoc analysis for chi-squared tests
 inspired by the methodology in:
 
 Beasley, T. M., & Schumacker, R. E. (1995). Multiple Regression Approach
@@ -124,13 +125,43 @@ my_table <- as.table(rbind(c(100, 150, 50), c(120, 90, 40)))
 dimnames(my_table) <- list(Gender = c("Male", "Female"),
                            Response = c("Agree", "Neutral", "Disagree"))
 
-# Perform chi-squared test with post-hoc analysis.
+# Perform chi-squared test with post hoc analysis.
 f_chisq_test(my_table)
-#> Error in eval(bquote(stats::chisq.test(.(as.name(x_name)), ...)), envir = env): object 'my_table' not found
+#> 
+#>  Pearson's Chi-squared test
+#> 
+#> data:  my_table
+#> X-squared = 13.495, df = 2, p-value = 0.001174
+#> 
+#> 
+#> Observed data and corresponding bonferroni corrected p-values:
+#>    
+#>         Agree     Neutral   Disagree
+#> Male    100       150       50      
+#> p-value 2.833e-03 5.874e-03 1       
+#>                                     
+#> Female  120       90        40      
+#> p-value 2.833e-03 5.874e-03 1       
+#>                                     
 
 # Use a different adjustment method.
 f_chisq_test(my_table, method = "holm")
-#> Error in eval(bquote(stats::chisq.test(.(as.name(x_name)), ...)), envir = env): object 'my_table' not found
+#> 
+#>  Pearson's Chi-squared test
+#> 
+#> data:  my_table
+#> X-squared = 13.495, df = 2, p-value = 0.001174
+#> 
+#> 
+#> Observed data and corresponding holm corrected p-values:
+#>    
+#>         Agree     Neutral   Disagree
+#> Male    100       150       50      
+#> p-value 2.833e-03 3.916e-03 1       
+#>                                     
+#> Female  120       90        40      
+#> p-value 2.833e-03 3.916e-03 1       
+#>                                     
 
 # Other forms still work like Goodness-of-Fit: Match to theoretical distribution.
 # Observed frequencies of rolling with a die 1 - 6.
@@ -141,5 +172,20 @@ expected_probs <- rep(1/6, 6)
 
 # Chi-Square Goodness-of-Fit Test.
 f_chisq_test(x = observed, p = expected_probs)
-#> Error in eval(bquote(stats::chisq.test(.(as.name(x_name)), ...)), envir = env): object 'observed' not found
+#> 
+#>  Chi-squared test for given probabilities
+#> 
+#> data:  observed
+#> X-squared = 25.4, df = 5, p-value = 0.0001166
+#> 
+#> 
+#> Observed data and corresponding bonferroni corrected p-values:
+#>    
+#>  Observed Expected Std.Residuals   p.value
+#>         2       10    -2.5298221     0.034
+#>         2       10    -2.5298221     0.034
+#>        10       10     0.0000000     1.000
+#>        20       10     3.1622777 3.192e-03
+#>        15       10     1.5811388     0.500
+#>        11       10     0.3162278     1.000
 ```

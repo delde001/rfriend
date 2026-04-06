@@ -13,7 +13,7 @@ When applied to a data frame, only numeric columns are processed. All output is 
 
     <a class="navbar-brand me-2" href="../index.html">rfriend</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">2.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -50,10 +50,11 @@ When applied to a data frame, only numeric columns are processed. All output is 
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">f_conditional_round</span><span class="op">(</span></span>
 <span>  <span class="va">x</span>,</span>
 <span>  threshold_small <span class="op">=</span> <span class="fl">0.01</span>,</span>
-<span>  threshold_large <span class="op">=</span> <span class="fl">9999</span>,</span>
+<span>  threshold_large <span class="op">=</span> <span class="fl">10000</span>,</span>
 <span>  digits <span class="op">=</span> <span class="fl">3</span>,</span>
 <span>  replace_na <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  detect_int_col <span class="op">=</span> <span class="cn">TRUE</span></span>
+<span>  na_string <span class="op">=</span> <span class="st">"-"</span>,</span>
+<span>  allow_integer_decimal_mix <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -72,20 +73,31 @@ threshold will be formatted using scientific notation. Default is <code>0.01</co
 
 <dt id="arg-threshold-large">threshold_large<a class="anchor" aria-label="anchor" href="#arg-threshold-large"></a></dt>
 <dd><p>Numeric value. Values with absolute magnitude larger than or equal
-to this threshold will be formatted using scientific notation. Default is <code>9999</code>.</p></dd>
+to this threshold will be formatted using scientific notation. Default is <code>10000</code>.</p></dd>
 
 
 <dt id="arg-digits">digits<a class="anchor" aria-label="anchor" href="#arg-digits"></a></dt>
-<dd><p>Integer. Number of significant digits to use in formatting. Default is <code>3</code>.</p></dd>
+<dd><p>Integer. Number of decimal digits to use in formatting. Default is <code>3</code>.</p></dd>
 
 
 <dt id="arg-replace-na">replace_na<a class="anchor" aria-label="anchor" href="#arg-replace-na"></a></dt>
-<dd><p>Logical. If TRUE, NA values will be replaced with empty strings ("")
-in the output. Default is TRUE.</p></dd>
+<dd><p>Logical. If <code>TRUE</code>, <code>NA</code> values in the output
+are replaced with the string specified by <code>na_string</code>. If
+<code>FALSE</code>, <code>NA</code> values are left as <code>NA</code>. Default is
+<code>TRUE</code>.</p></dd>
 
 
-<dt id="arg-detect-int-col">detect_int_col<a class="anchor" aria-label="anchor" href="#arg-detect-int-col"></a></dt>
-<dd><p>Logical. If <code>TRUE</code>, columns in a data.frame containing only integers will be displayed without decimal digits. Columns containing a mix of integers and decimal values will display all values with the specified number of digits. If <code>FALSE</code>, each individual cell is evaluated: integer values are displayed without digits, and numbers containing digits with the specified number of digits. Default is <code>TRUE</code>.</p></dd>
+<dt id="arg-na-string">na_string<a class="anchor" aria-label="anchor" href="#arg-na-string"></a></dt>
+<dd><p>Character string used to replace <code>NA</code> values in the
+output when <code>replace_na = TRUE</code>. Use <code>"-"</code> (default) for a
+standard "not available" dash, <code>""</code> for empty cells, or any other
+string as needed. Note that special characters such as the em dash
+(<code>"\u2014"</code>) may require additional LaTeX declarations when rendering
+to PDF via <code>pdflatex</code>. Default is <code>"-"</code>.</p></dd>
+
+
+<dt id="arg-allow-integer-decimal-mix">allow_integer_decimal_mix<a class="anchor" aria-label="anchor" href="#arg-allow-integer-decimal-mix"></a></dt>
+<dd><p>Logical. If <code>TRUE</code>, each individual cell is evaluated: integer values are displayed without decimal places, and non-integer values are displayed with the specified number of decimal places, i.e. <code>digits</code>. Default is <code>FALSE</code>, when a column contains a mix of integers and decimal values, all values are displayed with the specified number of decimal places. Note: columns containing only integers are **always** displayed without decimal places, regardless of <code>allow_integer_decimal_mix</code>.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -99,7 +111,7 @@ character columns formatted according to the specified rules.</p></li>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>The function applies the following formatting rules:</p><ul><li><p>Values smaller than <code>threshold_small</code> or larger than <code>threshold_large</code>
-        are formatted in scientific notation with <code>digits</code> significant digits.</p></li>
+        are formatted in scientific notation with decimal <code>digits</code>.</p></li>
 <li><p>Integer values are formatted without decimal places.</p></li>
 <li><p>Non-integer values that don't require scientific notation are rounded to
         <code>digits</code> decimal places.</p></li>
@@ -120,7 +132,7 @@ character columns formatted according to the specified rules.</p></li>
 <span class="r-in"><span><span class="co"># Returns: "1.000e-04" "0.500" "3" "1.000e+04".</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="fu">f_conditional_round</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.0001</span>, <span class="fl">0.5</span>, <span class="fl">3</span>, <span class="fl">10000</span>, <span class="cn">NA</span><span class="op">)</span>, replace_na <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "1.000e-04" "0.500"     "3.000"     "1.000e+04" ""         </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "1.000e-04" "0.500"     "3.000"     "1.000e+04" "-"        </span>
 <span class="r-in"><span><span class="co"># Returns: "1.000e-04" "0.500" "3" "1.000e+04" ""</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Data frame example.</span></span></span>
@@ -135,18 +147,27 @@ character columns formatted according to the specified rules.</p></li>
 <span class="r-in"><span><span class="co"># Show only two digits.</span></span></span>
 <span class="r-in"><span><span class="fu">f_conditional_round</span><span class="op">(</span><span class="va">df</span>, digits <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   name small_val integer integer_mix large_val</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1    A  1.00e-04       1       10.00     1e+04</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    A  1.00e-04       1       10.00  1.00e+04</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2    B  2.00e-03       2       20.00      5000</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3    C      0.50       3       30.10          </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3    C      0.50       3       30.10         -</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># To keep Integers as Integers (no digits)</span></span></span>
 <span class="r-in"><span><span class="co"># in columns with mixed data (Integers and digits)</span></span></span>
-<span class="r-in"><span><span class="co"># set detect_int_col = FALSE</span></span></span>
-<span class="r-in"><span><span class="fu">f_conditional_round</span><span class="op">(</span><span class="va">df</span>, detect_int_col <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># set allow_integer_decimal_mix = TRUE</span></span></span>
+<span class="r-in"><span><span class="fu">f_conditional_round</span><span class="op">(</span><span class="va">df</span>, allow_integer_decimal_mix <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   name small_val integer integer_mix large_val</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1    A 1.000e-04       1          10 1.000e+04</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2    B 2.000e-03       2          20      5000</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3    C     0.500       3      30.100          </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3    C     0.500       3      30.100         -</span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Custom NA replacement string.</span></span></span>
+<span class="r-in"><span><span class="fu">f_conditional_round</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.5</span>, <span class="cn">NA</span>, <span class="fl">3</span><span class="op">)</span>, replace_na <span class="op">=</span> <span class="cn">TRUE</span>, na_string <span class="op">=</span> <span class="st">"-"</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "0.500" "-"     "3.000"</span>
+<span class="r-in"><span><span class="co"># Returns: "0.500" "-" "3"</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="fu">f_conditional_round</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.5</span>, <span class="cn">NA</span>, <span class="fl">3</span><span class="op">)</span>, replace_na <span class="op">=</span> <span class="cn">TRUE</span>, na_string <span class="op">=</span> <span class="st">""</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "0.500" ""      "3.000"</span>
+<span class="r-in"><span><span class="co"># Returns: "0.500" "" "3"</span></span></span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">rfriend</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">2.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -42,7 +42,7 @@
 <span>  data <span class="op">=</span> <span class="va">data</span>,</span>
 <span>  digits <span class="op">=</span> <span class="fl">3</span>,</span>
 <span>  range <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">-</span><span class="fl">2</span>, <span class="fl">2</span><span class="op">)</span>,</span>
-<span>  plots <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  plots <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  transform.data <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  eps <span class="op">=</span> <span class="fl">1</span><span class="op">/</span><span class="fl">50</span>,</span>
 <span>  xlab <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/expression.html" class="external-link">expression</a></span><span class="op">(</span><span class="va">lambda</span><span class="op">)</span>,</span>
@@ -50,7 +50,7 @@
 <span>  alpha <span class="op">=</span> <span class="fl">0.05</span>,</span>
 <span>  open_generated_files <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  close_generated_files <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  output_type <span class="op">=</span> <span class="st">"off"</span>,</span>
+<span>  output_type <span class="op">=</span> <span class="st">"default"</span>,</span>
 <span>  save_as <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  save_in_wdir <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  <span class="va">...</span></span>
@@ -102,11 +102,23 @@
 
 
 <dt id="arg-close-generated-files">close_generated_files<a class="anchor" aria-label="anchor" href="#arg-close-generated-files"></a></dt>
-<dd><p>Logical. If <code>TRUE</code>, closes open 'Word' files depending on the output format. This to be able to save the newly generated files. 'Pdf' files should also be closed before using the function and cannot be automatically closed.</p></dd>
+<dd><p>Logical. Closes open Excel or Word (NOT pdf) files before writing, depending on the output format. Works on Windows (taskkill), macOS (pkill) and Linux (pkill/soffice). Default <code>FALSE</code>. <strong>WARNING:</strong> Always save your work before using this option!!</p></dd>
 
 
 <dt id="arg-output-type">output_type<a class="anchor" aria-label="anchor" href="#arg-output-type"></a></dt>
-<dd><p>Character string specifying the output format: <code>"pdf"</code>, <code>"word"</code>, <code>"rmd"</code>, <code>"off"</code> (no file generated) or <code>"console"</code>. The option <code>"console"</code> forces output to be printed. Default is <code>"off"</code>.</p></dd>
+<dd><p>Character string specifying the output format. Default is <code>"default"</code>.</p><ul><li><p><code>"default"</code>: Returns the object and lets R decide whether
+    to print; auto-prints if unassigned, silent if assigned to a variable.
+    Use <code>print(result)</code> or <code>plot(result)</code> to display the
+    returned object.</p></li>
+<li><p><code>"console"</code>: Forces immediate printing to the console
+    regardless of object assignment.</p></li>
+<li><p><code>"pdf"</code>, <code>"word"</code>, <code>"excel"</code>: Saves results to a
+    file of the corresponding format. See <code>save_as</code>,
+    <code>save_in_wdir</code>, and <code>open_generated_files</code> for file
+    path and opening behavior.</p></li>
+<li><p><code>"rmd"</code>: Stores the raw markdown string inside the returned
+    object for use in R Markdown documents.</p></li>
+</ul></dd>
 
 
 <dt id="arg-save-as">save_as<a class="anchor" aria-label="anchor" href="#arg-save-as"></a></dt>
@@ -181,15 +193,15 @@ rcompanion/R/transformTukey.r. (Developed by Salvatore Mangiafico)</p><ul><li><p
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">bc</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Box-Cox</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> --------</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> According to the Shapiro-Wilk test ( 2.923e-12  &lt;  0.05 ) original data is:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> According to the Shapiro-Wilk test ( 3.654e-18  &lt;  0.05 ) original data is:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  NOT normally distributed. Transformation will be applied...   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Formula used for transformation:   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> { (x^λ - 1) / λ } if λ != 0   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> { log(x)        } if λ == 0   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Box-Cox Transformation λ = -0.019   </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> According to the Shapiro-Wilk test ( 0.9528  &gt;  0.05 ) data is</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Box-Cox Transformation λ = -0.218   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> According to the Shapiro-Wilk test ( 0.9482  &gt;  0.05 ) data is</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  normally distributed after transformation.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot the QQ plots, Histograms and Lambda Log-Likelihood estimation.</span></span></span>
@@ -200,23 +212,23 @@ rcompanion/R/transformTukey.r. (Developed by Salvatore Mangiafico)</p><ul><li><p
 <span class="r-in"><span><span class="co"># Or Directly use the transformed data from the f_boxcox object.</span></span></span>
 <span class="r-in"><span><span class="va">df</span><span class="op">$</span><span class="va">values_transformed</span> <span class="op">&lt;-</span> <span class="fu">f_boxcox</span><span class="op">(</span><span class="va">df</span><span class="op">$</span><span class="va">values</span><span class="op">)</span><span class="op">$</span><span class="va">transformed_data</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">df</span><span class="op">$</span><span class="va">values_transformed</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   [1] -0.23068155  1.53585356  0.07046118  0.12912907  1.68742230  0.45890387</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   [7] -1.28038739 -0.69135420 -0.44755415  1.20995694  0.35858670  0.39924945</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [13]  0.11056642 -0.55878661  1.75691948  0.49550326 -2.00382113  0.69670354</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [19] -0.47492133 -1.07872969 -0.21842691 -1.03607026 -0.73396179 -0.62876541</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [25] -1.71401123  0.83115436  0.15314986 -1.15053200  1.23899832  0.42474110</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [31] -0.29590017  0.88755676  0.87084843  0.81520186  0.68415470  0.55101302</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [37] -0.06194814 -0.30685371 -0.38184952 -0.69931209 -0.20832850 -1.28073066</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [43]  2.12487209  1.19420531 -1.13517732 -0.40443078 -0.46873027  0.77421428</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [49] -0.08343513  0.25270987 -0.02855450 -0.04288792  1.35096134 -0.22625592</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [55]  1.49483194 -1.57176501  0.58137889  0.12370863  0.21549918  0.37827357</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [61] -0.50472822 -0.33426437 -1.02849548 -1.08277868  0.30265509  0.44630671</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [67]  0.05297755  0.91423398  2.01067104 -0.49332887 -2.36057439  0.99619010</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [73] -0.71400047 -0.69252516  1.01564389 -0.28554481 -1.23498424  0.18099156</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [79] -0.13907479  0.00576387  0.38387365 -0.37196830  0.64044800 -0.22094904</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [85]  0.33073840  1.08548896  0.43338730 -0.32694287  1.13636063  0.98418561</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [91]  0.54554983  0.23819112 -0.63166654  1.34321498 -0.60369560  2.14250411</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [97]  1.51051115 -0.23622892 -1.03649491 -0.71522264</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   [1] -0.76836962  0.24982329 -0.25344581 -0.36104715 -1.05752153 -0.04524945</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   [7] -0.85605638 -2.01153677 -0.39642947  0.83279174 -0.61298563  0.56939813</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [13] -1.93991732 -0.05589983  0.49107995  0.29148062  0.10446824 -0.68760902</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [19] -0.93349490 -1.14745718  0.11615077 -1.05242453 -0.51774851 -0.26337567</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [25]  1.51832008 -0.70055422  0.22944922  0.07730210 -1.07013394 -0.07186522</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [31]  1.23920626  0.42999520  0.04104816 -0.44256509 -2.58974817  1.00262116</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [37] -1.71996781  0.68335120  1.56165817 -1.69698357  0.65073773 -0.26983581</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [43] -1.87515923 -1.79469238 -1.91669919 -0.56284982 -1.72150177  0.63881943</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [49]  1.68505058 -1.48572345  0.72381189  0.70803331  0.32045870 -1.12779843</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [55] -0.12102151 -0.28914240  0.52981227 -0.38797585  0.87994431 -0.39029967</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [61]  0.94065117 -1.17885675 -1.45024768  2.32410585 -0.43638557  0.28873988</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [67]  0.59437478 -0.51021237  0.48880663  0.35451581 -0.22051696  0.06483054</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [73] -0.03419407  1.70292673 -0.80460200 -1.23800949  0.03763318  0.30020644</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [79]  0.41639670 -0.48204832 -1.19666953  1.10418433 -0.36332136 -0.95255330</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [85] -0.24247067 -0.20147501  0.98584623  0.08395942  0.69533761 -0.52747821</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [91]  0.20950996 -0.33645277  0.09361508 -0.98872000 -1.51727534  1.61921718</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [97]  0.56303822 -1.43856644 -0.65375005 -1.35275934</span>
 <span class="r-in"><span></span></span>
 <span class="r-plt img"><img src="f_boxcox-3.png" alt="" width="700" height="433"></span>
 </code></pre></div>

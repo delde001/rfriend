@@ -3,8 +3,8 @@
 Converts multiple specified columns of a data frame into factors. If no
 columns are specified, it automatically detects and converts columns
 that are suitable to be factors. The function returns the entire data
-frame including non factor columns and reports the properties of this
-new data frame in the console.
+frame including non factor columns and can report the properties of this
+new data frame in the console (`properties = TRUE`).
 
 ## Usage
 

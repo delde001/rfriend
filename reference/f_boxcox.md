@@ -13,7 +13,7 @@ f_boxcox(
   data = data,
   digits = 3,
   range = c(-2, 2),
-  plots = FALSE,
+  plots = NULL,
   transform.data = TRUE,
   eps = 1/50,
   xlab = expression(lambda),
@@ -21,7 +21,7 @@ f_boxcox(
   alpha = 0.05,
   open_generated_files = TRUE,
   close_generated_files = FALSE,
-  output_type = "off",
+  output_type = "default",
   save_as = NULL,
   save_in_wdir = FALSE,
   ...
@@ -85,16 +85,28 @@ f_boxcox(
 
 - close_generated_files:
 
-  Logical. If `TRUE`, closes open 'Word' files depending on the output
-  format. This to be able to save the newly generated files. 'Pdf' files
-  should also be closed before using the function and cannot be
-  automatically closed.
+  Logical. Closes open Excel or Word (NOT pdf) files before writing,
+  depending on the output format. Works on Windows (taskkill), macOS
+  (pkill) and Linux (pkill/soffice). Default `FALSE`. **WARNING:**
+  Always save your work before using this option!!
 
 - output_type:
 
-  Character string specifying the output format: `"pdf"`, `"word"`,
-  `"rmd"`, `"off"` (no file generated) or `"console"`. The option
-  `"console"` forces output to be printed. Default is `"off"`.
+  Character string specifying the output format. Default is `"default"`.
+
+  - `"default"`: Returns the object and lets R decide whether to print;
+    auto-prints if unassigned, silent if assigned to a variable. Use
+    `print(result)` or `plot(result)` to display the returned object.
+
+  - `"console"`: Forces immediate printing to the console regardless of
+    object assignment.
+
+  - `"pdf"`, `"word"`, `"excel"`: Saves results to a file of the
+    corresponding format. See `save_as`, `save_in_wdir`, and
+    `open_generated_files` for file path and opening behavior.
+
+  - `"rmd"`: Stores the raw markdown string inside the returned object
+    for use in R Markdown documents.
 
 - save_as:
 
@@ -232,15 +244,15 @@ bc <- f_boxcox(df$values)
 print(bc)
 #> Box-Cox
 #> --------
-#> According to the Shapiro-Wilk test ( 2.923e-12  <  0.05 ) original data is:
+#> According to the Shapiro-Wilk test ( 3.654e-18  <  0.05 ) original data is:
 #>  NOT normally distributed. Transformation will be applied...   
 #>   
 #> Formula used for transformation:   
 #> { (x^λ - 1) / λ } if λ != 0   
 #> { log(x)        } if λ == 0   
 #>    
-#> Box-Cox Transformation λ = -0.019   
-#> According to the Shapiro-Wilk test ( 0.9528  >  0.05 ) data is
+#> Box-Cox Transformation λ = -0.218   
+#> According to the Shapiro-Wilk test ( 0.9482  >  0.05 ) data is
 #>  normally distributed after transformation.
 
 # Plot the QQ plots, Histograms and Lambda Log-Likelihood estimation.
@@ -251,22 +263,22 @@ plot(bc)
 # Or Directly use the transformed data from the f_boxcox object.
 df$values_transformed <- f_boxcox(df$values)$transformed_data
 print(df$values_transformed)
-#>   [1] -0.23068155  1.53585356  0.07046118  0.12912907  1.68742230  0.45890387
-#>   [7] -1.28038739 -0.69135420 -0.44755415  1.20995694  0.35858670  0.39924945
-#>  [13]  0.11056642 -0.55878661  1.75691948  0.49550326 -2.00382113  0.69670354
-#>  [19] -0.47492133 -1.07872969 -0.21842691 -1.03607026 -0.73396179 -0.62876541
-#>  [25] -1.71401123  0.83115436  0.15314986 -1.15053200  1.23899832  0.42474110
-#>  [31] -0.29590017  0.88755676  0.87084843  0.81520186  0.68415470  0.55101302
-#>  [37] -0.06194814 -0.30685371 -0.38184952 -0.69931209 -0.20832850 -1.28073066
-#>  [43]  2.12487209  1.19420531 -1.13517732 -0.40443078 -0.46873027  0.77421428
-#>  [49] -0.08343513  0.25270987 -0.02855450 -0.04288792  1.35096134 -0.22625592
-#>  [55]  1.49483194 -1.57176501  0.58137889  0.12370863  0.21549918  0.37827357
-#>  [61] -0.50472822 -0.33426437 -1.02849548 -1.08277868  0.30265509  0.44630671
-#>  [67]  0.05297755  0.91423398  2.01067104 -0.49332887 -2.36057439  0.99619010
-#>  [73] -0.71400047 -0.69252516  1.01564389 -0.28554481 -1.23498424  0.18099156
-#>  [79] -0.13907479  0.00576387  0.38387365 -0.37196830  0.64044800 -0.22094904
-#>  [85]  0.33073840  1.08548896  0.43338730 -0.32694287  1.13636063  0.98418561
-#>  [91]  0.54554983  0.23819112 -0.63166654  1.34321498 -0.60369560  2.14250411
-#>  [97]  1.51051115 -0.23622892 -1.03649491 -0.71522264
+#>   [1] -0.76836962  0.24982329 -0.25344581 -0.36104715 -1.05752153 -0.04524945
+#>   [7] -0.85605638 -2.01153677 -0.39642947  0.83279174 -0.61298563  0.56939813
+#>  [13] -1.93991732 -0.05589983  0.49107995  0.29148062  0.10446824 -0.68760902
+#>  [19] -0.93349490 -1.14745718  0.11615077 -1.05242453 -0.51774851 -0.26337567
+#>  [25]  1.51832008 -0.70055422  0.22944922  0.07730210 -1.07013394 -0.07186522
+#>  [31]  1.23920626  0.42999520  0.04104816 -0.44256509 -2.58974817  1.00262116
+#>  [37] -1.71996781  0.68335120  1.56165817 -1.69698357  0.65073773 -0.26983581
+#>  [43] -1.87515923 -1.79469238 -1.91669919 -0.56284982 -1.72150177  0.63881943
+#>  [49]  1.68505058 -1.48572345  0.72381189  0.70803331  0.32045870 -1.12779843
+#>  [55] -0.12102151 -0.28914240  0.52981227 -0.38797585  0.87994431 -0.39029967
+#>  [61]  0.94065117 -1.17885675 -1.45024768  2.32410585 -0.43638557  0.28873988
+#>  [67]  0.59437478 -0.51021237  0.48880663  0.35451581 -0.22051696  0.06483054
+#>  [73] -0.03419407  1.70292673 -0.80460200 -1.23800949  0.03763318  0.30020644
+#>  [79]  0.41639670 -0.48204832 -1.19666953  1.10418433 -0.36332136 -0.95255330
+#>  [85] -0.24247067 -0.20147501  0.98584623  0.08395942  0.69533761 -0.52747821
+#>  [91]  0.20950996 -0.33645277  0.09361508 -0.98872000 -1.51727534  1.61921718
+#>  [97]  0.56303822 -1.43856644 -0.65375005 -1.35275934
 
 ```

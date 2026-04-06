@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">rfriend</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">2.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -42,6 +42,13 @@
 
       <dl><dt>
 
+          <code><a href="df_to_table.html">df_to_table()</a></code>
+
+        </dt>
+        <dd>Convert a data frame to a contingency table</dd>
+
+        <dt>
+
           <code><a href="f_aov.html">f_aov()</a></code>
 
         </dt>
@@ -63,7 +70,7 @@
 
         <dt>
 
-          <code><a href="f_boxplot.html">f_boxplot()</a></code>
+          <code><a href="f_boxplot.html">f_boxplot()</a></code> <code><a href="f_boxplot.html">f_boxplot_worker()</a></code>
 
         </dt>
         <dd>Generate a Boxplot Report of a data.frame</dd>
@@ -73,7 +80,7 @@
           <code><a href="f_chisq_test.html">f_chisq_test()</a></code>
 
         </dt>
-        <dd>Chi-squared Test with Post-hoc Analysis</dd>
+        <dd>Chi-squared Test with post hoc Analysis</dd>
 
         <dt>
 
@@ -94,7 +101,7 @@
           <code><a href="f_corplot.html">f_corplot()</a></code>
 
         </dt>
-        <dd>Correlation Plots with Factor Detection and Customization</dd>
+        <dd>Correlation Plots with Factor Detection, Customization, and Multiple Correlation Coefficients</dd>
 
         <dt>
 
@@ -108,7 +115,7 @@
           <code><a href="f_glm.html">f_glm()</a></code>
 
         </dt>
-        <dd>Perform multiple <code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm()</a></code> functions with diagnostics, assumption checking, and post-hoc analysis</dd>
+        <dd>Perform multiple <code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm()</a></code> functions with diagnostics, assumption checking, and post hoc analysis</dd>
 
         <dt>
 
@@ -133,7 +140,14 @@
 
         <dt>
 
-          <code><a href="f_model_comparison.html">f_model_comparison()</a></code>
+          <code><a href="f_long.html">f_long()</a></code>
+
+        </dt>
+        <dd>Transform 'Wide' (Excel) data to 'Long' (R) format</dd>
+
+        <dt>
+
+          <code><a href="f_model_compare.html">f_model_compare()</a></code>
 
         </dt>
         <dd>Compare Two Statistical Models</dd>
@@ -144,6 +158,13 @@
 
         </dt>
         <dd>Open a File with the Default Application</dd>
+
+        <dt>
+
+          <code><a href="f_outliers.html">f_outliers()</a></code>
+
+        </dt>
+        <dd>Identify Outliers within Groups using Tukey's Fences</dd>
 
         <dt>
 
@@ -161,6 +182,13 @@
 
         <dt>
 
+          <code><a href="f_remove_outliers.html">f_remove_outliers()</a></code>
+
+        </dt>
+        <dd>Remove Outliers from Data</dd>
+
+        <dt>
+
           <code><a href="f_rename_columns.html">f_rename_columns()</a></code>
 
         </dt>
@@ -175,10 +203,24 @@
 
         <dt>
 
+          <code><a href="f_scan.html">f_scan()</a></code>
+
+        </dt>
+        <dd>Perform a visual check on your data</dd>
+
+        <dt>
+
           <code><a href="f_setwd.html">f_setwd()</a></code>
 
         </dt>
         <dd>Set Working Directory Based on Current File or Specified Path</dd>
+
+        <dt>
+
+          <code><a href="f_stat_wizard.html">f_stat_wizard()</a></code>
+
+        </dt>
+        <dd>Statistical Test Wizard</dd>
 
         <dt>
 
@@ -189,10 +231,24 @@
 
         <dt>
 
+          <code><a href="f_t_test.html">f_t_test()</a></code>
+
+        </dt>
+        <dd>Perform multiple t-tests with optional data transformation, inspection and visualization.</dd>
+
+        <dt>
+
           <code><a href="f_theme.html">f_theme()</a></code>
 
         </dt>
         <dd>Apply a black or white 'RStudio' Theme and Zoom Level</dd>
+
+        <dt>
+
+          <code><a href="f_wilcox_test.html">f_wilcox_test()</a></code>
+
+        </dt>
+        <dd>Perform multiple Wilcoxon rank sum and signed rank tests with inspection and visualization.</dd>
 
         <dt>
 
@@ -210,10 +266,59 @@
 
         <dt>
 
+          <code><a href="plot.f_kruskal_test.html">plot(<i>&lt;f_kruskal_test&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Plot method for f_kruskal_test objects</dd>
+
+        <dt>
+
+          <code><a href="plot.f_long.html">plot(<i>&lt;f_long&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Plot method for f_long objects</dd>
+
+        <dt>
+
+          <code><a href="predict.f_boxcox.html">predict(<i>&lt;f_boxcox&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Predict method for f_boxcox objects</dd>
+
+        <dt>
+
+          <code><a href="print.f_outliers.html">print(<i>&lt;f_outliers&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Print method for f_outliers objects</dd>
+
+        <dt>
+
+          <code><a href="print.f_scan.html">print(<i>&lt;f_scan&gt;</i>)</a></code> <code><a href="print.f_scan.html">summary(<i>&lt;f_scan&gt;</i>)</a></code> <code><a href="print.f_scan.html">plot(<i>&lt;f_scan&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Print method for f_scan objects</dd>
+
+        <dt>
+
+          <code><a href="print.f_stat_wizard.html">print(<i>&lt;f_stat_wizard&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Print method for f_stat_wizard</dd>
+
+        <dt>
+
           <code><a href="print.f_summary.html">print(<i>&lt;f_summary&gt;</i>)</a></code>
 
         </dt>
         <dd>Print method for f_summary objects</dd>
+
+        <dt>
+
+          <code><a href="summary.f_long.html">summary(<i>&lt;f_long&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Summary method for f_long objects</dd>
       </dl></div>
   </main></div>
 

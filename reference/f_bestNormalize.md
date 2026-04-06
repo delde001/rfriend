@@ -11,7 +11,7 @@ f_bestNormalize(
   alpha = 0.05,
   plots = FALSE,
   data_name = NULL,
-  output_type = "off",
+  output_type = "default",
   save_as = NULL,
   save_in_wdir = FALSE,
   close_generated_files = FALSE,
@@ -42,9 +42,21 @@ f_bestNormalize(
 
 - output_type:
 
-  Character string specifying the output format: `"pdf"`, `"word"`,
-  `"rmd"`, `"off"` (no file generated) or `"console"`. The option
-  `"console"` forces output to be printed. Default is `"off"`.
+  Character string specifying the output format. Default is `"default"`.
+
+  - `"default"`: Returns the object and lets R decide whether to print;
+    auto-prints if unassigned, silent if assigned to a variable. Use
+    `print(result)` or `plot(result)` to display the returned object.
+
+  - `"console"`: Forces immediate printing to the console regardless of
+    object assignment.
+
+  - `"pdf"`, `"word"`, `"excel"`: Saves results to a file of the
+    corresponding format. See `save_as`, `save_in_wdir`, and
+    `open_generated_files` for file path and opening behavior.
+
+  - `"rmd"`: Stores the raw markdown string inside the returned object
+    for use in R Markdown documents.
 
 - save_as:
 
@@ -67,10 +79,10 @@ f_bestNormalize(
 
 - close_generated_files:
 
-  Logical. If `TRUE`, closes open 'Word' files. This to be able to save
-  the newly generated file by the `f_bestNormalize()` function. 'Pdf'
-  files should also be closed before using the function and cannot be
-  automatically closed. Default is `FALSE`.
+  Logical. Closes open Excel or Word (NOT pdf) files before writing,
+  depending on the output format. Works on Windows (taskkill), macOS
+  (pkill) and Linux (pkill/soffice). Default `FALSE`. **WARNING:**
+  Always save your work before using this option!!
 
 - open_generated_files:
 
@@ -102,16 +114,10 @@ Returns an object of class \`f_bestNormalize\` containing:
 
 - `rmd` Rmd code if outputype = "rmd".
 
-Also generates reports in specified formats, when using output to
+Also generates reports in 'Word', or 'pdf' files. When using output to
 console and plots = TRUE, the function prints QQ-plots, Histograms and a
-summary data transformation report.
-
-\#' @return An object of class 'f_bestNormalize' containing results from
-`"bestNormalize"`, the input data, transformed data, Shapiro-Wilk test
-on original and transformed data. Using the option "output_type", it can
-also generate output in the form of: R Markdown code, 'Word', or 'pdf'
-files. Includes print and plot methods for objects of class
-'f_bestNormalize'.
+summary data transformation report. Includes print and plot methods for
+objects of class 'f_bestNormalize'.
 
 ## Details
 
@@ -155,78 +161,122 @@ Sander H. van Delden <plantmind@proton.me>
 
 ``` r
 # \donttest{
-# Create some skewed data (e.g., using a log-normal distribution).
-skewed_data <- rlnorm(100, meanlog = 0, sdlog = 1)
-
 # Use set.seed to keep the outcome of bestNormalize stable.
 set.seed(123)
 
-# Transform the data and store all information in f_bestNormalize_out.
-f_bestNormalize_out <- f_bestNormalize(skewed_data)
+# Create some skewed data (e.g., using a log-normal distribution).
+skewed_data <- rlnorm(100, meanlog = 0, sdlog = 1)
 
-# Print the output.
-print(f_bestNormalize_out)
+# Basic usage: transform and store the full result object.
+result <- f_bestNormalize(skewed_data, data_name = "Skewed log-normal data")
+
+# Print a summary of the transformation.
+print(result)
 #> 
-#> Data transformation of skewed_data using `bestNormalize`: Quantile Normalization (ORQ) 
-#> Original Data Shapiro-Wilk Test:    W = 0.5823   p-value = 2.009e-15 
+#> Data transformation of Skewed log-normal data using `bestNormalize`: Quantile Normalization (ORQ) 
+#> Original Data Shapiro-Wilk Test:    W = 0.7302   p-value = 2.887e-12 
 #> Transformed Data Shapiro-Wilk Test: W = 0.9996   p-value = 1 
 #>   
 #> Below are all considered transformations: [Pearson P / df, lower => more normal]   (n=100)
 #>                Transformation Normality_Stat
 #>                    arcsinh(x)          2.324
-#>                       Box-Cox          2.402
-#>                  Center+scale         14.180
-#>    Double Reversed Log_b(x+a)         47.855
-#>                        Exp(x)        115.065
-#>                 Log-transform          1.674
-#>  Quantile Normalization (ORQ)          0.062
-#>                   sqrt(x + a)          3.702
-#>                   Yeo-Johnson          1.362
+#>                       Box-Cox          0.764
+#>                  Center+scale          8.356
+#>    Double Reversed Log_b(x+a)         25.308
+#>                        Exp(x)        102.684
+#>                 Log-transform          0.660
+#>  Quantile Normalization (ORQ)          0.036
+#>                   sqrt(x + a)          2.246
+#>                   Yeo-Johnson          0.582
 #>    
 #> 
 #> Check the normality plots, by using the plot() function or 'plots = TRUE' option
 
-# Show histograms and QQplots.
-plot(f_bestNormalize_out)
+# Inspect normality statistics for all candidate transformations.
+result$norm_stats
+#>                 Transformation Normality_Stat
+#> 1                   arcsinh(x)          2.324
+#> 2                      Box-Cox          0.764
+#> 3                 Center+scale          8.356
+#> 4   Double Reversed Log_b(x+a)         25.308
+#> 5                       Exp(x)        102.684
+#> 6                Log-transform          0.660
+#> 7 Quantile Normalization (ORQ)          0.036
+#> 8                  sqrt(x + a)          2.246
+#> 9                  Yeo-Johnson          0.582
+
+# Plot histograms and QQ-plots for original vs. transformed data.
+plot(result)
 
 
-# Directly store the transformed_data from f_bestNormalize and force to show
-# plots and transformation information.
-transformed_data <- f_bestNormalize(skewed_data, output_type = "console")$transformed_data
+# Use plots = TRUE to auto-plot when output_type = "default" (default).
+result2 <- f_bestNormalize(skewed_data, plots = TRUE)
+
+
+
+# Extract only the transformed (data) vector directly.
+transformed_data <- f_bestNormalize(skewed_data)$transformed_data
+
+# data.frame input: column name is used as data_name automatically.
+df <- data.frame(measurement = skewed_data)
+result_df <- f_bestNormalize(df)
+
+# Data with NAs: NAs are preserved at their original positions.
+skewed_na <- skewed_data
+skewed_na[c(5, 20)] <- NA
+result_na <- f_bestNormalize(skewed_na)
+
+# Access a specific alternative transformation (first check what is available).
+names(result$bestNormalize$other_transforms)
+#> [1] "arcsinh_x"          "boxcox"             "center_scale"      
+#> [4] "double_reverse_log" "exp_x"              "log_x"             
+#> [7] "sqrt_x"             "yeojohnson"        
+# Then extract the one you want, e.g.:
+# result$bestNormalize$other_transforms$yeojohnson$x.t
+
+# Force output to console (prints report + plots automatically).
+f_bestNormalize(skewed_data, output_type = "console")
 #> 
 #> Data transformation of skewed_data using `bestNormalize`: Quantile Normalization (ORQ) 
-#> Original Data Shapiro-Wilk Test:    W = 0.5823   p-value = 2.009e-15 
+#> Original Data Shapiro-Wilk Test:    W = 0.7302   p-value = 2.887e-12 
 #> Transformed Data Shapiro-Wilk Test: W = 0.9996   p-value = 1 
 #>   
 #> Below are all considered transformations: [Pearson P / df, lower => more normal]   (n=100)
 #>                Transformation Normality_Stat
 #>                    arcsinh(x)          2.324
-#>                       Box-Cox          2.402
-#>                  Center+scale         14.180
-#>    Double Reversed Log_b(x+a)         47.855
-#>                        Exp(x)        115.065
-#>                 Log-transform          1.674
-#>  Quantile Normalization (ORQ)          0.062
-#>                   sqrt(x + a)          3.702
-#>                   Yeo-Johnson          1.362
+#>                       Box-Cox          0.764
+#>                  Center+scale          8.356
+#>    Double Reversed Log_b(x+a)         25.308
+#>                        Exp(x)        102.684
+#>                 Log-transform          0.660
+#>  Quantile Normalization (ORQ)          0.036
+#>                   sqrt(x + a)          2.246
+#>                   Yeo-Johnson          0.582
 #>    
 #> 
 #> Check the normality plots, by using the plot() function or 'plots = TRUE' option
 
 
 
-# Any other transformation can be choosen by using:
-boxcox_transformed_data <- f_bestNormalize(skewed_data)$bestNormalize$other_transforms$boxcox$x.t
-# and substituting '$boxcox' with the transformation of choice.
+# Generate a PDF report saved to a custom path.
+f_bestNormalize(skewed_data,
+                output_type          = "pdf",
+                save_as              = "my_report",
+                open_generated_files = FALSE)
+#> Saving output in: /tmp/RtmpyM0xyc/my_report.pdf
+#> Warning: error in running command
+#> ! sh: 1: pdflatex: not found
+#> Error: LaTeX failed to compile /tmp/RtmpyM0xyc/my_report.tex. See https://yihui.org/tinytex/r/#debugging for debugging tips. See my_report.log for more info.
 
-#To print rmd output set chunck option to results = 'asis' and use:
-f_bestNormalize_rmd_out <- f_bestNormalize(skewed_data, output_type = "rmd")
-cat(f_bestNormalize_rmd_out$rmd)
+# Generate R Markdown output for use inside a .Rmd chunk
+# (set chunk option results = 'asis').
+rmd_result <- f_bestNormalize(skewed_data, output_type = "rmd")
+cat(rmd_result$rmd)
 #> 
 #>    
 #> ##  Data transformation of  skewed_data using `bestNormalize`: Quantile Normalization (ORQ) .  
 #>   
-#> **Original Data Shapiro-Wilk Test:**&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;W = 0.5823&nbsp;&nbsp;&nbsp;&nbsp;p-value = 2.0093e-15 
+#> **Original Data Shapiro-Wilk Test:**&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;W = 0.7302&nbsp;&nbsp;&nbsp;&nbsp;p-value = 2.8867e-12 
 #> 
 #> **Transformed Data Shapiro-Wilk Test:** W = 0.9996&nbsp;&nbsp;&nbsp;&nbsp;p-value = 1 
 #>   
@@ -234,28 +284,33 @@ cat(f_bestNormalize_rmd_out$rmd)
 #>   
 #> **Table.** All considered transformations: [Pearson P / df, lower => more normal]   (n=100)
 #> 
-#> -------------------------------------------
-#> Transforma                     Normality_  
-#> tion                           Stat        
-#> ------------------------------ ------------
-#> arcsinh(x)                     2.324       
+#> ----------------------------
+#> Transforma      Normality_  
+#> tion            Stat        
+#> --------------- ------------
+#> arcsinh(x)      2.324       
 #> 
-#> Box-Cox                        2.402       
+#> Box-Cox         0.764       
 #> 
-#> Center+scale                   14.180      
+#> Center+scale    8.356       
 #> 
-#> Double Reversed Log_b(x+a)     47.855      
+#> Double          25.308      
+#> Reversed                    
+#> Log_b(x+a)                  
 #> 
-#> Exp(x)                         115.065     
+#> Exp(x)          102.684     
 #> 
-#> Log-transform                  1.674       
+#> Log-transform   0.660       
 #> 
-#> Quantile Normalization (ORQ)   0.062       
+#> Quantile        0.036       
+#> Normalization               
+#> (ORQ)                       
 #> 
-#> sqrt(x + a)                    3.702       
+#> sqrt(x +        2.246       
+#> a)                          
 #> 
-#> Yeo-Johnson                    1.362       
-#> -------------------------------------------
+#> Yeo-Johnson     0.582       
+#> ----------------------------
 # }
 
 ```

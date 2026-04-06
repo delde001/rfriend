@@ -1,11 +1,11 @@
 # Perform multiple Kruskal-Wallis tests with a user-friendly output file, do data inspection and Dunn's test (of 'rstatix') as post hoc.
 
 Performs the Kruskal-Wallis rank sum test to assess whether there are
-statistically significant differences between three or more independent
-groups. It provides detailed outputs, including plots, assumption
-checks, and post-hoc analyses using Dunn's test. Results can be saved in
-various formats ('pdf', 'Word', 'Excel', or console only) with
-customizable output options.
+statistically significant differences in the distributions (mean ranks)
+of three or more independent groups. It provides detailed outputs,
+including plots, assumption checks, and post hoc analyses using Dunn's
+test. Results can be saved in various formats ('pdf', 'Word', 'Excel',
+or console only) with customizable output options.
 
 ## Usage
 
@@ -15,7 +15,7 @@ f_kruskal_test(
   data = NULL,
   plot = TRUE,
   alpha = 0.05,
-  output_type = "off",
+  output_type = "default",
   save_as = NULL,
   save_in_wdir = FALSE,
   intro_text = TRUE,
@@ -53,10 +53,21 @@ f_kruskal_test(
 
 - output_type:
 
-  Character string specifying the output format: `"pdf"`, `"word"`,
-  `"excel"`, `"rmd"`, `"console"` or `"off"` (no file generated). The
-  option `"console"` forces output to be printed, the option `"rmd"`
-  saves rmd code in the output object not in a file. Default is `"off"`.
+  Character string specifying the output format. Default is `"default"`.
+
+  - `"default"`: Returns the object and lets R decide whether to print;
+    auto-prints if unassigned, silent if assigned to a variable. Use
+    `print(result)` or `plot(result)` to display the returned object.
+
+  - `"console"`: Forces immediate printing to the console regardless of
+    object assignment.
+
+  - `"pdf"`, `"word"`, `"excel"`: Saves results to a file of the
+    corresponding format. See `save_as`, `save_in_wdir`, and
+    `open_generated_files` for file path and opening behavior.
+
+  - `"rmd"`: Stores the raw markdown string inside the returned object
+    for use in R Markdown documents.
 
 - save_as:
 
@@ -86,17 +97,16 @@ f_kruskal_test(
 
   Character string. Adjustment method for pairwise comparisons in Dunn's
   test. Options include
-  `"holm", "hommel", "bonferroni", "sidak", "hs", "hochberg", "bh", "by", "fdr"`
-  or `"none"`. Default is `"bonferroni"`, if you don't want to adjust
-  the p value (not recommended), use `p.adjust.method = "none"`.
+  `"holm", "hommel", "bonferroni", "hochberg", "bh", "by", "fdr"` or
+  `"none"`. Default is `"bonferroni"`, if you don't want to adjust the p
+  value (not recommended), use `adjust = "none"`.
 
 - close_generated_files:
 
-  Logical. If `TRUE`, closes open 'Excel' or 'Word' files depending on
-  the output format. This to be able to save the newly generated file by
-  the [`f_aov()`](https://delde001.github.io/rfriend/reference/f_aov.md)
-  function. 'Pdf' files should also be closed before using the function
-  and cannot be automatically closed. Default is `FALSE`.
+  Logical. Closes open Excel or Word (NOT pdf) files before writing,
+  depending on the output format. Works on Windows (taskkill), macOS
+  (pkill) and Linux (pkill/soffice). Default `FALSE`. **WARNING:**
+  Always save your work before using this option!!
 
 - open_generated_files:
 
@@ -107,15 +117,38 @@ f_kruskal_test(
 
 ## Value
 
-An object of class 'f_kruskal_test' containing:
+An object of class 'f_kruskal_test' (a named list, one entry per
+response-predictor combination) containing:
 
-- Kruskal-Wallis test results for each combination of response and
-  predictor variables.
+- kruskal.test:
 
-- Dunn's test analysis results (if applicable).
+  The `htest` object from
+  [`kruskal.test()`](https://rdrr.io/r/stats/kruskal.test.html).
 
-- Summary tables with compact letter displays for significant group
-  differences.
+- dunn_test:
+
+  Data frame of pairwise Dunn's test results from
+  [`rstatix::dunn_test()`](https://rpkgs.datanovia.com/rstatix/reference/dunn_test.html).
+
+- summary_table:
+
+  Descriptive statistics with compact letter display (Letters column).
+
+- alpha:
+
+  The significance level used.
+
+- DunnTest_adjust:
+
+  The p-value adjustment method used.
+
+- distributions:
+
+  ggplot density plot (if `plot = TRUE`).
+
+- Boxplot:
+
+  ggplot boxplot with CLD letters (if `plot = TRUE`).
 
 Using the option `output_type`, it can also generate output in the form
 of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and
@@ -132,14 +165,14 @@ analysis using the Kruskal-Wallis test:
 - Visualization: Generates density plots and boxplots to visualize group
   distributions.
 
-- Post-hoc Analysis: Conducts Dunn's test with specified correction
+- Post hoc Analysis: Conducts Dunn's test with specified correction
   methods if significant differences are found.
 
 ———–  
 
 Output files are generated in the format specified by `output_type =`
 and saved to the working directory, options are `"pdf", "word"` or
-`"excel"`. If `output_type = "rmd"` is used it is adviced to use it in a
+`"excel"`. If `output_type = "rmd"` is used it is advised to use it in a
 chunk with {r, echo=FALSE, results='asis'}
 
 This function requires
@@ -159,6 +192,21 @@ or higher), a universal document converter.
   and ensure the directory containing Pandoc is in your PATH.
 
 - If Pandoc is not found, this function may not work as intended.
+
+## Multiple Testing Across Response Variables
+
+When several response variables are analysed in a single call (e.g.
+`y1 + y2 + y3 ~ treatment`), each Kruskal-Wallis test is an independent
+null-hypothesis test at level `alpha`. The post hoc adjustment (e.g.
+`adjust = "bonferroni"`) only controls the family-wise error rate
+**within** one test (across pairwise Dunn comparisons for that
+response). It does **not** protect against the inflation of Type I error
+**across** the set of responses.
+
+**Practical implication:** With \\k\\ independent response variables all
+tested at \\\alpha = 0.05\\, the probability of obtaining at least one
+false positive is \\1 - (1 - 0.05)^k\\, which reaches ~40% for \\k =
+10\\.
 
 ## Author
 
@@ -180,7 +228,7 @@ output <- f_kruskal_test(
                adjust = "holm",
                open_generated_files = FALSE
                )
-#> Saving output in: /tmp/RtmpDUIw9V/iris_Kruskal_Wallis_output.docx
+#> Saving output in: /tmp/RtmpyM0xyc/iris_Kruskal_Wallis_output.docx
 
 # Save Kruskal-Wallis test and posthoc to Excel sheets: Sepal.Width and Sepal.Length.
 f_kruskal_out <- f_kruskal_test(
@@ -191,5 +239,5 @@ f_kruskal_out <- f_kruskal_test(
                      adjust = "holm",
                      open_generated_files = FALSE
                      )
-#> Saving output in: /tmp/RtmpDUIw9V/iris_Kruskal_Wallis_output.xlsx
+#> Saving output in: /tmp/RtmpyM0xyc/iris_Kruskal_Wallis_output.xlsx
 ```

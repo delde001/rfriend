@@ -1,0 +1,192 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[
+]{article}
+\usepackage{amsmath,amssymb}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{longtable,booktabs,array}
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\usepackage{graphicx}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+% Set default figure placement to htbp
+\makeatletter
+\def\fps@figure{htbp}
+\makeatother
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\usepackage[utf8]{inputenc}
+\DeclareUnicodeCharacter{03BB}{\ensuremath{\lambda}}
+\usepackage{titling}
+\setlength{\droptitle}{-2.5cm} % Adjust vertical spacing
+\ifLuaTeX
+  \usepackage{selnolig}  % disable illegal ligatures
+\fi
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  pdftitle={f\_Scan Data Analysis Report},
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\title{f\_Scan Data Analysis Report}
+\author{}
+\date{\vspace{-2.5em}2026-04-06}
+
+\begin{document}
+\maketitle
+
+\section{Diagnostic dashboard of: weight from
+plant\_data}\label{diagnostic-dashboard-of-weight-from-plant_data}
+
+\includegraphics{/home/runner/work/rfriend/rfriend/docs/reference/plant_data_fscan_output_files/ad70e2f0fb0f49fb62934eaf5cc7eb51ae844b3f.png}
+
+~
+
+\newpage
+
+\subsection{Summary table of variable: weight from
+plant\_data}\label{summary-table-of-variable-weight-from-plant_data}
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 22\tabcolsep) * \real{0.1020}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 22\tabcolsep) * \real{0.1224}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 22\tabcolsep) * \real{0.0816}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 22\tabcolsep) * \real{0.0510}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 22\tabcolsep) * \real{0.0816}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 22\tabcolsep) * \real{0.0714}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 22\tabcolsep) * \real{0.0714}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 22\tabcolsep) * \real{0.0816}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 22\tabcolsep) * \real{0.0816}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 22\tabcolsep) * \real{0.0918}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 22\tabcolsep) * \real{0.0816}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 22\tabcolsep) * \real{0.0816}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+species
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+treatment
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+batch
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+n
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+mean
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+sd
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+se
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+min
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Q1
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+median
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Q3
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+max
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+A & control & 1 & 10 & 9.72 & 3.16 & 1.00 & 5.12 & 6.66 & 10.57 & 12.37
+& 13.79 \\
+B & control & 1 & 10 & 14.26 & 1.58 & 0.50 & 11.61 & 13.36 & 14.59 &
+15.23 & 16.80 \\
+A & treated & 1 & 10 & 9.85 & 1.10 & 0.35 & 8.43 & 8.87 & 10.13 & 10.69
+& 11.52 \\
+B & treated & 1 & 10 & 14.55 & 2.66 & 0.84 & 10.68 & 12.55 & 14.30 &
+16.41 & 19.40 \\
+A & control & 2 & 10 & 10.33 & 1.37 & 0.43 & 8.87 & 9.43 & 9.73 & 10.89
+& 12.64 \\
+B & control & 2 & 10 & 13.96 & 1.72 & 0.55 & 11.80 & 12.21 & 14.27 &
+15.46 & 16.08 \\
+A & treated & 2 & 10 & 9.71 & 2.53 & 0.80 & 4.01 & 8.42 & 10.48 & 11.24
+& 13.15 \\
+B & treated & 2 & 10 & 13.49 & 2.13 & 0.67 & 11.08 & 12.09 & 13.10 &
+13.99 & 17.70 \\
+A & control & 3 & 10 & 10.36 & 2.85 & 0.90 & 4.69 & 9.41 & 9.76 & 12.00
+& 14.57 \\
+B & control & 3 & 10 & 14.93 & 1.38 & 0.44 & 12.91 & 13.77 & 15.05 &
+15.79 & 17.03 \\
+A & treated & 3 & 10 & 9.71 & 2.56 & 0.81 & 5.17 & 7.77 & 10.61 & 11.34
+& 12.89 \\
+B & treated & 3 & 10 & 13.84 & 1.19 & 0.38 & 12.28 & 12.98 & 13.85 &
+14.25 & 16.09 \\
+\end{longtable}
+
+\subsection{Outliers table of variable: weight from
+plant\_data}\label{outliers-table-of-variable-weight-from-plant_data}
+
+No outliers detected.
+
+\newpage
+
+\subsection{Boxplots of: weight from
+plant\_data}\label{boxplots-of-weight-from-plant_data}
+
+\includegraphics{/home/runner/work/rfriend/rfriend/docs/reference/plant_data_fscan_output_files/0bc5f0c8a263d93a60f7bea962b1edfca7c87862.png}
+
+\subsection{Histograms of: weight from
+plant\_data}\label{histograms-of-weight-from-plant_data}
+
+\includegraphics{/home/runner/work/rfriend/rfriend/docs/reference/plant_data_fscan_output_files/3686c19571e88afcbcf18395305eda74826260b2.png}
+
+\subsection{QQ-plots of: weight from
+plant\_data}\label{qq-plots-of-weight-from-plant_data}
+
+\includegraphics{/home/runner/work/rfriend/rfriend/docs/reference/plant_data_fscan_output_files/be092d2dc0592296b51653fc95994f898afe34a5.png}
+
+\end{document}

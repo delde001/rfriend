@@ -9,11 +9,22 @@ boxplots.
 ## Usage
 
 ``` r
-f_boxplot(
-  data = NULL,
+f_boxplot(x, ...)
+
+# S3 method for class 'formula'
+f_boxplot(formula, data, ...)
+
+# S3 method for class 'data.frame'
+f_boxplot(data, ...)
+
+f_boxplot_worker(
   formula = NULL,
+  data,
   fancy_names = NULL,
   output_type = "pdf",
+  outliers = TRUE,
+  coef = 1.5,
+  limit_columns = 7,
   save_as = NULL,
   save_in_wdir = FALSE,
   close_generated_files = FALSE,
@@ -31,10 +42,6 @@ f_boxplot(
 
 ## Arguments
 
-- data:
-
-  A `data.frame` containing the data to be used for creating boxplots.
-
 - formula:
 
   A formula specifying the factor to be plotted. More response variables
@@ -42,6 +49,10 @@ f_boxplot(
   `response1 + response2 ~ predictor`) to generate multiple boxplots. If
   the formula is omitted and only `data` is provided all data will be
   used for creating boxplots.
+
+- data:
+
+  A `data.frame` containing the data to be used for creating boxplots.
 
 - fancy_names:
 
@@ -53,6 +64,22 @@ f_boxplot(
   Character string, specifying the output format: `"pdf"`, `"word"`,
   `"rmd"` or `"png"`. The option `"rmd"` saves rmd code in the output
   object not in a file. Default is `"pdf"`.
+
+- outliers:
+
+  Logical. If `TRUE`, scans for outliers using Tukey's fences and if
+  they exist, adds them to the report using `f_outliers`. Default
+  `TRUE`.
+
+- coef:
+
+  Numeric. The multiplier for the Interquartile Range (IQR) used for
+  outlier detection. Default `1.5`.
+
+- limit_columns:
+
+  Integer or `NULL`. Defines the number of columns shown in the outlier
+  table. Default = `7`. `NULL` = all columns are shown.
 
 - save_as:
 
@@ -75,10 +102,10 @@ f_boxplot(
 
 - close_generated_files:
 
-  Logical. If `TRUE`, closes open 'Word' files depending on the output
-  format. This to be able to save the newly generated files. 'Pdf' files
-  should also be closed before using the function and cannot be
-  automatically closed.
+  Logical. Closes open Excel or Word (NOT pdf) files before writing,
+  depending on the output format. Works on Windows (taskkill), macOS
+  (pkill) and Linux (pkill/soffice). Default `FALSE`. **WARNING:**
+  Always save your work before using this option!!
 
 - open_generated_files:
 
@@ -201,7 +228,7 @@ f_boxplot(iris,
            output_type = "word",
            open_generated_files = FALSE
            )
-#> Saving output in: /tmp/RtmpDUIw9V/iris_BoxPlot.docx
+#> Saving output in: /tmp/RtmpyM0xyc/data_BoxPlot.docx
 
 # Use a formula to plot several response parameters (response 1 + response 2 etc)
 # and generate a rmd output without boxplot_explanation.
@@ -211,6 +238,6 @@ f_boxplot(hp + disp ~ gear*cyl,
            boxplot_explanation = FALSE,
            output_type = "word",
            open_generated_files = FALSE) # Do not automatically open the 'Word' file.
-#> Saving output in: /tmp/RtmpDUIw9V/mtcars_BoxPlot.docx
+#> Saving output in: /tmp/RtmpyM0xyc/data_BoxPlot.docx
 # }
 ```

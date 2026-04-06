@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">rfriend</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">2.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -31,6 +31,26 @@
 
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="3.0.0" id="rfriend-300-2026-02-01">rfriend 3.0.0 (2026-02-01)<a class="anchor" aria-label="anchor" href="#rfriend-300-2026-02-01"></a></h2>
+<div class="section level3">
+<h3 id="major-changes-3-0-0">Major Changes<a class="anchor" aria-label="anchor" href="#major-changes-3-0-0"></a></h3>
+<ul><li>
+<strong>BREAKING CHANGE:</strong> In order to take <code>formula</code> notation <code>f_summary</code> no longer accepts unquoted column names, either formula notation or quotes names must be used.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="new-features-3-0-0">New Features<a class="anchor" aria-label="anchor" href="#new-features-3-0-0"></a></h3>
+<p>New function to easily go from wide data to long format <code>f_long</code> and a function to scan the data distribution shape, spread, outliers and normality: <code>f_scan</code>. The new <code>f_stat_wizard</code> is still in BETA it analyzes your data structure based on a formula and recommends the appropriate statistical test.<code>f_wilcox_test</code> and <code>f_t_test</code> have been added to the package. Many functions now take formula notation, making iterative function use very simple e.g., summarize columns “disp” and “hp” from dataset “mtcars” grouped by “gear” and “cyl”: <code>f_summary(disp + hp ~ gear + cyl, data = mtcars)</code>. <code>f_summary</code> now allows showing Excess Kurtosis <code>show_kurtosis = TRUE</code> (measure of “tailedness”) and <code>show_skew = TRUE</code> Skewness (measure of asymmetry).</p>
+</div>
+<div class="section level3">
+<h3 id="minor-changes-3-0-0">Minor Changes<a class="anchor" aria-label="anchor" href="#minor-changes-3-0-0"></a></h3>
+<p>intro text and summary text of <code>f_aov</code>, <code>f_kruskall_test</code>, and <code>f_glm</code> has been improved to be more user friendly. <code>f_aov</code> and <code>f_glm</code> now show backtransformed data in post hoc summary table. A data summary table has been added to these functions. <code>f_aov</code> now has <code>transformation = "boxcox"</code> as default instead of <code>"bestnormalize"</code>. <code>f_open_file</code> has been improved for linux users, formatting of <code>Word</code> output is now compatible with <code>LibreOffice Writer</code>, tested on version 24.2.7.2. <code>f_corplot</code> has been rewritten to allow for ordinal variables and now shows Pearson, Spearman and Kendall correlation coefficients.</p>
+</div>
+<div class="section level3">
+<h3 id="bug-fixes-3-0-0">Bug Fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-3-0-0"></a></h3>
+<p>Bug fixes for all functions after stress testing by using extreme combinations of input options.</p>
+</div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="2.0.0" id="rfriend-200-2025-11-16">rfriend 2.0.0 (2025-11-16)<a class="anchor" aria-label="anchor" href="#rfriend-200-2025-11-16"></a></h2><p class="text-muted">CRAN release: 2025-11-11</p>
 <div class="section level3">
