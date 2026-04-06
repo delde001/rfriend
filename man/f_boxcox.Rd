@@ -8,7 +8,7 @@ f_boxcox(
   data = data,
   digits = 3,
   range = c(-2, 2),
-  plots = FALSE,
+  plots = NULL,
   transform.data = TRUE,
   eps = 1/50,
   xlab = expression(lambda),
@@ -16,7 +16,7 @@ f_boxcox(
   alpha = 0.05,
   open_generated_files = TRUE,
   close_generated_files = FALSE,
-  output_type = "off",
+  output_type = "default",
   save_as = NULL,
   save_in_wdir = FALSE,
   ...
@@ -43,9 +43,23 @@ f_boxcox(
 
 \item{open_generated_files}{Logical. If \code{TRUE}, opens the generated output files ('pdf', 'Word' or 'Excel') files depending on the output format. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.}
 
-\item{close_generated_files}{Logical. If \code{TRUE}, closes open 'Word' files depending on the output format. This to be able to save the newly generated files. 'Pdf' files should also be closed before using the function and cannot be automatically closed.}
+\item{close_generated_files}{Logical. Closes open Excel or Word (NOT pdf) files before writing, depending on the output format. Works on Windows (taskkill), macOS (pkill) and Linux (pkill/soffice). Default \code{FALSE}. \strong{WARNING:} Always save your work before using this option!!}
 
-\item{output_type}{Character string specifying the output format: \code{"pdf"}, \code{"word"}, \code{"rmd"}, \code{"off"} (no file generated) or \code{"console"}. The option \code{"console"} forces output to be printed. Default is \code{"off"}.}
+\item{output_type}{Character string specifying the output format. Default is \code{"default"}.
+\itemize{
+  \item \code{"default"}: Returns the object and lets R decide whether
+    to print; auto-prints if unassigned, silent if assigned to a variable.
+    Use \code{print(result)} or \code{plot(result)} to display the
+    returned object.
+  \item \code{"console"}: Forces immediate printing to the console
+    regardless of object assignment.
+  \item \code{"pdf"}, \code{"word"}, \code{"excel"}: Saves results to a
+    file of the corresponding format. See \code{save_as},
+    \code{save_in_wdir}, and \code{open_generated_files} for file
+    path and opening behavior.
+  \item \code{"rmd"}: Stores the raw markdown string inside the returned
+    object for use in R Markdown documents.
+}}
 
 \item{save_as}{Character string specifying the output file path (without extension).
 If a full path is provided, output is saved to that location.

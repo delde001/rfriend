@@ -9,7 +9,7 @@ f_bestNormalize(
   alpha = 0.05,
   plots = FALSE,
   data_name = NULL,
-  output_type = "off",
+  output_type = "default",
   save_as = NULL,
   save_in_wdir = FALSE,
   close_generated_files = FALSE,
@@ -26,7 +26,21 @@ f_bestNormalize(
 
 \item{data_name}{A character string to manually set the name of the data for plot axis and reporting. Default extracts name from input object. \code{data}.}
 
-\item{output_type}{Character string specifying the output format: \code{"pdf"}, \code{"word"}, \code{"rmd"}, \code{"off"} (no file generated) or \code{"console"}. The option \code{"console"} forces output to be printed. Default is \code{"off"}.}
+\item{output_type}{Character string specifying the output format. Default is \code{"default"}.
+\itemize{
+  \item \code{"default"}: Returns the object and lets R decide whether
+    to print; auto-prints if unassigned, silent if assigned to a variable.
+    Use \code{print(result)} or \code{plot(result)} to display the
+    returned object.
+  \item \code{"console"}: Forces immediate printing to the console
+    regardless of object assignment.
+  \item \code{"pdf"}, \code{"word"}, \code{"excel"}: Saves results to a
+    file of the corresponding format. See \code{save_as},
+    \code{save_in_wdir}, and \code{open_generated_files} for file
+    path and opening behavior.
+  \item \code{"rmd"}: Stores the raw markdown string inside the returned
+    object for use in R Markdown documents.
+}}
 
 \item{save_as}{Character string specifying the output file path (without extension).
 If a full path is provided, output is saved to that location.
@@ -37,7 +51,7 @@ Defaults to \code{file.path(tempdir(), "data_name_transformed.pdf")}.}
 
 \item{save_in_wdir}{Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.}
 
-\item{close_generated_files}{Logical. If \code{TRUE}, closes open 'Word' files. This to be able to save the newly generated file by the \code{f_bestNormalize()} function. 'Pdf' files should also be closed before using the function and cannot be automatically closed. Default is \code{FALSE}.}
+\item{close_generated_files}{Logical. Closes open Excel or Word (NOT pdf) files before writing, depending on the output format. Works on Windows (taskkill), macOS (pkill) and Linux (pkill/soffice). Default \code{FALSE}. \strong{WARNING:} Always save your work before using this option!!}
 
 \item{open_generated_files}{Logical. If \code{TRUE}, Opens the generated output file, this to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.}
 
@@ -55,9 +69,7 @@ Returns an object of class `f_bestNormalize` containing:
   \item \code{norm_stats} Data frame of normality statistics for all methods.
   \item \code{rmd} Rmd code if outputype = "rmd".
 }
-Also generates reports in specified formats, when using output to console and plots = TRUE, the function prints QQ-plots, Histograms and a summary data transformation report.
-
-#' @return An object of class 'f_bestNormalize' containing results from \code{"bestNormalize"}, the input data, transformed data, Shapiro-Wilk test on original and transformed data. Using the option "output_type", it can also generate output in the form of: R Markdown code, 'Word', or 'pdf' files. Includes print and plot methods for objects of class 'f_bestNormalize'.
+Also generates reports in 'Word', or 'pdf' files. When using output to console and plots = TRUE, the function prints QQ-plots, Histograms and a summary data transformation report. Includes print and plot methods for objects of class 'f_bestNormalize'.
 }
 \description{
 Applies optimal normalization transformations using 'bestNormalize',
@@ -80,32 +92,57 @@ This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (ver
 }
 \examples{
 \donttest{
-# Create some skewed data (e.g., using a log-normal distribution).
-skewed_data <- rlnorm(100, meanlog = 0, sdlog = 1)
-
 # Use set.seed to keep the outcome of bestNormalize stable.
 set.seed(123)
 
-# Transform the data and store all information in f_bestNormalize_out.
-f_bestNormalize_out <- f_bestNormalize(skewed_data)
+# Create some skewed data (e.g., using a log-normal distribution).
+skewed_data <- rlnorm(100, meanlog = 0, sdlog = 1)
 
-# Print the output.
-print(f_bestNormalize_out)
+# Basic usage: transform and store the full result object.
+result <- f_bestNormalize(skewed_data, data_name = "Skewed log-normal data")
 
-# Show histograms and QQplots.
-plot(f_bestNormalize_out)
+# Print a summary of the transformation.
+print(result)
 
-# Directly store the transformed_data from f_bestNormalize and force to show
-# plots and transformation information.
-transformed_data <- f_bestNormalize(skewed_data, output_type = "console")$transformed_data
+# Inspect normality statistics for all candidate transformations.
+result$norm_stats
 
-# Any other transformation can be choosen by using:
-boxcox_transformed_data <- f_bestNormalize(skewed_data)$bestNormalize$other_transforms$boxcox$x.t
-# and substituting '$boxcox' with the transformation of choice.
+# Plot histograms and QQ-plots for original vs. transformed data.
+plot(result)
 
-#To print rmd output set chunck option to results = 'asis' and use:
-f_bestNormalize_rmd_out <- f_bestNormalize(skewed_data, output_type = "rmd")
-cat(f_bestNormalize_rmd_out$rmd)
+# Use plots = TRUE to auto-plot when output_type = "default" (default).
+result2 <- f_bestNormalize(skewed_data, plots = TRUE)
+
+# Extract only the transformed (data) vector directly.
+transformed_data <- f_bestNormalize(skewed_data)$transformed_data
+
+# data.frame input: column name is used as data_name automatically.
+df <- data.frame(measurement = skewed_data)
+result_df <- f_bestNormalize(df)
+
+# Data with NAs: NAs are preserved at their original positions.
+skewed_na <- skewed_data
+skewed_na[c(5, 20)] <- NA
+result_na <- f_bestNormalize(skewed_na)
+
+# Access a specific alternative transformation (first check what is available).
+names(result$bestNormalize$other_transforms)
+# Then extract the one you want, e.g.:
+# result$bestNormalize$other_transforms$yeojohnson$x.t
+
+# Force output to console (prints report + plots automatically).
+f_bestNormalize(skewed_data, output_type = "console")
+
+# Generate a PDF report saved to a custom path.
+f_bestNormalize(skewed_data,
+                output_type          = "pdf",
+                save_as              = "my_report",
+                open_generated_files = FALSE)
+
+# Generate R Markdown output for use inside a .Rmd chunk
+# (set chunk option results = 'asis').
+rmd_result <- f_bestNormalize(skewed_data, output_type = "rmd")
+cat(rmd_result$rmd)
 }
 
 }

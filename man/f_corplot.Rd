@@ -2,20 +2,25 @@
 % Please edit documentation in R/fcorplot.R
 \name{f_corplot}
 \alias{f_corplot}
-\title{Correlation Plots with Factor Detection and Customization}
+\title{Correlation Plots with Factor Detection, Customization, and Multiple Correlation Coefficients}
 \usage{
 f_corplot(
   data,
   detect_factors = TRUE,
   factor_table = FALSE,
+  factor_exclude = NULL,
+  factor_select = NULL,
+  unique_num_treshold = 8,
+  repeats_threshold = 2,
   color_factor = "auto",
   shape_factor = "auto",
   print_legend = TRUE,
   fancy_names = NULL,
+  ordinal_vars = NULL,
   width = 15,
   height = 15,
   res = 600,
-  pointsize = 8,
+  pointsize = 10,
   close_generated_files = FALSE,
   open_generated_files = TRUE,
   output_type = "word",
@@ -24,62 +29,99 @@ f_corplot(
 )
 }
 \arguments{
-\item{data}{A \code{data.frame} containing the dataset to be visualized. Must include at least two numeric variables.}
+\item{data}{A \code{data.frame} containing the dataset. Must include at least
+two numeric variables.}
 
-\item{detect_factors}{Logical. If \code{TRUE}, the function automatically detects factor variables in the dataset for coloring and shaping points. Defaults to \code{TRUE}.}
+\item{detect_factors}{Logical. If \code{TRUE}, factor variables are
+automatically detected for colouring and shaping points. Default \code{TRUE}.}
 
-\item{factor_table}{Logical. If \code{TRUE}, prints a detailed table about the properties of the converted factors to the console. Default is FALSE, so no property table will be printed to the console.}
+\item{factor_table}{Logical. If \code{TRUE}, prints a detailed table of
+converted factors to the console. Default \code{FALSE}.}
 
-\item{color_factor}{Character. The name of the factor variable to use for point colors. If set to \code{"auto"}, it is automatically determined based on detected factors. Defaults to \code{"auto"}.}
+\item{factor_exclude}{A character vector specifying the names of the columns NOT to convert into factors. If \code{NULL}, no columns are excluded. Default is \code{NULL}.}
 
-\item{shape_factor}{Character. The name of the factor variable to use for point shapes. If set to \code{"auto"}, it is automatically determined based on detected factors. Defaults to \code{"auto"}.}
+\item{factor_select}{A character vector specifying the names of the columns to convert into factors. If \code{NULL}, the function automatically detects columns that should be factors based on their data type and unique value count. Default is \code{NULL}.}
 
-\item{print_legend}{Logical. If \code{TRUE}, a separate legend file is created and displayed. Defaults to \code{TRUE}.}
+\item{unique_num_treshold}{Numeric. A threshold of the amount of unique numbers a numeric column should have to keep it numeric, i.e. omit factor conversion. Default \code{8}.}
 
-\item{fancy_names}{Named character vector or \code{NULL}. Optional mapping of column names to more readable names for display in plots and legends.}
+\item{repeats_threshold}{Numeric. A threshold of the minimal number of repeats a numeric column should have to convert it to a factor. Default \code{2}.}
 
-\item{width}{Numeric. The width of the output plot in centimeters (default 15 cm).}
+\item{color_factor}{Character. Name of the factor variable used for point
+colours; \code{"auto"} selects automatically. Default \code{"auto"}.}
 
-\item{height}{Numeric. The height of the output plot in centimeters (default 15 cm).}
+\item{shape_factor}{Character. Name of the factor variable used for point
+shapes; \code{"auto"} selects automatically. Default \code{"auto"}.}
 
-\item{res}{Numeric. The resolution (in dots per inch) for the output plot image (defaults 1000 dpi).}
+\item{print_legend}{Logical. If \code{TRUE}, a separate legend file is
+created. Default \code{TRUE}.}
 
-\item{pointsize}{Numeric. The base font size for text in the plot image. Defaults to 8.}
+\item{fancy_names}{Named character vector or \code{NULL}. Maps column names
+to display names used in the plot and legend.}
 
-\item{close_generated_files}{Logical. If \code{TRUE}, closes open 'Word' files depending on the output format. This to be able to save the newly generated files. 'Pdf' files should also be closed before using the function and cannot be automatically closed. Default is \code{FALSE}.}
+\item{ordinal_vars}{Character vector or \code{NULL}. Names of variables to
+treat as ordinal. Ordered factors are coerced to integer ranks; other
+non-numeric types are coerced similarly. Their diagonal labels are
+italicised and Pearson \eqn{r}{r} is greyed and bracketed for any pair that
+involves them. Ordinal variables are included in the correlation panels but
+excluded from aesthetic factor detection. Default \code{NULL}.}
 
-\item{open_generated_files}{Logical. If \code{TRUE}, Opens the generated 'Word' output files. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.}
+\item{width}{Numeric. Plot width in centimetres. Default 15.}
 
-\item{output_type}{Character string specifying the output format: "pdf", "word", "png" or "rmd". Default is "word".}
+\item{height}{Numeric. Plot height in centimetres. Default 15.}
 
-\item{save_as}{Character string specifying the output file path (without extension).
-If a full path is provided, output is saved to that location.
-If only a filename is given, the file is saved in \code{tempdir()}.
-If only a directory is specified (providing an existing directory with trailing slash),
-the file is named "dataname_CorPlot" in that directory. If an extension is provided the output format specified with option "output_type" will be overruled.
-Defaults to \code{file.path(tempdir(), "dataname_CorPlot.docx")}.}
+\item{res}{Numeric. Resolution in DPI. Default 600.}
 
-\item{save_in_wdir}{Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.}
+\item{pointsize}{Numeric. Base font size. Default 8.}
+
+\item{close_generated_files}{Logical. Closes open Excel or Word (NOT pdf) files before writing, depending on the output format. Works on Windows (taskkill), macOS (pkill) and Linux (pkill/soffice). Default \code{FALSE}. \strong{WARNING:} Always save your work before using this option!!}
+
+\item{open_generated_files}{Logical. If \code{TRUE}, opens generated output
+files automatically. Default \code{TRUE}.}
+
+\item{output_type}{Character. One of \code{"pdf"}, \code{"word"},
+\code{"png"}, or \code{"rmd"}. Default \code{"word"}.}
+
+\item{save_as}{Character or \code{NULL}. Output file path without extension.
+A full path, a filename, or a directory (with trailing slash) are all
+accepted. Providing an extension overrides \code{output_type}.
+Default saves to \code{tempdir()}.}
+
+\item{save_in_wdir}{Logical. If \code{TRUE}, saves to the working directory.
+Overridden by \code{save_as}. Default \code{FALSE}.}
 }
 \value{
-Output is a 'Word' document with:
-\itemize{
-\item A correlation plot.
-\item A legend if applicable.
-}
-Using the option "output_type", it can also generate output in the form of: R Markdown code, 'pdf', or 'PNG' files. No value is returned to the R environment; instead, files are saved, and they are opened automatically if running on Windows.
+No value is returned to the R environment. Output files are saved
+  and opened automatically when running on Windows.
 }
 \description{
-Creates correlation plots for numeric variables in a data frame, optionally incorporating factors for coloring and shaping points. It supports automatic detection of factors, customization of plot aesthetics, and the generation of separate legend files.
+Creates correlation plots for numeric variables in a data frame. The upper
+triangle displays Pearson \eqn{r}{r}, Spearman \eqn{\rho}{rho}, and Kendall
+\eqn{\tau}{tau} simultaneously for each pair. Factor variables are automatically detected and
+used for grouping, i.e. point colouring and shaping. Ordinal variables are supported via
+\code{ordinal_vars}: their diagonal labels are italicised and Pearson \eqn{r}{r}
+is greyed and bracketed for any pair that involves them.A separate legend file documents both
+the grouping factors and the meaning of all three correlation symbols.
 }
 \details{
 \itemize{
-\item Factor Detection: If \code{detect_factors} is enabled, up to two factors are automatically detected from the dataset and used for coloring (\code{color_factor}) and shaping (\code{shape_factor}) points in the plot.
-\item Customization: Users can manually specify which factors to use by setting \code{color_factor} and/or (\code{shape_factor}). Non-factor variables are converted into factors automatically, with a message indicating this conversion.
-\item Legend Generation: A separate legend file is created when factors are used or if \code{print_legend} is explicitly set to \code{TRUE}.
+  \item \strong{Three correlations per panel:} Every upper-triangle panel
+    shows \eqn{r}{r} (Pearson), \eqn{\rho}{rho} (Spearman), and \eqn{\tau}{tau}
+    (Kendall) stacked vertically, so the reader can choose the most
+    appropriate coefficient for each variable pair.
+  \item \strong{Ordinal variables:} Specify column names with
+    \code{ordinal_vars}. Those variables appear in italic on the diagonal.
+    For any pair where at least one variable is ordinal, Pearson \eqn{r}{r} is
+    shown greyed and in parentheses to signal it is technically inappropriate;
+    Spearman and Kendall remain prominent.
+  \item \strong{Factor detection:} Only unordered factors are used for
+    colour/shape aesthetics. Ordered factors (\code{is.ordered()}) are
+    treated as ordinal data, not as grouping variables.
+  \item \strong{Legend:} The legend file documents the grouping factor levels
+    (when present) and always includes an explanation of all three
+    correlation symbols whenever a legend is generated.
+  \item \strong{Constant columns:} Zero-variance columns produce \code{NA}
+    in all correlation panels rather than crashing.
 }
-
-The function uses numeric variables in the dataset for scatterplots and computes Pearson correlations displayed in the upper triangle of the correlation matrix.
 
 This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
 \itemize{
@@ -90,37 +132,26 @@ This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (ver
 \item If Pandoc is not found, this function may not work as intended.
 }
 }
-\note{
-\itemize{
-\item At least two numeric variables are required in the dataset; otherwise, an error is thrown.
-\item If more than two factors are detected, only the first two are used with a warning message.
-}
-}
 \examples{
-# Example usage:
-data("mtcars")
-
+data(mtcars)
 mtcars_sub <- subset(mtcars, select = -c(am, qsec, vs))
-# Customizing factors:
 f_corplot(mtcars_sub,
-           shape_factor = "cyl",
-           color_factor = "gear",
-           output_type = "png",
-           open_generated_files = FALSE
-           )
+          color_factor = "gear",
+          shape_factor = "cyl",
+          output_type  = "png",
+          open_generated_files = FALSE)
 
-
-# Output to MS Word and add fancy column names, only adjusting two of the four variable names.
+# With ordinal variables
 data(iris)
-fancy_names <- c(Sepal.Length = "Sepal Length (cm)", Sepal.Width = "Sepal Width (cm)")
+fancy_names <- c(Sepal.Length = "Sepal Length (cm)",
+                 Sepal.Width  = "Sepal Width (cm)")
 f_corplot(iris,
-           fancy_names = fancy_names,
-           output_type = "word",
-           open_generated_files = FALSE
-           )
-
+          fancy_names  = fancy_names,
+          ordinal_vars = "Petal.Width",
+          output_type  = "png",
+          open_generated_files = FALSE)
 
 }
 \author{
-Sander H. van Delden  \email{plantmind@proton.me} \cr
+Sander H. van Delden \email{plantmind@proton.me}
 }

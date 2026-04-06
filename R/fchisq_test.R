@@ -1,15 +1,15 @@
-#' Chi-squared Test with Post-hoc Analysis
+#' Chi-squared Test with post hoc Analysis
 #'
 #' @description
-#' Performs a chi-squared test  \code{\link[stats]{chisq.test}}, then automatically conducts post-hoc analysis if the test is significant. The function provides adjusted p-values for each cell in the contingency table using a specified correction method.
+#' Performs a chi-squared test  \code{\link[stats]{chisq.test}}, then automatically conducts post hoc analysis if the test is significant. The function provides adjusted p-values for each cell in the contingency table using a specified correction method.
 #'
-#' @param x  A numeric vector (or factor), or a contingency table in matrix or table form. If a data frame is entered the function will try to convert it to a table.
+#' @param x  A numeric vector (or factor), or a contingency table in matrix or table form. If a data frame is entered the function will try to convert it to a table using \code{df_to_table()}.
 #' @param y A numeric vector; ignored if x is a matrix, table or data.frame. If x is a factor, y should be a factor of the same length.
 #' @param p A vector of probabilities of the same length as x. Default is \code{NULL}. An error is given if any entry of p is negative.
 #' @param method Character string specifying the adjustment method for p-values. Default is \code{"bonferroni"}. Other options include \code{"holm", "hochberg", "hommel", "BH", "BY", "fdr", and "none"}.
 #' @param digits Integer specifying the number of decimal places for rounding. Default is \code{3}.
 #' @param alpha Numeric threshold for significance. Default is \code{0.05}.
-#' @param force_posthoc Logical indicating whether to perform post-hoc tests even if the chi-squared test is not significant. Default is \code{FALSE}.
+#' @param force_posthoc Logical indicating whether to perform post hoc tests even if the chi-squared test is not significant. Default is \code{FALSE}.
 #' @param ... Additional arguments passed to \code{\link[stats]{chisq.test}}.
 #'
 #' @return An object of class f_chisq_test containing:
@@ -25,7 +25,7 @@
 #'
 #' @details
 #' The function first performs a chi-squared test using \code{\link[stats]{chisq.test}}. If the test is
-#' significant (p < alpha) or if \code{force_posthoc = TRUE}, it conducts post-hoc analysis by examining
+#' significant (p < alpha) or if \code{force_posthoc = TRUE}, it conducts post hoc analysis by examining
 #' the standardized residuals. The p-values for these residuals are adjusted using the specified method
 #' to control for multiple comparisons.
 #'
@@ -42,7 +42,7 @@
 #' dimnames(my_table) <- list(Gender = c("Male", "Female"),
 #'                            Response = c("Agree", "Neutral", "Disagree"))
 #'
-#' # Perform chi-squared test with post-hoc analysis.
+#' # Perform chi-squared test with post hoc analysis.
 #' f_chisq_test(my_table)
 #'
 #' # Use a different adjustment method.
@@ -59,7 +59,7 @@
 #' f_chisq_test(x = observed, p = expected_probs)
 #'
 #' @references
-#' This function implements a post-hoc analysis for chi-squared tests inspired by the methodology in:
+#' This function implements a post hoc analysis for chi-squared tests inspired by the methodology in:
 #'
 #' Beasley, T. M., & Schumacker, R. E. (1995). Multiple Regression Approach to Analyzing Contingency Tables: Post Hoc and Planned Comparison Procedures. The Journal of Experimental Education, 64(1), 79-93.
 #'
@@ -95,21 +95,43 @@ f_chisq_test <-
     x_name <- deparse(substitute(x))
 
 
-    if(is.data.frame(x) && is.null(p)){
+    if (is.data.frame(x) && is.null(p)) {
+      suppressMessages(x <- df_to_table(x))
+      env[[x_name]] <- x
+      message(x_name, " is a data.frame, converted to table using df_to_table().\nPlease check if this table is as intended.\nIf not, consider using df_to_table(", x_name, ", label_col = ) to pick the correct column.\n")
+      print(x)
+      message("---")
+    }
 
-      # Convert the input data to a table and store it in the new environment
-      env[[x_name]] <- as.table(as.matrix(x))
+    if(!is.table(x) && !is.vector(x) && is.null(p)){
       x <- as.table(as.matrix(x))
-
       message(x_name, " is not a table, tried to convert data to a table.\nPlease check if this table is as intended: \n")
       print(x)
       message("---")
+    }
 
+
+    # Always store x in env AFTER potential conversion
+    env[[x_name]] <- x
+
+
+    # Do the Probabilities in 'p' sum up to 1
+    if(!is.null(p) && abs(sum(p) - 1) > .Machine$double.eps^0.5){
+      stop("Probabilities in 'p' must sum to 1. Got sum(p) = ", round(sum(p), 4))
     }
 
     # Do chisq.test()
-    # Use eval to run chisq.test with the converted data, preserving the original name
-    chisq.test.output <-eval(bquote(stats::chisq.test(.(as.name(x_name)), ...)), envir = env)
+    # Build the call, forwarding y and p correctly
+    if (missing(y)) {
+      if (!is.null(p)) {
+        chisq.test.output <- eval(bquote(stats::chisq.test(.(as.name(x_name)), p = p, ...)), envir = env)
+      } else {
+        chisq.test.output <- eval(bquote(stats::chisq.test(.(as.name(x_name)), ...)), envir = env)
+      }
+    } else {
+      env[["y"]] <- y
+      chisq.test.output <- eval(bquote(stats::chisq.test(.(as.name(x_name)), y = y, ...)), envir = env)
+    }
 
     output_list[["chisq_test_output"]] <- chisq.test.output
 
@@ -125,23 +147,30 @@ f_chisq_test <-
 
       if(is.table(x) || is.matrix(x)){
         # Adjust the p values with the chosen method
-        adjusted_p_values <- apply(p_values, 2, p.adjust,
-                                   method = method,
-                                   n = length(p_values))
+        adjusted_p_values <- matrix(
+          p.adjust(as.vector(p_values), method = method),
+          nrow = nrow(p_values),
+          ncol = ncol(p_values),
+          dimnames = dimnames(p_values)
+        )
 
 
         # name the row of the p value table
         rownames(adjusted_p_values) <- rep("p-value", times = nrow(adjusted_p_values))
 
         # Round and create tables with p values for merging procedure
-        table_adj_p <- f_conditional_round(adjusted_p_values, digits = digits, detect_int_col = FALSE)
+        table_adj_p <- f_conditional_round(adjusted_p_values,
+                                           digits = digits,
+                                           allow_integer_decimal_mix = FALSE)
 
         # Save the adjusted p.values
         output_list[["adjusted_p_values"]] <- table_adj_p
 
         # Create tables with original data for merging procedure
         table_observed <- chisq.test.output$observed
-        table_observed <- f_conditional_round(table_observed, digits = 0, detect_int_col = FALSE)
+        table_observed <- f_conditional_round(table_observed,
+                                              digits = 0,
+                                              allow_integer_decimal_mix = FALSE)
 
         # Create some space for readability in printed output
         table_empty <- table_observed
@@ -161,7 +190,7 @@ f_chisq_test <-
         output_list[["observed_vs_adj_p_value"]] <- Posthoc_obs_pvalue
 
         # Interleave the formatted tables for output stdres vs pvalue
-        stdres <- f_conditional_round(stdres, digits = digits, detect_int_col = FALSE)
+        stdres <- f_conditional_round(stdres, digits = digits, allow_integer_decimal_mix = FALSE)
 
         # Interleave the formatted tables for output and store in output list
         n <- nrow(table_observed)
@@ -177,7 +206,7 @@ f_chisq_test <-
         adjusted_p_values <- p.adjust(p_values, method = method)
 
         # Round the p.values
-        adjusted_p_values <- f_conditional_round(adjusted_p_values, digits = digits, detect_int_col = FALSE)
+        adjusted_p_values <- f_conditional_round(adjusted_p_values, digits = digits, allow_integer_decimal_mix = FALSE)
 
         # Save the adjusted p.values
         output_list[["adj_p_values"]] <- adjusted_p_values
@@ -212,13 +241,13 @@ print.f_chisq_test <- function(x, ...) {
       cat("\nObserved data and corresponding", x$settings$method, "corrected p-values:\n   \n")
       print(x$spaced_observed_vs_adj_p_value, quote = FALSE)
 
-    } else if(!is.null(x$settings$p)){
+    } else if(!is.null(x$p)){
       cat("\nObserved data and corresponding", x$settings$method, "corrected p-values:\n   \n")
       print(x$posthoc_output_table, row.names = FALSE, quote = FALSE)
     }
 
   } else {
 
-    cat(paste0("No post-hoc test was performed. \nChi-squared test p value = ", round(x$chisq_test_output$p.value, digits = x$settings$digits), " which is higher than alpha = ", x$settings$alpha, "\n(NOTE: a post-hoc can be forced with option: 'force_posthoc = TRUE')"))
+    cat(paste0("No post hoc test was performed. \nChi-squared test p value = ", round(x$chisq_test_output$p.value, digits = x$settings$digits), " which is higher than alpha = ", x$settings$alpha, "\n(NOTE: a post hoc can be forced with option: 'force_posthoc = TRUE')"))
   }
 }

@@ -36,7 +36,7 @@ f_factors(
 Returns the modified data frame with the specified (or all suitable) columns converted to factors. Can also force a print of a summary of the data frame's structure to the console (properties = TRUE).
 }
 \description{
-Converts multiple specified columns of a data frame into factors. If no columns are specified, it automatically detects and converts columns that are suitable to be factors. The function returns the entire data frame including non factor columns and reports the properties of this new data frame in the console.
+Converts multiple specified columns of a data frame into factors. If no columns are specified, it automatically detects and converts columns that are suitable to be factors. The function returns the entire data frame including non factor columns and can report the properties of this new data frame in the console (\code{properties = TRUE}).
 }
 \details{
 \itemize{

@@ -2,7 +2,7 @@ Package: rfriend
 Type: Package
 Title: Provides Batch Functions and Visualisation for Basic Statistical
         Procedures
-Version: 2.0.0
+Version: 3.0.0
 Authors@R: c(person("Sander H.", "van Delden", role = c("aut", "cre"), email = "plantmind@proton.me"))
 Description: Designed to streamline data analysis and statistical testing, reducing the length of R 
     scripts while generating well-formatted outputs in 'pdf', 'Microsoft Word', and 'Microsoft Excel' 
@@ -31,7 +31,7 @@ Note: When loading, both MuMIn and rstatix are imported. Since rstatix internall
 License: GPL-3
 Encoding: UTF-8
 Depends: R (>= 4.4.0)
-Imports: bestNormalize, crayon, DHARMa, emmeans, ggplot2, grDevices,
+Imports: bestNormalize, crayon, DHARMa, emmeans, ggplot2, grDevices, gridExtra,
         knitr, magick, multcomp, multcompView, MuMIn, nortest, pander,
         rmarkdown, rstatix, rstudioapi, stringr, this.path, writexl,
         xfun

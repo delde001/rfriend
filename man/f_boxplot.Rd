@@ -2,13 +2,25 @@
 % Please edit documentation in R/fboxplot.R
 \name{f_boxplot}
 \alias{f_boxplot}
+\alias{f_boxplot.formula}
+\alias{f_boxplot.data.frame}
+\alias{f_boxplot_worker}
 \title{Generate a Boxplot Report of a data.frame}
 \usage{
-f_boxplot(
-  data = NULL,
+f_boxplot(x, ...)
+
+\method{f_boxplot}{formula}(formula, data, ...)
+
+\method{f_boxplot}{data.frame}(data, ...)
+
+f_boxplot_worker(
   formula = NULL,
+  data,
   fancy_names = NULL,
   output_type = "pdf",
+  outliers = TRUE,
+  coef = 1.5,
+  limit_columns = 7,
   save_as = NULL,
   save_in_wdir = FALSE,
   close_generated_files = FALSE,
@@ -24,13 +36,19 @@ f_boxplot(
 )
 }
 \arguments{
-\item{data}{A \code{data.frame} containing the data to be used for creating boxplots.}
-
 \item{formula}{A formula specifying the factor to be plotted. More response variables can be added using \code{-} or \code{+} (e.g., \code{response1 + response2 ~ predictor}) to generate multiple boxplots. If the formula is omitted and only \code{data} is provided all data will be used for creating boxplots.}
+
+\item{data}{A \code{data.frame} containing the data to be used for creating boxplots.}
 
 \item{fancy_names}{An optional named vector mapping column names in \code{data} to more readable names for display in plots (name map). Defaults to \code{NULL}.}
 
 \item{output_type}{Character string, specifying the output format: \code{"pdf"}, \code{"word"}, \code{"rmd"} or \code{"png"}. The option \code{"rmd"} saves rmd code in the output object not in a file. Default is \code{"pdf"}.}
+
+\item{outliers}{Logical. If \code{TRUE}, scans for outliers using Tukey's fences and if they exist, adds them to the report using \code{f_outliers}. Default \code{TRUE}.}
+
+\item{coef}{Numeric. The multiplier for the Interquartile Range (IQR) used for outlier detection. Default \code{1.5}.}
+
+\item{limit_columns}{Integer or \code{NULL}. Defines the number of columns shown in the outlier table. Default = \code{7}. \code{NULL} = all columns are shown.}
 
 \item{save_as}{Character string specifying the output file path (without extension).
 If a full path is provided, output is saved to that location.
@@ -41,7 +59,7 @@ Defaults to \code{file.path(tempdir(), "dataname_BoxPlot.pdf")}.}
 
 \item{save_in_wdir}{Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.}
 
-\item{close_generated_files}{Logical. If \code{TRUE}, closes open 'Word' files depending on the output format. This to be able to save the newly generated files. 'Pdf' files should also be closed before using the function and cannot be automatically closed.}
+\item{close_generated_files}{Logical. Closes open Excel or Word (NOT pdf) files before writing, depending on the output format. Works on Windows (taskkill), macOS (pkill) and Linux (pkill/soffice). Default \code{FALSE}. \strong{WARNING:} Always save your work before using this option!!}
 
 \item{open_generated_files}{Logical. If \code{TRUE}, Opens the generated output files ('pdf', 'Word' or 'png') files depending on the output format. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.}
 

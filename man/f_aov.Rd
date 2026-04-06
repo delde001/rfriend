@@ -8,15 +8,17 @@ f_aov(
   formula,
   data = NULL,
   norm_plots = TRUE,
+  interaction_plots = TRUE,
   ANCOVA = FALSE,
   transformation = TRUE,
   force_transformation = NULL,
+  force_aov = FALSE,
   alpha = 0.05,
   adjust = "sidak",
   intro_text = TRUE,
   close_generated_files = FALSE,
   open_generated_files = TRUE,
-  output_type = "off",
+  output_type = "default",
   save_as = NULL,
   save_in_wdir = FALSE
 )
@@ -26,13 +28,22 @@ f_aov(
 
 \item{data}{A data frame containing the variables in the model.}
 
-\item{norm_plots}{Logical. If \code{TRUE}, plots are included in the output files. Default is \code{TRUE}.}
+\item{norm_plots}{Logical. If \code{TRUE}, diagnostic residual plots are included in the output files. Default is \code{TRUE}.}
+
+\item{interaction_plots}{Logical. If \code{TRUE}, estimated means / interaction plots are included in the output files after the post hoc table. Default is \code{TRUE}.}
 
 \item{ANCOVA}{Logical. If \code{TRUE}, prevents automatic conversion of predictors to factors, allowing for Analysis of Covariance (ANCOVA). Default is \code{FALSE}.}
 
-\item{transformation}{Logical or character string. If \code{TRUE}, or if \code{"bestnormalize"}, applies \code{bestNormalize()} transformation if residuals are not normal. If \code{"boxcox"} applies a boxcox transformation. If \code{FALSE} no transformation will be applied. Default is \code{TRUE}.}
+\item{transformation}{Logical or character string. If \code{TRUE}, or if \code{"boxcox"} applies a \code{f_boxcox()} transformation if residuals are not normal. If \code{"bestnormalize"}, applies \code{f_bestNormalize()} transformation. If \code{FALSE} no transformation will be applied. Default is \code{TRUE}.}
 
 \item{force_transformation}{Character string. A vector containing the names of response variables that should be transformed regardless of the normality test. Default is \code{NULL}}
+
+\item{force_aov}{Logical. If \code{TRUE}, runs the ANOVA even when at least
+one cell has \eqn{n = 1} (saturated model). By default (\code{FALSE}),
+such responses are skipped with a warning because F-statistics and
+p-values are undefined for saturated models. Set to \code{TRUE} only for
+diagnostic purposes — results should \strong{not} be reported or
+interpreted as valid. Default is \code{FALSE}.}
 
 \item{alpha}{Numeric. Significance level for ANOVA, post hoc tests, and Shapiro-Wilk test. Default is \code{0.05}.}
 
@@ -52,11 +63,25 @@ for multiple comparisons. Available methods include:
 
 \item{intro_text}{Logical. If \code{TRUE}, includes a short explanation about ANOVA assumptions in the output file. Default is \code{TRUE}.}
 
-\item{close_generated_files}{Logical. If \code{TRUE}, closes open 'Excel' or 'Word' files depending on the output format. This to be able to save the newly generated file by the \code{f_aov()} function. 'Pdf' files should also be closed before using the function and cannot be automatically closed. Default is \code{FALSE}.}
+\item{close_generated_files}{Logical. Closes open Excel or Word (NOT pdf) files before writing, depending on the output format. Works on Windows (taskkill), macOS (pkill) and Linux (pkill/soffice). Default \code{FALSE}. \strong{WARNING:} Always save your work before using this option!!}
 
 \item{open_generated_files}{Logical. If \code{TRUE}, Opens the generated output files ('pdf', 'Word' or 'Excel') files depending on the output format. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.}
 
-\item{output_type}{Character string specifying the output format: \code{"pdf"}, \code{"word"}, \code{"excel"}, \code{"rmd"}, \code{"console"} or \code{"off"} (no file generated). The option \code{"console"} forces output to be printed, the option \code{"rmd"} saves rmd code in the output object not in a file. Default is \code{"off"}.}
+\item{output_type}{Character string specifying the output format. Default is \code{"default"}.
+\itemize{
+  \item \code{"default"}: Returns the object and lets R decide whether
+    to print; auto-prints if unassigned, silent if assigned to a variable.
+    Use \code{print(result)} or \code{plot(result)} to display the
+    returned object.
+  \item \code{"console"}: Forces immediate printing to the console
+    regardless of object assignment.
+  \item \code{"pdf"}, \code{"word"}, \code{"excel"}: Saves results to a
+    file of the corresponding format. See \code{save_as},
+    \code{save_in_wdir}, and \code{open_generated_files} for file
+    path and opening behavior.
+  \item \code{"rmd"}: Stores the raw markdown string inside the returned
+    object for use in R Markdown documents.
+}}
 
 \item{save_as}{Character string specifying the output file path (without extension).
 If a full path is provided, output is saved to that location.
@@ -72,7 +97,7 @@ An object of class 'f_aov' containing results from \code{aov()}, normality tests
 }
 \description{
 Performs an Analysis of Variance (ANOVA) on a given dataset with options for (Box-Cox)
-transformations, normality tests, and post-hoc analysis. Several response parameters can be analysed in sequence and the generated output can be in various formats ('Word', 'pdf', 'Excel').
+transformations, normality tests, and post hoc analysis. Several response parameters can be analysed in sequence and the generated output can be in various formats ('Word', 'pdf', 'Excel').
 }
 \details{
 The function performs the following steps:
@@ -99,6 +124,44 @@ This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (ver
 \item If Pandoc is not found, this function may not work as intended.
 }
 }
+\section{Multiple Testing Across Response Variables}{
+
+When several response variables are analysed in a single call
+(e.g. \code{y1 + y2 + y3 ~ treatment}), each ANOVA is an independent
+null-hypothesis test at level \code{alpha}. The post hoc adjustments
+(\code{adjust = "sidak"}, \code{"tukey"}, etc.) only control the
+family-wise error rate \strong{within} one ANOVA (across pairwise group
+comparisons for that response). They do \strong{not} protect against
+the inflation of Type I error \strong{across} the set of responses.
+
+\strong{Practical implication:} With \eqn{k} independent response
+variables all tested at \eqn{\alpha = 0.05}, the probability of
+obtaining at least one false positive is
+\eqn{1 - (1 - 0.05)^k}, which reaches ~40\% for \eqn{k = 10}.
+
+\strong{When this matters:} The risk is highest in exploratory studies
+where many responses are screened simultaneously without a clear
+a priori hypothesis for each one. It is less of a concern when
+each response is a pre-specified primary outcome with its own
+biological rationale.
+
+\strong{Possible remedies:}
+\itemize{
+  \item \strong{Bonferroni correction across responses:} use
+    \code{alpha = 0.05 / k} where \code{k} is the number of
+    response variables. Conservative but simple.
+  \item \strong{False Discovery Rate (FDR):} apply
+    \code{p.adjust(p_values, method = "fdr")} to the vector of
+    per-response ANOVA p-values after the fact.
+  \item \strong{MANOVA:} if the responses are correlated and you
+    want a single omnibus test across all of them, use
+    \code{manova()} before interpreting individual ANOVAs.
+  \item \strong{Pre-registration:} declare primary vs. exploratory
+    responses before data collection to justify differential
+    correction thresholds.
+}
+}
+
 \examples{
 # Make a factor of Species.
 iris$Species <- factor(iris$Species)
@@ -110,8 +173,8 @@ f_aov_out <- f_aov(Sepal.Width + Sepal.Length ~ Species,
                    data = iris,
                    # Save output in MS Word file (Default is console)
                    output_type = "word",
-                   # Do boxcox transformation for non-normal residual (Default is bestnormalize)
-                   transformation = "boxcox",
+                   # Do bestNormalize transformation for non-normal residual (Default is boxcox)
+                   transformation = "bestnormalize",
                    # Do not automatically open the file.
                    open_generated_files = FALSE
                    )

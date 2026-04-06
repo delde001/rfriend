@@ -43,12 +43,20 @@ f_open_file <- function(filepath) {
 
   # Use appropriate command based on OS
   if (os == "Windows") {
-    shell.exec(filepath)  # Windows-specific command
+    shell.exec(filepath)
+
   } else if (os == "Linux") {
-    system(paste("xdg-open", shQuote(filepath)))  # Linux-specific command
-  } else if (os == "Darwin") {  # macOS identifies as 'Darwin'
-    system(paste("open", shQuote(filepath)))  # macOS-specific command
+    # 1. use 'env LD_LIBRARY_PATH=' to clear RStudio's custom libraries so they
+    #    don't conflict with system apps (like LibreOffice).
+    # 2. use wait = FALSE so R doesn't freeze while the file is open.
+    # 3. ignore stdout/stderr to keep the R console clean.
+    system(paste("env LD_LIBRARY_PATH= xdg-open", shQuote(filepath)),
+           wait = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE)
+
+  } else if (os == "Darwin") { # macOS
+    system(paste("open", shQuote(filepath)), wait = FALSE)
+
   } else {
-   message("Unsupported operating system, the file will not be opened")
+    message("Unsupported operating system, the file will not be opened")
   }
 }

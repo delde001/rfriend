@@ -1,6 +1,6 @@
 #' Convert multiple columns to Factors in a data frame
 #'
-#' Converts multiple specified columns of a data frame into factors. If no columns are specified, it automatically detects and converts columns that are suitable to be factors. The function returns the entire data frame including non factor columns and reports the properties of this new data frame in the console.
+#' Converts multiple specified columns of a data frame into factors. If no columns are specified, it automatically detects and converts columns that are suitable to be factors. The function returns the entire data frame including non factor columns and can report the properties of this new data frame in the console (\code{properties = TRUE}).
 #'
 #' @param data A data frame containing the columns to be converted.
 #' @param select A character vector specifying the names of the columns to convert into factors. If \code{NULL}, the function automatically detects columns that should be factors based on their data type and unique value count. Default is \code{NULL}.

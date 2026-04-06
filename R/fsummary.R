@@ -1,361 +1,405 @@
 #' Summarize a Data Frame with Grouping Variables
 #'
-#' Computes summary statistics (e.g., mean, standard deviation, median, etc.) for a specified column ("character string") in a data frame, grouped by one or more grouping variables in that data frame ("character strings"). Summary parameters can be customized and the results can be exported to an 'Excel' file.
+#' @description
+#' Computes summary statistics (n, mean, sd, etc.) for a specified numerical columns
+#' in a data frame. The data can be analyzed as a whole or split by one or more
+#' grouping variables.
 #'
-#' @param data A 'data.frame', 'data.table' or 'tibble', i.e. input data to be summarized.
-#' @param data.column A character string, vector or list with characters. The name of the column(s) in \code{data} for which summary statistics will be calculated.
-#' @param ... One or more character strings specifying the grouping variables in \code{data}.
-#' @param show_n Logical. If \code{TRUE}, the summary results \code{n} will be included in the output.
-#' @param show_mean Logical. If \code{TRUE}, the summary results \code{mean} will be included in the output.
-#' @param show_sd Logical. If \code{TRUE}, the summary results \code{sd} will be included in the output.
-#' @param show_se Logical. If \code{TRUE}, the summary results \code{se} will be included in the output.
-#' @param show_min Logical. If \code{TRUE}, the summary results \code{min} will be included in the output.
-#' @param show_max Logical. If \code{TRUE}, the summary results \code{max} will be included in the output.
-#' @param show_median Logical. If \code{TRUE}, the summary results \code{median} will be included in the output.
-#' @param show_Q1 Logical. If \code{TRUE}, the summary results \code{Q1} will be included in the output.
-#' @param show_Q3 Logical. If \code{TRUE}, the summary results \code{Q3} will be included in the output.
-#' @param digits Integer. Round to the number of digits specified. If \code{digits = NULL} no rounding is applied (default is \code{digits = 2}). Note that this rounding is independent of the rounding in the exported excel file.
-#' @param export_to_excel Logical. If \code{TRUE}, the (unrounded values) summary results will be exported to an 'Excel' file. Default is \code{FALSE}.
-#' @param save_as Character string specifying the output file path (without extension).
-#'   If a full path is provided, output is saved to that location.
-#'   If only a filename is given, the file is saved in \code{tempdir()}.
-#'   If only a directory is specified (providing an existing directory with trailing slash),
-#'   the file is named "dataname_summary.xlsx" in that directory.
-#'   Defaults to \code{file.path(tempdir(), "dataname_summary.xlsx")}.
-#' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, to avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.
-#' @param close_generated_files Logical. If \code{TRUE}, closes open 'Excel' files. This to be able to save the newly generated file. Default is \code{FALSE}.
-#' @param open_generated_files Logical. If \code{TRUE}, Opens the generated 'Excel' files. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.
-#' @param check_input If \code{TRUE}, checks the input and stops the function if the input is incorrect (default is \code{TRUE}).
-#' @param eval_input Logical. If \code{TRUE}, the function evaluates the third function argument. This should be a character vector with the group by columns. Default is \code{FALSE}, which allows group by columns to be written without quotes.
-#' @param digits_excel Integer. Round cells in the excel file to the number of digits specified. If \code{digits_excel = NULL} no rounding is applied (default is \code{digits_excel = NULL}). Note to preserve formatting numbers will be stored as text.
-#' @param detect_int_col Logical. If \code{TRUE}, columns in a data.frame containing only integers will be displayed without decimal digits. Columns containing a mix of integers and decimal values will display all values with the specified number of digits. If \code{FALSE}, each individual cell is evaluated: integer values are displayed without digits, and numbers containing digits with the specified number of digits. Default is \code{TRUE}.
+#' The function returns a formatted data frame and includes options to export
+#' the results directly to an 'Excel' file.
+#'
+#' @param formula A formula specifying the columns (right hand side) to be summarized by groups (left hand side). More columns or groups can be added using \code{-} or \code{+} (e.g., \code{col1 + col2 ~ group1 + group2}) to do a sequential summary for each column parameter.
+#' @param data A 'data.frame', 'data.table', or 'tibble'.
+#' @param columns The numerical column(s) to summarize if no formula is used. Can be entered as a single character string (e.g., \code{"weight"}) or as a character vector \code{c("weight", "length"}).
+#' @param group_vars A character vector specifying the grouping variables in \code{data}
+#'   (e.g., \code{c("species", "fertilizer")}) if no formula is used. If \code{NULL}, the entire dataset is summarized.
+#' @param show_name Logical. Include variable name. Default \code{TRUE}.
+#' @param show_n Logical. Include count (\code{n}). Default \code{TRUE}.
+#' @param show_mean Logical. Include mean. Default \code{TRUE}.
+#' @param show_sd Logical. Include standard deviation. Default \code{TRUE}.
+#' @param show_se Logical. Include standard error. Default \code{TRUE}.
+#' @param show_min Logical. Include minimum value. Default \code{TRUE}.
+#' @param show_max Logical. Include maximum value. Default \code{TRUE}.
+#' @param show_median Logical. Include median. Default \code{TRUE}.
+#' @param show_Q1 Logical. Include first quartile (25th percentile). Default \code{TRUE}.
+#' @param show_Q3 Logical. Include third quartile (75th percentile). Default \code{TRUE}.
+#' @param show_skew Logical. Include Skewness (measure of asymmetry). Default \code{FALSE}.
+#' @param show_kurtosis Logical. Include Excess Kurtosis (measure of "tailedness"). Default \code{FALSE}.
+#' @param digits Integer. Number of decimal places for the R console output.
+#'   Default is \code{2}. If \code{NULL}, no rounding is applied.
+#'   (Note: This does not affect the raw numbers exported to Excel).
+#' @param export_to_excel Logical. If \code{TRUE}, exports results to an 'Excel' file. Default \code{FALSE}.
+#' @param digits_excel Integer. Number of decimal places for the Excel file cells. Default \code{NULL} (no rounding). Defining \code{digits_excel}, sets \code{export_to_excel = TRUE} when excel output is not intended use: \code{digits} instead.
+#' @param allow_integer_decimal_mix Logical. If \code{TRUE}, intergers in columns with a mix of integers and non-integers are displayed without decimals. Default \code{FALSE}, meaning if there are one or more numbers with decimals the whole column contains the number of decimals set by \code{digits}.
+#' @param save_as Character string. Custom path or filename for the Excel export.
+#'   \itemize{
+#'     \item If full path: Saves to that location.
+#'     \item If filename only: Saves to \code{tempdir()} (unless \code{save_in_wdir = TRUE}).
+#'     \item If directory: Saves as "dataname_summary.xlsx" in that directory.
+#'   }
+#' @param save_in_wdir Logical. If \code{TRUE}, saves to the current working directory. Default \code{FALSE}.
+#' @param close_generated_files Logical. If \code{TRUE}, forces Excel to close before saving (Windows only). Default \code{FALSE}.
+#' @param open_generated_files Logical. If \code{TRUE}, opens the Excel file after creation. Default \code{TRUE}.
+#' @param check_input Logical. If \code{TRUE}, performs validation checks on inputs. Default \code{TRUE}.
+#'
 #'
 #' @details
-#' The function computes the following summary statistics for the specified column:
-#'\itemize{
-#' \item \code{n}: number of observations
-#' \item \code{mean}: mean
-#' \item \code{sd}: standard deviation
-#' \item \code{se}: standard error of the mean
-#' \item \code{min}: minimum value
-#' \item \code{max}: maximum value
-#' \item \code{median}: median
-#' \item \code{Q1}: first quartile
-#' \item \code{Q3}: third quartile
-#'}
-#' Each of these summary statistics can be removed by setting e.g. \code{show_n = FALSE}, The results are grouped by the specified grouping variables and returned as a data frame. If \code{export_to_excel} is set to \code{TRUE}, the results are saved as an 'Excel' file in the working directory with a dynamically generated filename.
+#' The function computes the following statistics:
+#' \itemize{
+#'   \item \code{n}: number of observations
+#'   \item \code{mean}: arithmetic mean
+#'   \item \code{sd}: standard deviation
+#'   \item \code{se}: standard error (\eqn{sd / \sqrt{n}})
+#'   \item \code{min}: minimum value
+#'   \item \code{max}: maximum value
+#'   \item \code{median}: median value
+#'   \item \code{Q1}: 25th percentile
+#'   \item \code{Q3}: 75th percentile
+#'   \item \code{skew}: Sample skewness (if requested).
+#'   \item \code{kurt}: Sample excess kurtosis (if requested).
+#' }
 #'
-#' When only \code{data} and \code{data.column} is provided the function defaults to base:summary(data).
+#' \code{skew} stands for Skewness which is a measure of asymmetry of a distribution around its mean. Where \code{skew} values near \bold{0} indicate approximate symmetry, while large positive or negative values indicate noticeable asymmetry.
+#' \itemize{
+#'   \item \code{> 0}: Right-skewed (long or heavier tail to the right).
+#'   \item \code{< 0}: Left-skewed  (long or heavier tail to the left).
+#'  }
 #'
-#' @return A data frame containing the computed summary statistics, grouped by the specified variables. This data frame can be automatically saved as an 'Excel' file using \code{export_to_excel = TRUE}.
+#' \code{kurt} stands for Excess Kurtosis: Tells you about the "tails" and the peak.
+#'   \itemize{
+#'     \item \code{0}: Same tail heaviness as the normal distribution (mesokurtic).
+#'     \item \code{> 0}: Heavier tails than normal (Leptokurtic) — indicates frequent outliers.
+#'     \item \code{< 0}: Lighter tails than normal (Platykurtic) — indicates fewer (or less extreme) outliers than a normal distribution.
+#'  }
+#' If \code{group_vars} are provided, the statistics are calculated for each group combination.
+#' When \code{export_to_excel = TRUE}, the file is automatically generated.
+#'
+#' @return A list of class \code{f_summary} containing the results data frame.
 #'
 #' @author
-#' Sander H. van Delden  \email{plantmind@proton.me} \cr
+#' Sander H. van Delden \email{plantmind@proton.me}
 #'
 #' @examples
-#' # Example usage:
-#' # Create a summary of mtcars for data column hp grouped by cyl and gear,
-#' # and remove Q1 and Q3 from the output.
-#' # Note that variable can be written as "hp" or as hp. Only data.frame must be data (no quotes)
-#' summary_mtcars <- f_summary(mtcars, "hp", "cyl", "gear", show_Q1 = FALSE, show_Q3 = FALSE)
+#'
+#' # --- Example 1: Basic Usage (data.frame notation) ---
+#' # Summarize "hp" grouped by "cyl"; columns and group_vars can be positional
+#' summary_mtcars <- f_summary(mtcars, columns = "hp", group_vars = "cyl")
+#' summary_mtcars <- f_summary(mtcars, "hp", "cyl")  # shorthand equivalent
 #' print(summary_mtcars)
 #'
-#' # Create a summary for iris
-#' summary_iris <- f_summary(iris, Sepal.Length, Species)
+#' # --- Example 2: Multiple Columns & Groups with Custom Toggles ---
+#' # Summarize "hp" and "disp", grouped by "cyl" and "gear", hide Q1/Q3
+#' summary_custom <- f_summary(mtcars,
+#'                             columns    = c("hp", "disp"),
+#'                             group_vars = c("cyl", "gear"),
+#'                             show_Q1    = FALSE,
+#'                             show_Q3    = FALSE)
+#' print(summary_custom)
 #'
-#' # Print the a table with column width of 10 characters and table length of 70 characters
-#' print(summary_iris, col_width =  10, table_width = 70)
+#' # --- Example 3: Formula Notation ---
+#' # Identical result to Example 2 using formula interface
+#' # and export output to excel
+#' summary_formula <- f_summary(hp + disp ~ cyl + gear,
+#'                              data    = mtcars,
+#'                              show_Q1 = FALSE,
+#'                              show_Q3 = FALSE,
+#'                              export_to_excel = TRUE)
+#' print(summary_formula)
 #'
+#' # --- Example 4: Distributional Stats & Digits ---
+#' # Add skewness and kurtosis, control rounding
+#' summary_dist <- f_summary(Sepal.Length + Petal.Length ~ Species,
+#'                           data          = iris,
+#'                           show_skew     = TRUE,
+#'                           show_kurtosis = TRUE,
+#'                           digits        = 3)
+#' print(summary_dist)
+#'
+#' # --- Example 5: Custom Print Formatting ---
+#' summary_iris <- f_summary(iris, "Sepal.Length", group_vars = "Species")
+#' print(summary_iris, col_width = 10, table_width = 70)
+
 #' @export
-#'
-f_summary <- function(data, data.column, ...,
-                      show_n = TRUE,
-                      show_mean = TRUE,
-                      show_sd = TRUE,
-                      show_se = TRUE,
-                      show_min = TRUE,
-                      show_max = TRUE,
-                      show_median = TRUE,
-                      show_Q1 = TRUE,
-                      show_Q3 = TRUE,
-                      digits = 2,
-                      export_to_excel = FALSE,
-                      close_generated_files = FALSE,
-                      open_generated_files = TRUE,
-                      save_as = NULL,
-                      save_in_wdir = FALSE,
-                      check_input = TRUE,
-                      eval_input = FALSE,
-                      digits_excel = NULL,
-                      detect_int_col = TRUE
-                      ) {
+f_summary <- function(x, ...) {
+  # Use match.call() to check for 'data' WITHOUT evaluating the arguments.
+  # This prevents the "object x not found" error.
+  mc <- match.call()
 
-
-  # List of known arguments to exclude if named
-  excluded_options <- c(
-    "show_n", "show_mean", "show_sd", "show_se", "show_min", "show_max",
-    "show_median", "show_Q1", "show_Q3", "digits", "export_to_excel",
-    "close_generated_files", "save_as", "save_in_wdir",
-    "open_excel", "check_input", "digits_excel"
-  )
-
-  # 1. Get the names of ALL arguments passed to the function
-  # [-1] removes the function name itself ("f_summary")
-  all_arg_names <- names(match.call()[-1])
-
-  # 2. Filter out the excluded options
-  user_supplied_args <- all_arg_names[
-    !all_arg_names %in% excluded_options
-  ]
-
-  # 3. Count the remaining arguments
-  n_args <- length(user_supplied_args)
-
-  # Check if at least 2 arguments were supplied
-  if (n_args < 2) {
-    message(paste0("f_summary requires at least 2 arguments:
-         data        = data.frame,
-         data.column = data column to summarize,
-         and if desired one or more grouping variables (data columns within the data.frame)
-
-        Therefore, the default output of base::summary(",deparse(substitute(data)),").")
-                   )
-    return(base::summary(data))
-  }
-
-
-  # Define the summary statistics function
-  summary_fun <- function(x) {
-    result <- c()
-    if(show_n) result["n"] <- length(x)
-    if(show_mean) result["mean"] <- mean(x, na.rm = TRUE)
-    if(show_sd) result["sd"] <- sd(x, na.rm = TRUE)
-    if(show_se) result["se"] <- sd(x, na.rm = TRUE) / sqrt(length(x))
-    if(show_min) result["min"] <- min(x, na.rm = TRUE)
-    if(show_Q1) result["Q1"] <- quantile(x, probs = 0.25, na.rm = TRUE)
-    if(show_median) result["median"] <- median(x, na.rm = TRUE)
-    if(show_Q3) result["Q3"] <- quantile(x, probs = 0.75, na.rm = TRUE)
-    if(show_max) result["max"] <- max(x, na.rm = TRUE)
-    return(result)
-  }
-
-  # Define function to allow noquotes or quotes for column names
-  check_var <- function(expr) {
-    expr_chr <- deparse(expr)
-
-    if (is.character(expr)) {
-      return(expr)
-    }
-
-    # if (exists(expr_chr, envir = .GlobalEnv, inherits = FALSE)) {
-    #   obj <- get(expr_chr, envir = .GlobalEnv)
-
-      if (exists(expr_chr, envir = parent.frame(2), inherits = TRUE)) {
-        obj <- get(expr_chr, envir = parent.frame(2))
-
-
-      if (!is.character(obj)) {
-        stop(paste0("Error: ", dQuote(expr_chr),
-                    " exists but is not a character vector. Use a column name in quotation marks.\n"))
-      } else {
-        return(obj)
-      }
+  if (missing(x)) {
+    # Check if 'data' was provided in the call (e.g. f_summary(data = mtcars))
+    if (!is.null(mc$data)) {
+      # Manually retrieve the data object
+      x_val <- eval(mc$data, envir = parent.frame())
+      # Dispatch manually to the data.frame method
+      return(f_summary.data.frame(x_val, ...))
     } else {
-      return(expr_chr)
+      stop("Argument 'x' (or 'data') is missing.")
+    }
+  }
+
+  # Standard S3 Dispatch
+  UseMethod("f_summary")
+}
+
+#' @export
+#' @rdname f_summary
+f_summary.formula <- function(x, data, ...) {
+  # x is the formula (e.g., y ~ B0 + B1)
+
+  # Parse LHS (Response Variable)
+  lhs_vars <- all.vars(x[[2]])
+
+  # Parse RHS (Grouping Variables)
+  rhs_vars  <- all.vars(x[[3]])
+  if (length(rhs_vars) == 0)
+    rhs_vars <- NULL
+
+  # Capture the name of the data object passed to the formula method
+  data_name_str <- deparse(substitute(data))
+
+  if(length(data_name_str) > 1) data_name_str <- "data"
+
+  # Call the data.frame method
+  f_summary.data.frame(x = data,
+                       columns = lhs_vars,
+                       group_vars = rhs_vars,
+                       internal_data_name = data_name_str,
+                       ...)
+}
+
+#' @export
+#' @rdname f_summary
+f_summary.data.frame <- function(x,
+                                 columns,
+                                 group_vars = NULL,
+                                 show_name = TRUE,
+                                 # Statistics Toggles
+                                 show_n = TRUE,
+                                 show_mean = TRUE,
+                                 show_sd = TRUE,
+                                 show_se = TRUE,
+                                 show_min = TRUE,
+                                 show_max = TRUE,
+                                 show_median = TRUE,
+                                 show_Q1 = TRUE,
+                                 show_Q3 = TRUE,
+                                 show_skew = FALSE,
+                                 show_kurtosis = FALSE,
+                                 digits = NULL,
+                                 # File Options
+                                 export_to_excel = FALSE,
+                                 close_generated_files = FALSE,
+                                 open_generated_files = TRUE,
+                                 save_as = NULL,
+                                 save_in_wdir = FALSE,
+                                 check_input = TRUE,
+                                 digits_excel = NULL,
+                                 allow_integer_decimal_mix = FALSE,
+                                 ...) {
+  # Map 'x' (S3 standard) back to 'data' (Internal logic)
+  data <- x
+
+  # Input Validation & Setup
+  if (!is.data.frame(data))
+    stop("Input must be a data.frame.")
+
+  # Check if there is one or multiple columns to summarize
+  if(length(columns) == 1){
+    single_col = TRUE
+  } else if(length(columns) > 1){
+    single_col = FALSE
+  }
+
+  # Validate Group Vars
+  if (!is.null(group_vars)) {
+    if (!all(group_vars %in% names(data))) {
+      missing <- group_vars[!group_vars %in% names(data)]
+      stop(paste("Group columns not found:", paste(missing, collapse = ", ")))
+    }
+  }
+
+  # Safe filename logic
+  # Default safety fallback
+  data_name <- "data"
+
+  # Check for the hidden internal name (passed from formula method)
+  dots <- list(...)
+  if ("internal_data_name" %in% names(dots)) {
+    data_name <- dots[["internal_data_name"]]
+  } else {
+    # If no internal name, try to grab it from 'x' using:
+    try_name <- try(deparse(substitute(x)), silent = TRUE)
+    if (!inherits(try_name, "try-error") && length(try_name) == 1 && nchar(try_name) < 50) {
+      data_name <- try_name
     }
   }
 
   # Create a list to store all outputs in this function
   output_list <- list()
+  output_excel<- list()
 
-  # Colletct the data col to be summarized
-  expr_data.column <- substitute(data.column, env = environment())
-  data.column      <- check_var(expr_data.column)
+  # --- WORKER FUNCTION ---
+  summary_fun <- function(vec) {
+    result <- c()
+    if (show_n)
+      result["n"] <- sum(!is.na(vec))
+    if (show_mean)
+      result["mean"] <- mean(vec, na.rm = TRUE)
+    if (show_sd)
+      result["sd"] <- sd(vec, na.rm = TRUE)
+    if (show_se)
+      result["se"] <- sd(vec, na.rm = TRUE) / sqrt(length(vec))
+    if (show_min)
+      result["min"] <- min(vec, na.rm = TRUE)
+    if (show_Q1)
+      result["Q1"] <- quantile(vec, probs = 0.25, na.rm = TRUE)
+    if (show_median)
+      result["median"] <- median(vec, na.rm = TRUE)
+    if (show_Q3)
+      result["Q3"] <- quantile(vec, probs = 0.75, na.rm = TRUE)
+    if (show_max)
+      result["max"] <- max(vec, na.rm = TRUE)
+
+    if (show_skew || show_kurtosis) {
+      n <- length(vec)
+      s <- sd(vec, na.rm = TRUE)
+      m <- mean(vec, na.rm = TRUE)
+      if (show_skew) {
+        if (n < 3 || s == 0)
+          result["skew"] <- NA
+        else {
+          m3 <- sum((vec - m)^3) / n
+          result["skew"] <- (n * (n - 1)) / (n - 2) * (m3 / s^3)
+        }
+      }
+      if (show_kurtosis) {
+        if (n < 4 || s == 0)
+          result["kurt"] <- NA
+        else {
+          m4 <- sum((vec - m)^4) / n
+          kurt_val <- ((n + 1) * n * (n - 1)) / ((n - 2) * (n - 3)) * (m4 / s^4)
+          result["kurt"] <- kurt_val - (3 * (n - 1)^2) / ((n - 2) * (n - 3))
+        }
+      }
+    }
+    return(result)
+  }
 
 
-  # Collect grouping columns from the ... argument
 
-  if(eval_input == TRUE){
-    # Collect grouping columns from the ... argument
-    group_vars_list <- list(...)
-    # Convert group_vars into a character vector (not a list)
-    group_vars <- unlist(group_vars_list)
-  } else {
-  # Capture unevaluated expressions
-  exprs <- as.list(substitute(alist(...)))[-1]
+  for (column in columns) {
 
-  # Convert expressions to character strings
-  group_vars <- vapply(exprs, function(expr) {
-    if (is.character(expr)) {
-      expr
+    # --- AGGREGATION ---
+    if (is.null(group_vars)) {
+      raw_result <- summary_fun(data[[column]])
+      result <- as.data.frame(t(raw_result))
     } else {
-      paste(deparse(expr), collapse = "")
-    }
-  }, character(1))
+      result <- do.call(data.frame, aggregate(data[[column]], by = data[group_vars], FUN = summary_fun))
 
-  # Keep only unnamed arguments or those not in the excluded list
-  keep <- is.null(group_vars) | group_vars == "" | !(group_vars %in% excluded_options)
-
-  group_vars <- group_vars[keep]
-  }
-
-  ######## Do some checks to increase user friendlyness #####################
-  # Check if the input is a data frame
-  if (!is.data.frame(data)) {
-    stop("Input must be a data.frame, data.table or tibble")
-  }
-
-  # Get the column names of the data frame
-  data_col_names <- names(data)
-
-  if(check_input == TRUE){
-    # Check if data.column exists in the data frame
-    var_exists <- data.column %in% data_col_names
-    if (!var_exists) {
-        stop(paste0("Warning: column '", data.column, "' does not exist in the data frame."))
+      base_cols <- group_vars
+      stat_cols <- names(result)[(length(base_cols) + 1):ncol(result)]
+      stat_cols <- gsub("^x\\.", "", stat_cols)
+      if (length(stat_cols) == 1 && stat_cols == "x") {
+        stat_cols <- names(summary_fun(data[[column]]))
+      }
+      if (show_name == TRUE) {
+        names(result) <- c(base_cols, paste(column, stat_cols, sep = "."))
+      } else {
+        names(result) <- c(base_cols, stat_cols)
+      }
     }
 
-    # Check if all group_vars_list exist in the data frame
-    all_group_vars_exist <- all(group_vars %in% data_col_names)
+    # --- FORMATTING ---
 
-    if (all_group_vars_exist == FALSE) {
-      missing_group_vars <- group_vars[!group_vars %in% data_col_names]
-        stop(paste("Warning: The following group column(s) do not exist in the data frame: ",
-                   paste(missing_group_vars, collapse = ", "), sep = ""))
+    # For backward compatability use the name "output_df" when only one column is produced.
+    if (single_col) {
+      output_list[["output_df"]] <- result
+    } else {
+      output_list[[column]] <- result
     }
 
-    # Check if the data.column is numeric
-    if (!is.numeric(data[[data.column]])) {
-      stop("Summary column must be a numeric")
+    # Use separate rounding for excel or default to no rounding.
+    if (!is.null(digits_excel) ) {
+      output_excel[[column]] <- f_conditional_round(result,
+                                         digits = digits_excel,
+                                         allow_integer_decimal_mix = allow_integer_decimal_mix)
+    } else {
+      output_excel[[column]] <- result
     }
 
-    # Ensure the grouping variables are character strings
-    if (any(!vapply(group_vars, is.character, logical(1)))) {
-      stop("All group variables should be 'character strings'.")
-    }
-
-    # Check if at least one grouping variable is provided
-    if (length(group_vars) == 0) {
-      message("No grouping variable provided")
-    }
-
-    # Check if the data column is provided
-    if (missing(data.column) || !any(vapply(data.column, is.character, logical(1)))) {
-      stop("A valid column name ('character string') must be provided for 'data.column'")
-    }
-  }
-
-  for(data.col.x in data.column){
-
-  # Perform the aggregation
-  result <-  do.call(data.frame, aggregate(data[[data.col.x]], by = data[group_vars], FUN = summary_fun))
-
-  # Rename the result columns
-  # Rename the grouping columns to match their names
-  colnames(result)[seq_along(group_vars)] <- group_vars
-
-  # Rename the summary statistics columns to be prefixed with the data column name
-  summary_cols <- colnames(result)[(length(group_vars) + 1):ncol(result)]
-
-  # Remove the 'x.' prefix from summary columns
-  summary_cols <- gsub("^x\\.", "", summary_cols)
-
-  # Apply the new names to the summary columns
-  colnames(result)[(length(group_vars) + 1):ncol(result)] <- paste(data.col.x, summary_cols, sep = ".")
-
-  output_list[[data.col.x]] <- result
-  }
-
-  if (length(output_list) == 1) {
-    output_list <- data.frame(output_list)
-    colnames(output_list) <- colnames(result)
-  }
-
-
-  # Store output as data.frame in output_list.
-  output_list[["output_df"]] <- as.data.frame(output_list)
-  output_df_no_rounding <- as.data.frame(output_list[["output_df"]])
-
-  # Round unless user enters digits = NULL
-  if(!is.null(digits)){
-    output_list[["output_df"]] <- f_conditional_round(output_list[["output_df"]],
-                                                      digits = digits,
-                                                      detect_int_col = detect_int_col)
   }
 
   class(output_list) <- "f_summary"
 
-  # If export_to_excel is TRUE, save the result to an Excel file
-
-  # If the user specifies a path or digits assume that an excel file should be created
-  if (!is.null(save_as) || !is.null(digits_excel) || save_in_wdir == TRUE) {
+  # --- EXCEL EXPORT ---
+  if (!is.null(save_as) ||
+      !is.null(digits_excel) || save_in_wdir == TRUE) {
     export_to_excel = TRUE
   }
 
-
   if (export_to_excel) {
 
-    if(!is.null(digits_excel)){
-      output_df_no_rounding <- f_conditional_round(output_df_no_rounding,
-                                                   digits = digits_excel,
-                                                   detect_int_col = detect_int_col)
-    }
+    if (close_generated_files)
+      system("taskkill /im EXCEL.EXE /f")
 
-    if(close_generated_files == TRUE){
-     # Close all MS Excel files to avoid conflicts (so save your work first)
-     system("taskkill /im EXCEL.EXE /f")
-    }
-
-
-    # Construct the file name dynamically using deparse(substitute())
-    data_name <- deparse(substitute(data))  # Get the name of the data frame
-
-
-    if(save_in_wdir == TRUE){
+    if (save_in_wdir)
       save_dir <- getwd()
-    }else{
+    else
       save_dir <- tempdir()
-    }
 
-    # use helper get_save_path() to create output_path
-    output_path <- get_save_path(save_as = save_as,
-                                 default_name = paste(data_name, "summary.xlsx", sep = "_"),
-                                 default_dir = save_dir,
-                                 file.ext = ".xlsx"
-                                 )
+    output_path <- get_save_path(
+      save_as = save_as,
+      default_name = paste(data_name, "summary.xlsx", sep = "_"),
+      default_dir = save_dir,
+      file.ext = ".xlsx"
+    )
 
     message(paste0("Saved output in: ", output_path))
 
-    # Write to an Excel file with each table in its own sheet
-    write_xlsx(output_df_no_rounding, path = output_path)
+    write_xlsx(output_excel, path = output_path)
 
-    # Open files after creation
-    if(open_generated_files == TRUE){
-    f_open_file(output_path)
+    if (open_generated_files){
+      f_open_file(output_path)
     }
   }
 
-
-
-
-
-  # Return the result as a data frame
+  attr(output_list, "digits") <- digits
   return(output_list)
 }
 
 
 #' Print method for f_summary objects
 #'
-#' This function prints \code{f_summary} objects.
+#' Prints a formatted summary table to the console.
 #'
-#' @param x Object of class f_summary
-#' @param col_width Integer. Specifies the maximum number of characters allowed in table header columns before a line break is inserted. Defaults to \code{6}.
-#' @param table_width Integer or \code{NULL}. Defines the number of characters after which the table is split into separate sections. Defaults to \code{NULL}, meaning no break is applied.
-#' @param ... Additional arguments passed to the \code{pander} function.
-#' @return This function is called for its side effect of printing a formatted output to the console
-#' and does not return a useful value. It invisibly returns \code{1}.
+#' @param x Object of class f_summary.
+#' @param col_width Integer. Max characters in header before line break. Default \code{6}.
+#' @param table_width Integer or \code{NULL}. Characters after which table splits. Default \code{90}.
+#' @param ... Additional arguments passed to \code{pander}.
+#' @return Invisibly returns \code{1}.
 #' @export
-print.f_summary <- function(x, col_width = 6, table_width = 90, ...) {
-  f_pander(x$output_df, col_width = col_width, table_width = table_width)
+print.f_summary <- function(x,
+                            col_width = 6,
+                            table_width = 90,
+                            digits = 2,
+                            allow_integer_decimal_mix = FALSE,
+                            ...) {
 
+  # Get digits from f_summary()
+  if (missing(digits) && !is.null(attr(x, "digits"))) {
+    digits <- attr(x, "digits")
+  }
+
+  # Loop over each category (a, b, etc.)
+  for (category in names(x)) {
+    # Get the sublist for this category
+    sublist <- x[[category]]
+
+    # Round numbers if digits is not NULL
+    if (!is.null(digits)) {
+      sublist <- f_conditional_round(sublist, digits = digits, allow_integer_decimal_mix = allow_integer_decimal_mix)
+    }
+
+    f_pander(sublist, col_width = col_width, table_width = table_width)
+  }
 }

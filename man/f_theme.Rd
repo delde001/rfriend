@@ -52,7 +52,7 @@ f_theme(color = "black", zlevel = 2)
 f_theme(color = "black", zlevel = 4)
 
 # Apply the default light theme default zoom level:
-f_theme(color = "black", zlevel = 0)
+f_theme(color = "white", zlevel = 0)
 }
 
 }

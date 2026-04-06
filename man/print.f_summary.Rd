@@ -4,21 +4,27 @@
 \alias{print.f_summary}
 \title{Print method for f_summary objects}
 \usage{
-\method{print}{f_summary}(x, col_width = 6, table_width = 90, ...)
+\method{print}{f_summary}(
+  x,
+  col_width = 6,
+  table_width = 90,
+  digits = 2,
+  allow_integer_decimal_mix = FALSE,
+  ...
+)
 }
 \arguments{
-\item{x}{Object of class f_summary}
+\item{x}{Object of class f_summary.}
 
-\item{col_width}{Integer. Specifies the maximum number of characters allowed in table header columns before a line break is inserted. Defaults to \code{6}.}
+\item{col_width}{Integer. Max characters in header before line break. Default \code{6}.}
 
-\item{table_width}{Integer or \code{NULL}. Defines the number of characters after which the table is split into separate sections. Defaults to \code{NULL}, meaning no break is applied.}
+\item{table_width}{Integer or \code{NULL}. Characters after which table splits. Default \code{90}.}
 
-\item{...}{Additional arguments passed to the \code{pander} function.}
+\item{...}{Additional arguments passed to \code{pander}.}
 }
 \value{
-This function is called for its side effect of printing a formatted output to the console
-and does not return a useful value. It invisibly returns \code{1}.
+Invisibly returns \code{1}.
 }
 \description{
-This function prints \code{f_summary} objects.
+Prints a formatted summary table to the console.
 }

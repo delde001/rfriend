@@ -1,3 +1,19 @@
+# rfriend 3.0.0 (2026-02-01)
+
+## Major Changes
+
+* **BREAKING CHANGE:** In order to take `formula` notation `f_summary` no longer accepts unquoted column names, either formula notation or quotes names must be used.
+
+## New Features
+New function to easily go from wide data to long format `f_long` and a function to scan the data distribution shape, spread, outliers and normality: `f_scan`. The new `f_stat_wizard` is still in BETA it analyzes your data structure based on a formula and recommends the appropriate statistical test.`f_wilcox_test` and `f_t_test` have been added to the package. Many functions now take formula notation, making iterative function use very simple e.g., summarize columns "disp" and "hp" from dataset "mtcars" grouped by "gear" and "cyl": `f_summary(disp + hp ~ gear + cyl, data = mtcars)`. `f_summary` now allows showing Excess Kurtosis `show_kurtosis = TRUE` (measure of "tailedness") and `show_skew = TRUE` Skewness (measure of asymmetry).
+
+## Minor Changes
+intro text and summary text of `f_aov`, `f_kruskall_test`, and `f_glm` has been improved to be more user friendly. `f_aov` and `f_glm` now show backtransformed data in post hoc summary table. A data summary table has been added to these functions. `f_aov` now has `transformation = "boxcox"` as default instead of `"bestnormalize"`. `f_open_file` has been improved for linux users, formatting of `Word` output is now compatible with `LibreOffice Writer`, tested on version 24.2.7.2. `f_corplot` has been rewritten to allow for ordinal variables and now shows Pearson, Spearman and Kendall correlation coefficients. 
+
+## Bug Fixes
+Bug fixes for all functions after stress testing by using extreme combinations of input options.
+
+
 # rfriend 2.0.0 (2025-11-16)
 
 ## Major Changes

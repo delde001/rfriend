@@ -1,7 +1,10 @@
+#' @import rmarkdown
+#' @import knitr
+#' @import ggplot2
 #' @importFrom grDevices dev.off png rainbow rgb graphics.off  recordPlot replayPlot
 #' @importFrom graphics abline boxplot hist legend lines pairs par points polygon text stripchart strwidth layout mtext title
-#' @importFrom stats aggregate aov as.formula cor kruskal.test median qchisq qqline qqnorm residuals sd shapiro.test spline chisq.test pnorm p.adjust AIC BIC anova coef deviance df.residual fitted formula gaussian glm hatvalues logLik model.frame nobs sigma terms update
-#' @importFrom utils capture.output tail
+#' @importFrom stats aggregate aov as.formula cor kruskal.test drop1 median qchisq qqline qqnorm residuals sd shapiro.test spline chisq.test pnorm p.adjust AIC BIC anova coef deviance df.residual fitted formula gaussian glm hatvalues logLik model.frame nobs sigma terms update
+#' @importFrom utils capture.output tail combn
 #' @importFrom multcompView multcompLetters
 #' @importFrom pander pander panderOptions
 #' @importFrom rstudioapi getActiveDocumentContext documentId documentPath
@@ -9,7 +12,8 @@
 #' @importFrom rstatix levene_test dunn_test
 #' @importFrom nortest ad.test
 #' @importFrom writexl write_xlsx
-#' @importFrom ggplot2 ggplot aes geom_density sym labs geom_boxplot geom_jitter geom_text theme_bw ggsave
+#' @importFrom grid unit grid.newpage grid.draw
+#' @importFrom gridExtra grid.arrange arrangeGrob
 #' @importFrom knitr knit_hooks opts_knit knit_child
 #' @importFrom crayon red
 #' @importFrom xfun split_lines dir_exists
@@ -21,7 +25,9 @@
 #' @importFrom stringr str_replace_all
 #' @importFrom this.path this.dir
 #' @importFrom MuMIn r.squaredGLMM
+#' @importFrom dplyr select
+#' @importFrom tidyr pivot_longer all_of
+#' @importFrom magrittr %>%
 #' @importFrom DHARMa plotResiduals testResiduals testDispersion simulateResiduals
-#' @import rmarkdown
-#' @import knitr
+#' @importFrom rlang .data
 NULL

@@ -12,7 +12,7 @@
 #'   the file is named "dataname_BoxPlot" in that directory. If an extension is provided the output format specified with option "output_type" will be overruled.
 #'   Defaults to \code{file.path(tempdir(), "dataname_BoxPlot.pdf")}.
 #' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.
-#' @param close_generated_files Logical. If \code{TRUE}, closes open 'Word' files depending on the output format. This to be able to save the newly generated files. 'Pdf' files should also be closed before using the function and cannot be automatically closed.
+#' @param close_generated_files Logical. Closes open Excel or Word (NOT pdf) files before writing, depending on the output format. Works on Windows (taskkill), macOS (pkill) and Linux (pkill/soffice). Default \code{FALSE}. \strong{WARNING:} Always save your work before using this option!!
 #' @param open_generated_files Logical. If \code{TRUE}, Opens the generated output files ('pdf', 'Word' or 'png') files depending on the output format. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.
 #' @param boxplot_explanation A logical value indicating whether to include an explanation of how to interpret boxplots in the report. Defaults to \code{TRUE}.
 #' @param detect_factors A logical value indicating whether to automatically detect factor variables in the dataset. Defaults to \code{TRUE}.
@@ -22,7 +22,9 @@
 #' @param units Character string, png figure units default \code{"in"} = inch, other options are: \code{"px"} = Pixels, \code{"cm"} = centimeters, \code{"mm"} = millimeters.
 #' @param res Numeric, png figure resolution default 300 dpi
 #' @param las An integer (\code{0} t/m \code{3}), \code{las = 0}: Axis labels are parallel to the axis. \code{las = 1}: Axis labels are always horizontal. \code{las = 2}: Axis labels are perpendicular to the axis. (default setting). \code{las = 3}: Axis labels are always vertical.
-#'
+#' @param outliers Logical. If \code{TRUE}, scans for outliers using Tukey's fences and if they exist, adds them to the report using \code{f_outliers}. Default \code{TRUE}.
+#' @param coef Numeric. The multiplier for the Interquartile Range (IQR) used for outlier detection. Default \code{1.5}.
+#' @param limit_columns Integer or \code{NULL}. Defines the number of columns shown in the outlier table. Default = \code{7}. \code{NULL} = all columns are shown.
 #'
 #' @details
 #' The function performs the following steps:
@@ -87,25 +89,53 @@
 #' }
 #'
 #' @export
-f_boxplot <- function(
+# Public generic — first argument drives dispatch
+f_boxplot <- function(x, ...) {
+  UseMethod("f_boxplot")
+}
 
-  data = NULL,         # data.frame used to plot box plot
-  formula = NULL,      # function formula
-  fancy_names = NULL,  # Optional mapping of column names to more readable names in plots (name_map).
-  output_type = "pdf", # Output type can be word, pdf, rmd, console
-  save_as = NULL,      # Specify the name of the output dir and file (name and type).
-  save_in_wdir = FALSE,# Save file output in the working directory.
-  close_generated_files = FALSE,# Closes either open word files depending on the output format.
-  open_generated_files = TRUE,  # Open files after creation
-  boxplot_explanation = TRUE,   # This text reminds the user on how to read a boxplot.
-  detect_factors  = TRUE,       # Detect factors automatically (TRUE) or not (FALSE)
-  jitter = FALSE,               # show individual data points
-  #ouput png settings
-  width = 8,
-  height = 7,
-  units = "in",
-  res = 300,
-  las = 2
+#' @export
+#' @rdname f_boxplot
+# Dispatch when first argument is a formula
+f_boxplot.formula <- function(formula, data, ...) {
+  f_boxplot_worker(formula = formula, data = data, ...)
+}
+
+#' @export
+#' @rdname f_boxplot
+# Dispatch when first argument is a data.frame
+f_boxplot.data.frame <- function(data, ...) {
+  f_boxplot_worker(formula = NULL, data = data, ...)
+}
+
+#' @export
+#' @rdname f_boxplot
+# Private worker — all the real logic lives here
+f_boxplot_worker <- function(formula = NULL, data, fancy_names = NULL,
+                             output_type = "pdf", outliers = TRUE,
+                             coef = 1.5,
+                      limit_columns = 7,
+                      save_as = NULL,
+                      # Specify the name of the output dir and file (name and type).
+                      save_in_wdir = FALSE,
+                      # Save file output in the working directory.
+                      close_generated_files = FALSE,
+                      # Closes either open word files depending on the output format.
+                      open_generated_files = TRUE,
+                      # Open files after creation
+                      boxplot_explanation = TRUE,
+                      # This text reminds the user on how to read a boxplot.
+                      detect_factors  = TRUE,
+                      # Detect factors automatically (TRUE) or not (FALSE)
+                      jitter = FALSE,
+                      # show individual data points
+                      #ouput png settings
+                      width = 8,
+                      height = 7,
+                      units = "in",
+                      res = 300,
+                      las = 2
+
 )
 {
 
@@ -149,7 +179,7 @@ f_boxplot <- function(
 
   # Create the output file "output.Rmd" in tempdir()
   file.create(temp_output_file)
-
+  file_extension <- NULL
 
   ####### Save dataframe name and Handle input from vectors (dataframe column) #####
 
@@ -177,11 +207,13 @@ f_boxplot <- function(
   }
 
   #### Handle option "save_as = " ###
-  if(save_in_wdir == TRUE){
-    save_dir <- getwd()
-  }else{
-    save_dir <- tempdir()
-  }
+  if (output_type != "rmd"){
+    if(save_in_wdir == TRUE){
+      save_dir <- getwd()
+    }else{
+      save_dir <- tempdir()
+    }
+
 
   #map the output type to extensions
   output_type_map <- c(
@@ -203,7 +235,7 @@ f_boxplot <- function(
       }
     }
 
-    if(!exists("file_extension") && output_type == "word"){
+    if(is.null(file_extension) && output_type == "word"){
       # use helper get_save_path() to create output_path
       output_path <- get_save_path(save_as = save_as,
                                    default_name = paste(data_name, "BoxPlot", sep = "_"),
@@ -215,7 +247,7 @@ f_boxplot <- function(
       output_type <- "word"
 
     }
-    else if(!exists("file_extension") && output_type %in% c("pdf", "word", "excel", "rmd", "png")){
+    else if(is.null(file_extension) && output_type %in% c("pdf", "word", "excel", "rmd", "png")){
 
       #create extension based on input_type
       file.ext <- unname(output_type_map[output_type])
@@ -230,7 +262,7 @@ f_boxplot <- function(
 
 
     }
-    else if(exists("file_extension")) {
+    else if(!is.null(file_extension) && length(file_extension) >= 2) {
 
       # use helper get_save_path() to create output_path
       output_path <- get_save_path(save_as = save_as,
@@ -239,8 +271,10 @@ f_boxplot <- function(
                                    file.ext     = file_extension[1]
       )
 
-      # reset the output type to match the user input extention in save_as
-      output_type <- file_extension[2]
+      # Only override output_type if we actually got a valid type back
+      if (!is.na(file_extension[2]) && nchar(file_extension[2]) > 0) {
+        output_type <- file_extension[2]
+      }
     }
   } else {
 
@@ -262,12 +296,26 @@ f_boxplot <- function(
   }
 
 
-  if(output_type != "rmd"){
-    if(close_generated_files == TRUE && output_type == "word"){
-      # Close all MS Word files to avoid conflicts (so save your work first)
-      system("taskkill /im WINWORD.EXE /f")
+  if (output_type == "rmd") close_generated_files <- FALSE
+
+  # Cross-platform close_generated_files (was Windows-only taskkill)
+  if (output_type != "rmd" && isTRUE(close_generated_files)) {
+    close_app <- function(win_proc, mac_name, linux_name) {
+      sysname <- Sys.info()[["sysname"]]
+      if (.Platform$OS.type == "windows") {
+        system(paste0("taskkill /im ", win_proc, " /f"),
+               ignore.stdout = TRUE, ignore.stderr = TRUE)
+      } else if (sysname == "Darwin") {
+        system(paste0("pkill -f '", mac_name, "'"),
+               ignore.stdout = TRUE, ignore.stderr = TRUE)
+      } else {
+        system(paste0("pkill -f ", linux_name),
+               ignore.stdout = TRUE, ignore.stderr = TRUE)
+      }
     }
-  }
+    if (output_type == "word")  close_app("WINWORD.EXE", "Microsoft Word",  "soffice")
+    }
+}
 
   # Wrap lines in rmd output document
   f_wrap_lines()
@@ -307,15 +355,28 @@ f_boxplot <- function(
     if(!is.null(fancy_names) ){
     formula <-  rename_formula_terms(formula, fancy_names)
     }
-  # Extract response variables from the left-hand side of the formula
-    numeric_vars <- all.vars(formula[[2]])  # Get LHS variables (response)
-  # Extract the right-hand side (RHS) of the formula as a string
-    RHS <- deparse(formula[[3]])  # Preserve the RHS structure
-    factor_vars <- all.vars(formula[[3]])  # Get LHS variables (predictors)
+    # Extract and backtick-wrap RHS variable names that need it
+    rhs_vars <- all.vars(formula[[3]])
+    rhs_vars_backt <- ifelse(
+      rhs_vars != make.names(rhs_vars),
+      paste0("`", rhs_vars, "`"),
+      rhs_vars
+    )
+    # Rebuild RHS string replacing bare names with backtick versions
+    RHS <- deparse(formula[[3]])
+    for (i in seq_along(rhs_vars)) {
+      if (rhs_vars[i] != make.names(rhs_vars[i])) {  # only non-syntactic names
+        backticked <- paste0("`", rhs_vars[i], "`")
+        if (!grepl(backticked, RHS, fixed = TRUE)) {  # only if NOT already wrapped
+          RHS <- gsub(rhs_vars[i], backticked, RHS, fixed = TRUE)
+        }
+      }
+    }
+    factor_vars <- all.vars(formula[[3]])  # bare names for data frame indexing
   }
 
 
-generate_report <- function(n) {
+generate_report <- function() {
     # This text reminds the user on how to read a boxplot.
     if(boxplot_explanation == TRUE){
 
@@ -391,18 +452,17 @@ Boxplots are particularly valuable when comparing distributions across multiple 
 
     if (response_name != make.names(response_name)) {
       response_name_backt <- paste0("`", response_name, "`")
-      response_name_quote <- paste0('"', response_name, '"')
     } else {
       response_name_backt <- response_name
-      response_name_quote <- response_name
-      }
+    }
 
-      if(output_type != "png"){
+    if(output_type != "png"){
       cat("  \n  \n#  Boxplots of: ", response_name, "  \n")
-      }
-      if(!is.null(formula)){
+    }
+
+    if(!is.null(formula)){
         if(output_type != "png"){
-        cat("##  Boxplot of: ", response_name, " as function of: ", RHS, "  \n")
+        cat("##  Boxplot of: ", response_name, " as function of ", RHS, "  \n")
         }
 
         current_formula <- as.formula(paste(response_name_backt, "~", RHS))
@@ -431,23 +491,25 @@ Boxplots are particularly valuable when comparing distributions across multiple 
         temp_file <- tempfile(fileext = ".png")
         png(temp_file, width = width, height = height, units = units, res = res)
 
+        # Set margins where c(1=bottom, 2=left, 3=top and 4=right).
+        # par(mar = c(5,7,4,2) + 0.1) ## default is c(5,4,4,2) + 0.1
+        par(mar = c(8,5,4,2))
+        par(cex.lab=0.9)  # is text size for y-axis
+        par(cex.axis=0.9) # is text size for x-axis
+
         #Draw Boxplot (note gsub("(^')|('$)", "", resp$name[[i]]) removes the leading and tailing single quotes)
         boxp <- boxplot(current_formula,
                         data = data,
                         xlab = "",
-                        ylab = response_name_backt,
+                        ylab = response_name,
                         las  = las,
                         #Create nice colors
                         col=c2, medcol=c3, whiskcol=c1, staplecol=c3, boxcol=c3, outcol=c3,
                         #Set box width using relative number of boxes to keep them more or less equal
-                        boxwex = box.width,
+                        boxwex = box.width
                         #Let the width of the boxes depend on relative number of replicas: varwidth = TRUE
                         # varwidth = TRUE,
-                        # Set margins where c(1=bottom, 2=left, 3=top and 4=right).
-                        # par(mar = c(5,7,4,2) + 0.1) ## default is c(5,4,4,2) + 0.1
-                        par(mar = c(8,5,4,2)),
-                        par(cex.lab=0.9), # is text size for y-axis
-                        par(cex.axis=0.9) # is text size for x-axis
+
         )
         # Add jittered points
         if(jitter == TRUE){
@@ -489,6 +551,33 @@ Boxplots are particularly valuable when comparing distributions across multiple 
         if (output_type != "png"){
         # Include the saved plots in R Markdown
         cat(paste0("![](", temp_file, ")"), "   \n  \n")
+
+          if(outliers == TRUE){
+          suppressMessages(
+            out <- f_outliers(
+                data,
+                columns = response_name,
+                group_vars = factor_cols,
+                coef = coef
+              )
+          )
+            if (!is.null(out) &&
+                is.data.frame(out) && nrow(out) > 0 && ncol(out) > 0) {
+              cat("##  Outlier Table of: ",
+                  response_name,
+                  " as function of ",
+                  RHS,
+                  "  \n")
+              cat(f_pander(out, limit_columns = limit_columns))
+            } else {
+              cat("*No outliers found in:* ",
+                  response_name,
+                  " as function of ",
+                  RHS,
+                  "  \n  \n")
+            }
+          }
+
         }
 
         if (output_type == "png"){
@@ -510,9 +599,8 @@ Boxplots are particularly valuable when comparing distributions across multiple 
 
         if (factor_name != make.names(factor_name)) {
           factor_name_backt  <- paste0("`", factor_name, "`")
-          factor_name_quote  <- paste0('"', factor_name, '"')
+
         } else {
-          factor_name_quote  <- factor_name
           factor_name_backt   <- factor_name
           }
 
@@ -522,7 +610,7 @@ Boxplots are particularly valuable when comparing distributions across multiple 
 
 
       if(output_type != "png"){
-      cat("##  Boxplot of: ", response_name, " as function of: ", factor_name, "  \n")
+      cat("##  Boxplot of: ", response_name, " as function of ", factor_name, "  \n")
       }
       # Get the number of bars per boxplot and store in num.bars
       num.bars <- length(levels(data[[factor_name]]))
@@ -539,36 +627,57 @@ Boxplots are particularly valuable when comparing distributions across multiple 
 
 
       temp_file <- tempfile(fileext = ".png")
-      png(temp_file, width = width, height = height, units = units, res = res)
+      png(
+        temp_file,
+        width = width,
+        height = height,
+        units = units,
+        res = res
+      )
 
-      #Draw Boxplot (note gsub("(^')|('$)", "", resp$name[[i]]) removes the leading and tailing single quotes)
-      boxp <- boxplot(current_formula,
-                      data = data,
-                      xlab = "",
-                      ylab = response_name,
-                      las  = las,
-                #Create nice colors
-                      col=c2, medcol=c3, whiskcol=c1, staplecol=c3, boxcol=c3, outcol=c3,
-                #Set box width using relative number of boxes to keep them more or less equal
-                      boxwex = box.width,
-                #Let the width of the boxes depend on relative number of replicas: varwidth = TRUE
-                      # varwidth = TRUE,
-                # Set margins where c(1=bottom, 2=left, 3=top and 4=right).
-                      # par(mar = c(5,7,4,2) + 0.1) ## default is c(5,4,4,2) + 0.1
-                      par(mar = c(8,5,4,2)),
-                      par(cex.lab=0.9), # is text size for y-axis
-                      par(cex.axis=0.9) # is text size for x-axis
+      # Set margins where c(1=bottom, 2=left, 3=top and 4=right).
+      # par(mar = c(5,7,4,2) + 0.1) ## default is c(5,4,4,2) + 0.1
+      par(mar = c(8,5,4,2))
+      par(cex.lab=0.9) # is text size for y-axis
+      par(cex.axis=0.9) # is text size for x-axis
+
+      # Draw Boxplot (note gsub("(^')|('$)", "",
+      # resp$name[[i]]) removes the leading and tailing single quotes)
+      boxp <- boxplot(
+        current_formula,
+        data = data,
+        xlab = "",
+        ylab = response_name,
+        las  = las,
+        #Create nice colors
+        col = c2,
+        medcol = c3,
+        whiskcol = c1,
+        staplecol = c3,
+        boxcol = c3,
+        outcol = c3,
+        #Set box width using relative number of boxes to keep them more or less equal
+        boxwex = box.width
+        #Let the width of the boxes depend on relative number of replicas: varwidth = TRUE
+        # varwidth = TRUE,
       )
       # Add jittered points
-      if(jitter == TRUE){
-      stripchart(current_formula,
-                 data = data,
-                 method = "jitter", # Adds random noise
-                 pch = 19,          # Point style
-                 vertical = TRUE,   # Align points vertically or not
-                 cex = 0.7,         # Reduce point size
-                 col = c1,          # Point color
-                 add = TRUE)        # Overlay on the boxplot
+      if (jitter == TRUE) {
+        stripchart(
+          current_formula,
+          data = data,
+          method = "jitter",
+          # Adds random noise
+          pch = 19,
+          # Point style
+          vertical = TRUE,
+          # Align points vertically or not
+          cex = 0.7,
+          # Reduce point size
+          col = c1,
+          # Point color
+          add = TRUE
+        )        # Overlay on the boxplot
       }
 
 
@@ -600,6 +709,35 @@ Boxplots are particularly valuable when comparing distributions across multiple 
       if (output_type != "png"){
         # Include the saved plots in R Markdown
         cat(paste0("![](", temp_file, ")"), "   \n  \n")
+
+
+        if (outliers == TRUE) {
+          suppressMessages(
+            out <- f_outliers(
+              data,
+              columns = response_name,
+              group_vars = factor_name,
+              coef = coef
+            )
+          )
+          if (!is.null(out) &&
+              is.data.frame(out) && nrow(out) > 0 && ncol(out) > 0) {
+            cat("##  Outlier Table of: ",
+                response_name,
+                " as function of ",
+                factor_name,
+                "  \n")
+            cat(f_pander(out, limit_columns = limit_columns))
+          } else {
+            cat("*No outliers found in:* ",
+                response_name,
+                " as function of ",
+                factor_name,
+                "  \n  \n")
+          }
+        }
+
+
       }
 
       if (output_type == "png"){
@@ -683,8 +821,8 @@ header-includes:
   }
   else if (output_type == "rmd"){
 
-    if (is.null(opts_knit$get("output.dir"))) {
-      opts_knit$set(output.dir = tempdir())
+    if (is.null(knitr::opts_knit$get("output.dir"))) {
+      knitr::opts_knit$set(output.dir = tempdir())
     }
 
     # Re-capture the markdown text for the rmd output

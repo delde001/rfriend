@@ -4,14 +4,28 @@
 \alias{f_pander}
 \title{Fancy Pander Table Output}
 \usage{
-f_pander(table, col_width = 10, table_width = NULL, ...)
+f_pander(
+  table,
+  col_width = 10,
+  table_width = NULL,
+  limit_columns = NULL,
+  style = "multiline",
+  console = TRUE,
+  ...
+)
 }
 \arguments{
 \item{table}{A data frame, matrix, or other table-like structure to be rendered.}
 
-\item{col_width}{Integer. Specifies the maximum number of characters allowed in table header columns before a line break is inserted. Defaults to \code{10}.}
+\item{col_width}{Integer. Specifies the maximum number of characters allowed in table header columns before a line break is inserted. Defaults to \code{10}. Note that latex will not break the table header if the col with is longer due to long names below the header.}
 
 \item{table_width}{Integer or \code{NULL}. Defines the number of characters after which the table is split into separate sections. Defaults to \code{NULL}, meaning no break is applied.}
+
+\item{limit_columns}{Integer or \code{NULL}. Defines the number of columns shown in a table.}
+
+\item{style}{Character. Pander table style. Defaults to \code{"multiline"}.}
+
+\item{console}{Logical. Whether to process headers for console output. Defaults to \code{TRUE}.}
 
 \item{...}{Additional arguments passed to the \code{pander} function.}
 }
@@ -28,16 +42,17 @@ This function sets several \code{pander} options to ensure that the table output
   \item \code{table.alignment.rownames}: Aligns row names to the left.
   \item \code{keep.trailing.zeros}: Keeps trailing zeros in numeric values.
   \item \code{knitr.auto.asis}: Ensures output is not automatically treated as 'asis'.
-  \item \code{table.split.table}: Prevents splitting of tables across pages or slides.
   \item \code{table.caption.prefix}: Removes the default "Table" prefix in captions.
+  \item \code{keep.line.breaks}: Preserves line breaks in cell content.
+  \item \code{table.split.table}: Controls table splitting (set to \code{Inf} if \code{table_width} is \code{NULL} or \code{FALSE}).
+  \item \code{table.split.cells}: Inserts line breaks in headers every \code{col_width} characters.
 }
 
 This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
 \itemize{
 \item \bold{Windows:} Install Pandoc and ensure the installation folder \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
-\item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary’s location is in your PATH.
-\item \bold{Linux:} Install Pandoc through your distribution’s package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.
-
+\item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.
+\item \bold{Linux:} Install Pandoc through your distribution's package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.
 \item If Pandoc is not found, this function may not work as intended.
 }
 }

@@ -36,9 +36,23 @@
 #' @param digits Numeric. Determines the accuracy of the estimate for lambda. Higher values increase computation time. Defaults to \code{3}.
 #' @param range A numeric vector of length 2 defining the search interval for lambda. Defaults to \code{c(-2, 2)}.
 #' @param plots Logical. If \code{TRUE}, plots log-likelihood of the Box-Cox transformation, Histograms and Q-Q plots of the original and transformed data. Default is \code{FALSE}.
-#' @param close_generated_files Logical. If \code{TRUE}, closes open 'Word' files depending on the output format. This to be able to save the newly generated files. 'Pdf' files should also be closed before using the function and cannot be automatically closed.
+#' @param close_generated_files Logical. Closes open Excel or Word (NOT pdf) files before writing, depending on the output format. Works on Windows (taskkill), macOS (pkill) and Linux (pkill/soffice). Default \code{FALSE}. \strong{WARNING:} Always save your work before using this option!!
 #' @param open_generated_files Logical. If \code{TRUE}, opens the generated output files ('pdf', 'Word' or 'Excel') files depending on the output format. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.
-#' @param output_type Character string specifying the output format: \code{"pdf"}, \code{"word"}, \code{"rmd"}, \code{"off"} (no file generated) or \code{"console"}. The option \code{"console"} forces output to be printed. Default is \code{"off"}.
+#' @param output_type Character string specifying the output format. Default is \code{"default"}.
+#'   \itemize{
+#'     \item \code{"default"}: Returns the object and lets R decide whether
+#'       to print; auto-prints if unassigned, silent if assigned to a variable.
+#'       Use \code{print(result)} or \code{plot(result)} to display the
+#'       returned object.
+#'     \item \code{"console"}: Forces immediate printing to the console
+#'       regardless of object assignment.
+#'     \item \code{"pdf"}, \code{"word"}, \code{"excel"}: Saves results to a
+#'       file of the corresponding format. See \code{save_as},
+#'       \code{save_in_wdir}, and \code{open_generated_files} for file
+#'       path and opening behavior.
+#'     \item \code{"rmd"}: Stores the raw markdown string inside the returned
+#'       object for use in R Markdown documents.
+#'   }
 #' @param save_as Character string specifying the output file path (without extension).
 #'   If a full path is provided, output is saved to that location.
 #'   If only a filename is given, the file is saved in \code{tempdir()}.
@@ -147,7 +161,7 @@ f_boxcox <- function(
     data = data,                  # Vector or a data.frame column
     digits = 3,                   # Accuracy by how many digits lambda is estimated
     range = c(-2, 2),             # The search interval for lambda.
-    plots = FALSE,                # Show lambda est.histograms and QQ plots (TRUE) or not (FALSE)
+    plots = NULL,                # Show lambda est.histograms and QQ plots (TRUE) or not (FALSE)
     transform.data = TRUE,        # Specify the name of the file
     eps = 1 / 50,                 # Tolerance for lambda. Defaults to 0.02.
     xlab = expression(lambda),    # X-axis title of plot
@@ -155,7 +169,7 @@ f_boxcox <- function(
     alpha = 0.05,                 # Significance level for shapiro test
     open_generated_files = TRUE,  # Open files after creation
     close_generated_files = FALSE,# Close open files to save a new one
-    output_type = "off",          # Output type can be word, pdf, rmd, console
+    output_type = "default",          # Output type can be word, pdf, rmd, console
     save_as = NULL,               # Specify the name of the output dir and file (name and type).
     save_in_wdir = FALSE,         # Save file output in the working directory.
     ...                           # Additional arguments for model fitting
@@ -194,10 +208,15 @@ f_boxcox <- function(
 
 
   # Parameter validation
-  if( !(output_type %in% c("pdf", "word", "excel", "rmd", "console" , "off")) ){
-    stop("Character string specifying the output format (output_type = ) should be either: 'pdf', 'word', 'excel', 'console','rmd', 'off'")
+  if( !(output_type %in% c("pdf", "word", "excel", "rmd", "console" , "default")) ){
+    stop("Character string specifying the output format (output_type = ) should be either: 'pdf', 'word', 'excel', 'console','rmd', 'default'")
   }
 
+  if(is.null(plots) && output_type %in% c("pdf", "word")){
+    plots <- TRUE
+  } else if(is.null(plots)){
+    plots <- FALSE
+  }
 
   # Generate a temporary file path for "output.Rmd"
   temp_output_dir  <- tempdir()
@@ -205,10 +224,13 @@ f_boxcox <- function(
 
   # Create the output file "output.Rmd" in tempdir()
   file.create(temp_output_file)
+  # Create a file_extension switch
+  file_extension <- NULL
 
   # Create an output list to store info
   output_list <- list()
   output_list[["plots"]] <- plots
+
 
   # Capture the name of the submitted data object
   if (is.data.frame(data)) {
@@ -231,6 +253,7 @@ f_boxcox <- function(
 
   clean_data_name <- sub(".*\\$", "", data_name)  # Remove everything before the "$" symbol
 
+  output_list[["data_name"]] <- clean_data_name
 
   #### Handle option "save_as = " ###
   if(save_in_wdir == TRUE){
@@ -258,7 +281,7 @@ f_boxcox <- function(
       }
     }
 
-    if(!exists("file_extension") && output_type %in% c("console", "off")){
+    if(is.null(file_extension) && output_type %in% c("console", "default")){
       # use helper get_save_path() to create output_path
       output_path <- get_save_path(save_as = save_as,
                                    default_name = paste(clean_data_name, "BoxCox_output", sep = "_"),
@@ -269,7 +292,7 @@ f_boxcox <- function(
       output_type <- "pdf"
 
     }
-    else if(!exists("file_extension") && output_type %in% c("pdf", "word", "excel", "rmd")){
+    else if(is.null(file_extension) && output_type %in% c("pdf", "word", "excel", "rmd")){
 
       #create extension based on input_type
       file.ext <- unname(output_type_map[output_type])
@@ -283,7 +306,7 @@ f_boxcox <- function(
 
 
     }
-    else if(exists("file_extension")) {
+    else if(!is.null(file_extension)) {
 
       # use helper get_save_path() to create output_path
       output_path <- get_save_path(save_as = save_as,
@@ -309,22 +332,25 @@ f_boxcox <- function(
 
 
   # Prevent output to console and keep files open when output is "rmd" format
-  if(output_type == "rmd"){
-    close_generated_files <- FALSE
-  }
+  if (output_type == "rmd") close_generated_files <- FALSE
 
-  if(output_type != "rmd"){
-
-    if(close_generated_files == TRUE && output_type == "word"){
-      # Close all MS Word files to avoid conflicts (so save your work first)
-      system("taskkill /im WINWORD.EXE /f")
+  # Cross-platform close_generated_files (was Windows-only taskkill)
+  if (output_type != "rmd" && isTRUE(close_generated_files)) {
+    close_app <- function(win_proc, mac_name, linux_name) {
+      sysname <- Sys.info()[["sysname"]]
+      if (.Platform$OS.type == "windows") {
+        system(paste0("taskkill /im ", win_proc, " /f"),
+               ignore.stdout = TRUE, ignore.stderr = TRUE)
+      } else if (sysname == "Darwin") {
+        system(paste0("pkill -f '", mac_name, "'"),
+               ignore.stdout = TRUE, ignore.stderr = TRUE)
+      } else {
+        system(paste0("pkill -f ", linux_name),
+               ignore.stdout = TRUE, ignore.stderr = TRUE)
+      }
     }
-
-    if(close_generated_files == TRUE && output_type == "excel"){
-      # Close all MS Word files to avoid conflicts (so save your work first)
-      system("taskkill /im EXCEL.EXE /f")
-    }
-
+    if (output_type == "word")  close_app("WINWORD.EXE", "Microsoft Word",  "soffice")
+    if (output_type == "excel") close_app("EXCEL.EXE",   "Microsoft Excel", "soffice")
   }
 
   #Create a Vector of potential values for lambda
@@ -341,6 +367,7 @@ f_boxcox <- function(
   y_clean <- y_clean / exp(mean(log(y_clean)))  # Geometric mean scaling
   logy <- log(y_clean)
   n <- length(y_clean)
+  output_list[["geom_mean"]] <- exp(mean(log(y[!is.na(y)])))
 
   # Initialize log-likelihood
   loglik <- numeric(length(lambda))
@@ -382,6 +409,7 @@ f_boxcox <- function(
 
 
   n <- length(data$y)
+
   if (n <= 5000) {
     # Shapiro on initial data (run once)
     st0 <- shapiro.test(data[[1]])
@@ -394,47 +422,58 @@ f_boxcox <- function(
     W <- signif(st1$statistic, digits = 4)
     Shapiro.p.value <- signif(st1$p.value, digits = 4)
     df <- data.frame("lambda" = lambda_out, W, Shapiro.p.value)
+
+    output_list[["Shapiro_original_data"]]    <- df0
+    output_list[["Shapiro_transformed_data"]] <- df
+  } else {
+    message("Shapiro-Wilks cannot be used with sample sizes > 5000.")
+    output_list[["Shapiro_original_data"]]    <- NULL
+    output_list[["Shapiro_transformed_data"]] <- NULL
   }
 
-  if( n > 5000){
-  #   A =signif(ad.test(transformed_data[[1]])$statistic, digits=4)
-  #   Anderson.p.value =signif(ad.test(transformed_data[[1]])$p.value, digits=4)
-  #   df=data.frame("Lambda" = lambda_out, A, Anderson.p.value)
-  message("Shapiro-Wilks cannot be used with sample sizes > 5000.")
-  }
 
-  output_list[["transformed_data"]]         <- transformed_data[[1]]
-  output_list[["original_data"]]            <- data[[1]]
-  output_list[["lambda"]]                   <- lambda_out
-  output_list[["n"]]                        <- n
-  output_list[["missing values"]]           <- sum(is.na(y))
-  output_list[["xlab"]]                     <- xlab
-  output_list[["ylab"]]                     <- ylab
-  output_list[["alpha"]]                    <- alpha
-  output_list[["lambda_estimates"]]         <- lambda
-  output_list[["loglik"]]                   <- loglik
-  output_list[["conf_limit"]]               <- conf_limit
-  output_list[["ylab"]]                     <- ylab
-  output_list[["ylab"]]                     <- ylab
-  output_list[["Shapiro_original_data"]]    <- df0
-  output_list[["Shapiro_transformed_data"]] <- df[1-2]
+    output_list[["transformed_data"]]         <- transformed_data[[1]]
+    output_list[["original_data"]]            <- data[[1]]
+    output_list[["lambda"]]                   <- lambda_out
+    output_list[["n"]]                        <- n
+    output_list[["missing values"]]           <- sum(is.na(y))
+    output_list[["xlab"]]                     <- xlab
+    output_list[["ylab"]]                     <- ylab
+    output_list[["alpha"]]                    <- alpha
+    output_list[["lambda_estimates"]]         <- lambda
+    output_list[["loglik"]]                   <- loglik
+    output_list[["conf_limit"]]               <- conf_limit
+
 
   # Make a class from the output to print and plot
   class(output_list) <- "f_boxcox"
 
 
-  if(output_type != "console" && output_type != "off"){
+  if(output_type != "console" && output_type != "default"){
   generate_report <- function(){
   # Return results
-    cat("Shapiro-Wilkinson test on untransformed **original data:**")
-    cat(" W =", W0, " p value =", Shapiro.p.value0, "   \n")
-    if(Shapiro.p.value0 >= alpha){
-      cat("According to the ShapiroW test (", Shapiro.p.value0, " > ",alpha,") original data is already normally distributed. \nTransformation will be applied regardless...  \n")
+    if (n <= 5000) {
+      cat("Shapiro-Wilk test on untransformed **original data:**")
+      cat(" W =", W0, " p value =", Shapiro.p.value0, "   \n")
+      if (Shapiro.p.value0 >= alpha) {
+        cat(
+          "According to the ShapiroW test (",
+          Shapiro.p.value0,
+          " > ",
+          alpha,
+          ") original data is already normally distributed. \nTransformation will be applied regardless...  \n"
+        )
+      }
+      if (Shapiro.p.value0 < alpha) {
+        cat(
+          "According to the Shapiro-Wilk test (",
+          Shapiro.p.value0,
+          " < ",
+          alpha,
+          ") original data is NOT normally distributed.  \nTransformation will be applied..."
+        )
+      }
     }
-    if(Shapiro.p.value0 < alpha){
-      cat("According to the ShapiroW test (", Shapiro.p.value0, " < ",alpha,") original data is NOT normally distributed.  \nTransformation will be applied...")
-    }
-
     cat("   \n   \n")
     cat("$$y(\\lambda) = \\begin{cases} \\frac{y^\\lambda - 1}{\\lambda}, & \\lambda \\neq 0 \\\\    \\log(y), & \\lambda = 0 \\end{cases}
             $$   \n")
@@ -452,12 +491,12 @@ f_boxcox <- function(
     }
 
 
-    cat("   \n   \n**Interpretion:**   \n")
+    cat("   \n   \n**Interpretation:**   \n")
     if(Shapiro.p.value >= alpha){
-      cat("According to the ShapiroW test (", Shapiro.p.value, " > ",alpha,") data is normally distributed after transformation.  \n \n Inspect the plots to check normality and outliers:  \n  \n ")
+      cat("According to the Shapiro-Wilk test (", Shapiro.p.value, " > ",alpha,") data is normally distributed after transformation.  \n \n Inspect the plots to check normality and outliers:  \n  \n ")
     }
     if(Shapiro.p.value < alpha){
-      cat("According to the ShapiroW test (", Shapiro.p.value, " < ",alpha,") data is still NOT normally distributed after transformation.  \n  \n Inspect the plots to check normality and outliers:  \n  \n ")
+      cat("According to the Shapiro-Wilk test (", Shapiro.p.value, " < ",alpha,") data is still NOT normally distributed after transformation.  \n  \n Inspect the plots to check normality and outliers:  \n  \n ")
     }
 
 
@@ -563,7 +602,7 @@ header-includes:
 
 
   }
-  else if (output_type == "off"){
+  else if (output_type == "default"){
 
  # Do not show anything unless the user want to see plots:
     # Plot results of transformation if the user wants to
@@ -574,7 +613,7 @@ header-includes:
 
       warning("Invalid output format specified. No file generated.")
 
-      generate_report()
+
    }
 
   # Remove the temporary R Markdown file
@@ -607,11 +646,13 @@ print.f_boxcox <- function(x, ...) {
   }
   if(x$Shapiro_transformed_data$Shapiro.p.value < x$alpha){
   cat("According to the Shapiro-Wilk test (", x$Shapiro_transformed_data$Shapiro.p.value, " < ",x$alpha,") data is\n still NOT normally distributed after transformation.")
-
   cat("\nCheck the normality plots, by using the plot() function or 'plots = TRUE' option\n")
   }
 
-  if(x$plots == TRUE) plot(x)
+  if(x$plots == TRUE){
+
+    plot(x)
+  }
 
 }
 
@@ -641,7 +682,7 @@ par(ask = ask)
 
   # 1: Log-likelihood plot
 if (1 %in% which) {
-    plot(x$lambda_est, x$loglik, type = "l",
+    plot(x$lambda_estimates, x$loglik, type = "l",
          xlab = x$xlab, ylab = x$ylab,
          main = paste("Log-Likelihood estimation\nLambda=", x$lambda))
     abline(h = x$conf_limit, lty = 2)
@@ -682,7 +723,116 @@ if (3 %in% which) {
     mtext("Normal Q-Q Plot with 95% Confidence Bands", outer = TRUE, cex = 1.3)
     par(mfrow = c(1,1))
     layout(1)  # Clear layout matrix
+ }
 }
 
+#' Predict method for f_boxcox objects
+#'
+#' Applies the fitted Box-Cox transformation to new data (forward transform),
+#' or reverses it back to the original scale (inverse transform). This is
+#' useful for transforming hypothesis test parameters (e.g., \code{mu}) to the
+#' transformed scale, or for back-transforming confidence intervals to the
+#' original scale.
+#'
+#' @param object An object of class \code{f_boxcox}, as returned by
+#'   \code{\link{f_boxcox}}.
+#' @param newdata A numeric vector of values to transform. For the forward
+#'   transform (\code{inverse = FALSE}), all values must be strictly positive
+#'   (Box-Cox requires \eqn{y > 0}). For the inverse transform
+#'   (\code{inverse = TRUE}), values are assumed to be on the Box-Cox
+#'   transformed scale.
+#' @param inverse Logical. If \code{FALSE} (default), applies the forward
+#'   Box-Cox transformation to \code{newdata} using the estimated \eqn{\lambda}
+#'   from the original fit. If \code{TRUE}, reverses the transformation, mapping
+#'   values from the Box-Cox scale back to the original scale. Default is \code{FALSE}.
+#' @param ... Further arguments passed to or from other methods (currently
+#'   unused).
+#'
+#' @return A numeric vector of the same length as \code{newdata}, containing
+#'   either the forward-transformed or back-transformed values.
+#'
+#' @details
+#' The forward transformation applies the standard Box-Cox formula:
+#' \deqn{y(\lambda) = \begin{cases}
+#'   \frac{y^\lambda - 1}{\lambda}, & \lambda \neq 0 \\
+#'   \log(y),                       & \lambda = 0
+#' \end{cases}}
+#'
+#' The inverse transformation reverses this process to recover the original scale:
+#' \deqn{y = \begin{cases}
+#'   (y(\lambda) \cdot \lambda + 1)^{1/\lambda}, & \lambda \neq 0 \\
+#'   \exp(y(\lambda)),                           & \lambda = 0
+#' \end{cases}}
+#'
+#' \strong{Note on inverse validity:} When \eqn{\lambda > 0}, not all
+#' transformed-scale values have a valid inverse. If
+#' \eqn{y(\lambda) \cdot \lambda + 1 \leq 0}, the result is undefined and
+#' \code{NaN} is returned with a warning.
+#'
+#' @examples
+#' # Assuming mtcars is available and f_boxcox is loaded
+#' bc <- f_boxcox(mtcars$hp)
+#'
+#' # Forward: transform a hypothesis value (mu) to the Box-Cox scale
+#' mu <- 100
+#' mu_transformed <- predict(bc, newdata = mu)
+#'
+#' # Inverse: back-transform a confidence interval to the original scale
+#' ci_transformed <- c(5.5, 6.8)
+#' predict(bc, newdata = ci_transformed, inverse = TRUE)
+#'
+#' # Round-trip sanity check should return exactly mu (e.g., 100)
+#' predict(bc, newdata = mu_transformed, inverse = TRUE)
+#'
+#' @seealso \code{\link{f_boxcox}}
+#'
+#' @method predict f_boxcox
+#' @export
+predict.f_boxcox <- function(object, newdata, inverse = FALSE, ...) {
 
+  # The geometric mean scaling applied internally in f_boxcox
+  # during lambda estimation in is not part of
+  # the stored transformation and is therefore not applied here.
+
+
+  if (!is.numeric(newdata)) {
+    stop("'newdata' must be numeric.")
+  }
+
+  lambda <- object$lambda
+
+  if (!inverse) {
+    # --- Forward transform: original scale -> Box-Cox scale ---
+    if (any(newdata <= 0, na.rm = TRUE)) {
+      stop("Box-Cox requires all values > 0. Found non-positive values in 'newdata'.")
+    }
+
+    # Must match the exact logic of the f_boxcox output generation
+    if (lambda != 0) {
+      transformed <- (newdata ^ lambda - 1) / lambda
+    } else {
+      transformed <- log(newdata)
+    }
+    return(transformed)
+
+  } else {
+    # --- Inverse transform: Box-Cox scale -> original scale ---
+    if (lambda != 0) {
+
+      # Statistical safety check: Ensure predictions are within the valid Box-Cox domain
+      domain_check <- newdata * lambda + 1
+      if (any(domain_check <= 0, na.rm = TRUE)) {
+        warning("Some 'newdata' values are outside the valid inverse Box-Cox domain and will return NaN.")
+      }
+
+      # suppressWarnings safely ignores the NaNs generated by the domain check,
+      # as we have already warned the user above.
+      back_transformed <- suppressWarnings((domain_check) ^ (1 / lambda))
+
+    } else {
+      back_transformed <- exp(newdata)
+    }
+
+    return(back_transformed)
+  }
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/fchisq_test.R
 \name{f_chisq_test}
 \alias{f_chisq_test}
-\title{Chi-squared Test with Post-hoc Analysis}
+\title{Chi-squared Test with post hoc Analysis}
 \usage{
 f_chisq_test(
   x,
@@ -16,7 +16,7 @@ f_chisq_test(
 )
 }
 \arguments{
-\item{x}{A numeric vector (or factor), or a contingency table in matrix or table form. If a data frame is entered the function will try to convert it to a table.}
+\item{x}{A numeric vector (or factor), or a contingency table in matrix or table form. If a data frame is entered the function will try to convert it to a table using \code{df_to_table()}.}
 
 \item{y}{A numeric vector; ignored if x is a matrix, table or data.frame. If x is a factor, y should be a factor of the same length.}
 
@@ -28,7 +28,7 @@ f_chisq_test(
 
 \item{alpha}{Numeric threshold for significance. Default is \code{0.05}.}
 
-\item{force_posthoc}{Logical indicating whether to perform post-hoc tests even if the chi-squared test is not significant. Default is \code{FALSE}.}
+\item{force_posthoc}{Logical indicating whether to perform post hoc tests even if the chi-squared test is not significant. Default is \code{FALSE}.}
 
 \item{...}{Additional arguments passed to \code{\link[stats]{chisq.test}}.}
 }
@@ -45,11 +45,11 @@ An object of class f_chisq_test containing:
 }
 }
 \description{
-Performs a chi-squared test  \code{\link[stats]{chisq.test}}, then automatically conducts post-hoc analysis if the test is significant. The function provides adjusted p-values for each cell in the contingency table using a specified correction method.
+Performs a chi-squared test  \code{\link[stats]{chisq.test}}, then automatically conducts post hoc analysis if the test is significant. The function provides adjusted p-values for each cell in the contingency table using a specified correction method.
 }
 \details{
 The function first performs a chi-squared test using \code{\link[stats]{chisq.test}}. If the test is
-significant (p < alpha) or if \code{force_posthoc = TRUE}, it conducts post-hoc analysis by examining
+significant (p < alpha) or if \code{force_posthoc = TRUE}, it conducts post hoc analysis by examining
 the standardized residuals. The p-values for these residuals are adjusted using the specified method
 to control for multiple comparisons.
 
@@ -63,7 +63,7 @@ my_table <- as.table(rbind(c(100, 150, 50), c(120, 90, 40)))
 dimnames(my_table) <- list(Gender = c("Male", "Female"),
                            Response = c("Agree", "Neutral", "Disagree"))
 
-# Perform chi-squared test with post-hoc analysis.
+# Perform chi-squared test with post hoc analysis.
 f_chisq_test(my_table)
 
 # Use a different adjustment method.
@@ -81,7 +81,7 @@ f_chisq_test(x = observed, p = expected_probs)
 
 }
 \references{
-This function implements a post-hoc analysis for chi-squared tests inspired by the methodology in:
+This function implements a post hoc analysis for chi-squared tests inspired by the methodology in:
 
 Beasley, T. M., & Schumacker, R. E. (1995). Multiple Regression Approach to Analyzing Contingency Tables: Post Hoc and Planned Comparison Procedures. The Journal of Experimental Education, 64(1), 79-93.
 

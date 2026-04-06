@@ -2,12 +2,19 @@
 % Please edit documentation in R/fsummary.R
 \name{f_summary}
 \alias{f_summary}
+\alias{f_summary.formula}
+\alias{f_summary.data.frame}
 \title{Summarize a Data Frame with Grouping Variables}
 \usage{
-f_summary(
-  data,
-  data.column,
-  ...,
+f_summary(x, ...)
+
+\method{f_summary}{formula}(x, data, ...)
+
+\method{f_summary}{data.frame}(
+  x,
+  columns,
+  group_vars = NULL,
+  show_name = TRUE,
   show_n = TRUE,
   show_mean = TRUE,
   show_sd = TRUE,
@@ -17,106 +24,161 @@ f_summary(
   show_median = TRUE,
   show_Q1 = TRUE,
   show_Q3 = TRUE,
-  digits = 2,
+  show_skew = FALSE,
+  show_kurtosis = FALSE,
+  digits = NULL,
   export_to_excel = FALSE,
   close_generated_files = FALSE,
   open_generated_files = TRUE,
   save_as = NULL,
   save_in_wdir = FALSE,
   check_input = TRUE,
-  eval_input = FALSE,
   digits_excel = NULL,
-  detect_int_col = TRUE
+  allow_integer_decimal_mix = FALSE,
+  ...
 )
 }
 \arguments{
-\item{data}{A 'data.frame', 'data.table' or 'tibble', i.e. input data to be summarized.}
+\item{data}{A 'data.frame', 'data.table', or 'tibble'.}
 
-\item{data.column}{A character string, vector or list with characters. The name of the column(s) in \code{data} for which summary statistics will be calculated.}
+\item{columns}{The numerical column(s) to summarize if no formula is used. Can be entered as a single character string (e.g., \code{"weight"}) or as a character vector \code{c("weight", "length"}).}
 
-\item{...}{One or more character strings specifying the grouping variables in \code{data}.}
+\item{group_vars}{A character vector specifying the grouping variables in \code{data}
+(e.g., \code{c("species", "fertilizer")}) if no formula is used. If \code{NULL}, the entire dataset is summarized.}
 
-\item{show_n}{Logical. If \code{TRUE}, the summary results \code{n} will be included in the output.}
+\item{show_name}{Logical. Include variable name. Default \code{TRUE}.}
 
-\item{show_mean}{Logical. If \code{TRUE}, the summary results \code{mean} will be included in the output.}
+\item{show_n}{Logical. Include count (\code{n}). Default \code{TRUE}.}
 
-\item{show_sd}{Logical. If \code{TRUE}, the summary results \code{sd} will be included in the output.}
+\item{show_mean}{Logical. Include mean. Default \code{TRUE}.}
 
-\item{show_se}{Logical. If \code{TRUE}, the summary results \code{se} will be included in the output.}
+\item{show_sd}{Logical. Include standard deviation. Default \code{TRUE}.}
 
-\item{show_min}{Logical. If \code{TRUE}, the summary results \code{min} will be included in the output.}
+\item{show_se}{Logical. Include standard error. Default \code{TRUE}.}
 
-\item{show_max}{Logical. If \code{TRUE}, the summary results \code{max} will be included in the output.}
+\item{show_min}{Logical. Include minimum value. Default \code{TRUE}.}
 
-\item{show_median}{Logical. If \code{TRUE}, the summary results \code{median} will be included in the output.}
+\item{show_max}{Logical. Include maximum value. Default \code{TRUE}.}
 
-\item{show_Q1}{Logical. If \code{TRUE}, the summary results \code{Q1} will be included in the output.}
+\item{show_median}{Logical. Include median. Default \code{TRUE}.}
 
-\item{show_Q3}{Logical. If \code{TRUE}, the summary results \code{Q3} will be included in the output.}
+\item{show_Q1}{Logical. Include first quartile (25th percentile). Default \code{TRUE}.}
 
-\item{digits}{Integer. Round to the number of digits specified. If \code{digits = NULL} no rounding is applied (default is \code{digits = 2}). Note that this rounding is independent of the rounding in the exported excel file.}
+\item{show_Q3}{Logical. Include third quartile (75th percentile). Default \code{TRUE}.}
 
-\item{export_to_excel}{Logical. If \code{TRUE}, the (unrounded values) summary results will be exported to an 'Excel' file. Default is \code{FALSE}.}
+\item{show_skew}{Logical. Include Skewness (measure of asymmetry). Default \code{FALSE}.}
 
-\item{close_generated_files}{Logical. If \code{TRUE}, closes open 'Excel' files. This to be able to save the newly generated file. Default is \code{FALSE}.}
+\item{show_kurtosis}{Logical. Include Excess Kurtosis (measure of "tailedness"). Default \code{FALSE}.}
 
-\item{open_generated_files}{Logical. If \code{TRUE}, Opens the generated 'Excel' files. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.}
+\item{digits}{Integer. Number of decimal places for the R console output.
+Default is \code{2}. If \code{NULL}, no rounding is applied.
+(Note: This does not affect the raw numbers exported to Excel).}
 
-\item{save_as}{Character string specifying the output file path (without extension).
-If a full path is provided, output is saved to that location.
-If only a filename is given, the file is saved in \code{tempdir()}.
-If only a directory is specified (providing an existing directory with trailing slash),
-the file is named "dataname_summary.xlsx" in that directory.
-Defaults to \code{file.path(tempdir(), "dataname_summary.xlsx")}.}
+\item{export_to_excel}{Logical. If \code{TRUE}, exports results to an 'Excel' file. Default \code{FALSE}.}
 
-\item{save_in_wdir}{Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, to avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.}
+\item{close_generated_files}{Logical. If \code{TRUE}, forces Excel to close before saving (Windows only). Default \code{FALSE}.}
 
-\item{check_input}{If \code{TRUE}, checks the input and stops the function if the input is incorrect (default is \code{TRUE}).}
+\item{open_generated_files}{Logical. If \code{TRUE}, opens the Excel file after creation. Default \code{TRUE}.}
 
-\item{eval_input}{Logical. If \code{TRUE}, the function evaluates the third function argument. This should be a character vector with the group by columns. Default is \code{FALSE}, which allows group by columns to be written without quotes.}
+\item{save_as}{Character string. Custom path or filename for the Excel export.
+\itemize{
+  \item If full path: Saves to that location.
+  \item If filename only: Saves to \code{tempdir()} (unless \code{save_in_wdir = TRUE}).
+  \item If directory: Saves as "dataname_summary.xlsx" in that directory.
+}}
 
-\item{digits_excel}{Integer. Round cells in the excel file to the number of digits specified. If \code{digits_excel = NULL} no rounding is applied (default is \code{digits_excel = NULL}). Note to preserve formatting numbers will be stored as text.}
+\item{save_in_wdir}{Logical. If \code{TRUE}, saves to the current working directory. Default \code{FALSE}.}
 
-\item{detect_int_col}{Logical. If \code{TRUE}, columns in a data.frame containing only integers will be displayed without decimal digits. Columns containing a mix of integers and decimal values will display all values with the specified number of digits. If \code{FALSE}, each individual cell is evaluated: integer values are displayed without digits, and numbers containing digits with the specified number of digits. Default is \code{TRUE}.}
+\item{check_input}{Logical. If \code{TRUE}, performs validation checks on inputs. Default \code{TRUE}.}
+
+\item{digits_excel}{Integer. Number of decimal places for the Excel file cells. Default \code{NULL} (no rounding). Defining \code{digits_excel}, sets \code{export_to_excel = TRUE} when excel output is not intended use: \code{digits} instead.}
+
+\item{allow_integer_decimal_mix}{Logical. If \code{TRUE}, intergers in columns with a mix of integers and non-integers are displayed without decimals. Default \code{FALSE}, meaning if there are one or more numbers with decimals the whole column contains the number of decimals set by \code{digits}.}
+
+\item{formula}{A formula specifying the columns (right hand side) to be summarized by groups (left hand side). More columns or groups can be added using \code{-} or \code{+} (e.g., \code{col1 + col2 ~ group1 + group2}) to do a sequential summary for each column parameter.}
 }
 \value{
-A data frame containing the computed summary statistics, grouped by the specified variables. This data frame can be automatically saved as an 'Excel' file using \code{export_to_excel = TRUE}.
+A list of class \code{f_summary} containing the results data frame.
 }
 \description{
-Computes summary statistics (e.g., mean, standard deviation, median, etc.) for a specified column ("character string") in a data frame, grouped by one or more grouping variables in that data frame ("character strings"). Summary parameters can be customized and the results can be exported to an 'Excel' file.
+Computes summary statistics (n, mean, sd, etc.) for a specified numerical columns
+in a data frame. The data can be analyzed as a whole or split by one or more
+grouping variables.
+
+The function returns a formatted data frame and includes options to export
+the results directly to an 'Excel' file.
 }
 \details{
-The function computes the following summary statistics for the specified column:
+The function computes the following statistics:
 \itemize{
-\item \code{n}: number of observations
-\item \code{mean}: mean
-\item \code{sd}: standard deviation
-\item \code{se}: standard error of the mean
-\item \code{min}: minimum value
-\item \code{max}: maximum value
-\item \code{median}: median
-\item \code{Q1}: first quartile
-\item \code{Q3}: third quartile
+  \item \code{n}: number of observations
+  \item \code{mean}: arithmetic mean
+  \item \code{sd}: standard deviation
+  \item \code{se}: standard error (\eqn{sd / \sqrt{n}})
+  \item \code{min}: minimum value
+  \item \code{max}: maximum value
+  \item \code{median}: median value
+  \item \code{Q1}: 25th percentile
+  \item \code{Q3}: 75th percentile
+  \item \code{skew}: Sample skewness (if requested).
+  \item \code{kurt}: Sample excess kurtosis (if requested).
 }
-Each of these summary statistics can be removed by setting e.g. \code{show_n = FALSE}, The results are grouped by the specified grouping variables and returned as a data frame. If \code{export_to_excel} is set to \code{TRUE}, the results are saved as an 'Excel' file in the working directory with a dynamically generated filename.
 
-When only \code{data} and \code{data.column} is provided the function defaults to base:summary(data).
+\code{skew} stands for Skewness which is a measure of asymmetry of a distribution around its mean. Where \code{skew} values near \bold{0} indicate approximate symmetry, while large positive or negative values indicate noticeable asymmetry.
+\itemize{
+  \item \code{> 0}: Right-skewed (long or heavier tail to the right).
+  \item \code{< 0}: Left-skewed  (long or heavier tail to the left).
+ }
+
+\code{kurt} stands for Excess Kurtosis: Tells you about the "tails" and the peak.
+  \itemize{
+    \item \code{0}: Same tail heaviness as the normal distribution (mesokurtic).
+    \item \code{> 0}: Heavier tails than normal (Leptokurtic) — indicates frequent outliers.
+    \item \code{< 0}: Lighter tails than normal (Platykurtic) — indicates fewer (or less extreme) outliers than a normal distribution.
+ }
+If \code{group_vars} are provided, the statistics are calculated for each group combination.
+When \code{export_to_excel = TRUE}, the file is automatically generated.
 }
 \examples{
-# Example usage:
-# Create a summary of mtcars for data column hp grouped by cyl and gear,
-# and remove Q1 and Q3 from the output.
-# Note that variable can be written as "hp" or as hp. Only data.frame must be data (no quotes)
-summary_mtcars <- f_summary(mtcars, "hp", "cyl", "gear", show_Q1 = FALSE, show_Q3 = FALSE)
+
+# --- Example 1: Basic Usage (data.frame notation) ---
+# Summarize "hp" grouped by "cyl"; columns and group_vars can be positional
+summary_mtcars <- f_summary(mtcars, columns = "hp", group_vars = "cyl")
+summary_mtcars <- f_summary(mtcars, "hp", "cyl")  # shorthand equivalent
 print(summary_mtcars)
 
-# Create a summary for iris
-summary_iris <- f_summary(iris, Sepal.Length, Species)
+# --- Example 2: Multiple Columns & Groups with Custom Toggles ---
+# Summarize "hp" and "disp", grouped by "cyl" and "gear", hide Q1/Q3
+summary_custom <- f_summary(mtcars,
+                            columns    = c("hp", "disp"),
+                            group_vars = c("cyl", "gear"),
+                            show_Q1    = FALSE,
+                            show_Q3    = FALSE)
+print(summary_custom)
 
-# Print the a table with column width of 10 characters and table length of 70 characters
-print(summary_iris, col_width =  10, table_width = 70)
+# --- Example 3: Formula Notation ---
+# Identical result to Example 2 using formula interface
+# and export output to excel
+summary_formula <- f_summary(hp + disp ~ cyl + gear,
+                             data    = mtcars,
+                             show_Q1 = FALSE,
+                             show_Q3 = FALSE,
+                             export_to_excel = TRUE)
+print(summary_formula)
 
+# --- Example 4: Distributional Stats & Digits ---
+# Add skewness and kurtosis, control rounding
+summary_dist <- f_summary(Sepal.Length + Petal.Length ~ Species,
+                          data          = iris,
+                          show_skew     = TRUE,
+                          show_kurtosis = TRUE,
+                          digits        = 3)
+print(summary_dist)
+
+# --- Example 5: Custom Print Formatting ---
+summary_iris <- f_summary(iris, "Sepal.Length", group_vars = "Species")
+print(summary_iris, col_width = 10, table_width = 70)
 }
 \author{
-Sander H. van Delden  \email{plantmind@proton.me} \cr
+Sander H. van Delden \email{plantmind@proton.me}
 }

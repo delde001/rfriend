@@ -1,6 +1,6 @@
 #' Perform multiple Kruskal-Wallis tests with a user-friendly output file, do data inspection and Dunn's test (of 'rstatix') as post hoc.
 #'
-#' Performs the Kruskal-Wallis rank sum test to assess whether there are statistically significant differences between three or more independent groups. It provides detailed outputs, including plots, assumption checks, and post-hoc analyses using Dunn's test. Results can be saved in various formats ('pdf', 'Word', 'Excel', or console only) with customizable output options.
+#' Performs the Kruskal-Wallis rank sum test to assess whether there are statistically significant differences in the distributions (mean ranks) of three or more independent groups. It provides detailed outputs, including plots, assumption checks, and post hoc analyses using Dunn's test. Results can be saved in various formats ('pdf', 'Word', 'Excel', or console only) with customizable output options.
 #'
 #' @param formula A formula specifying the response and predictor variable (e.g., \code{response ~ predictor)}.
 #' more response variables and predictors can be added using \code{-} or \code{+} (e.g., \code{response1 + response2 ~ predictor1 + predictor2)}. The function iterates through these combinations or response and predictors, because the Kruskal-Wallis test itself only allows one response and one predictor combination to be tested simultaneously.
@@ -9,11 +9,25 @@
 #'   in the output files. Default is \code{TRUE}.
 #' @param alpha Numeric. The significance level for the Kruskal-Wallis test and Dunn's
 #'   test. Default is  \code{0.05}.
-#' @param adjust Character string. Adjustment method for pairwise comparisons in Dunn's test. Options include \code{"holm", "hommel", "bonferroni", "sidak", "hs", "hochberg", "bh", "by", "fdr"} or \code{"none"}. Default is \code{"bonferroni"}, if you don't want to adjust the p value (not recommended), use  \code{p.adjust.method = "none"}.
+#' @param adjust Character string. Adjustment method for pairwise comparisons in Dunn's test. Options include \code{"holm", "hommel", "bonferroni", "hochberg", "bh", "by", "fdr"} or \code{"none"}. Default is \code{"bonferroni"}, if you don't want to adjust the p value (not recommended), use \code{adjust = "none"}.
 #' @param intro_text Logical. If \code{TRUE}, includes a section about Kruskal-Wallis test assumptions in the output document. Default is \code{TRUE}.
-#' @param close_generated_files Logical. If \code{TRUE}, closes open 'Excel' or 'Word' files depending on the output format. This to be able to save the newly generated file by the \code{f_aov()} function. 'Pdf' files should also be closed before using the function and cannot be automatically closed. Default is \code{FALSE}.
+#' @param close_generated_files Logical. Closes open Excel or Word (NOT pdf) files before writing, depending on the output format. Works on Windows (taskkill), macOS (pkill) and Linux (pkill/soffice). Default \code{FALSE}. \strong{WARNING:} Always save your work before using this option!!
 #' @param open_generated_files Logical. If \code{TRUE}, Opens the generated output files ('pdf', 'Word' or 'Excel') files depending on the output format. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.
-#' @param output_type Character string specifying the output format: \code{"pdf"}, \code{"word"}, \code{"excel"}, \code{"rmd"}, \code{"console"} or \code{"off"} (no file generated). The option \code{"console"} forces output to be printed, the option \code{"rmd"} saves rmd code in the output object not in a file. Default is \code{"off"}.
+#' @param output_type Character string specifying the output format. Default is \code{"default"}.
+#'   \itemize{
+#'     \item \code{"default"}: Returns the object and lets R decide whether
+#'       to print; auto-prints if unassigned, silent if assigned to a variable.
+#'       Use \code{print(result)} or \code{plot(result)} to display the
+#'       returned object.
+#'     \item \code{"console"}: Forces immediate printing to the console
+#'       regardless of object assignment.
+#'     \item \code{"pdf"}, \code{"word"}, \code{"excel"}: Saves results to a
+#'       file of the corresponding format. See \code{save_as},
+#'       \code{save_in_wdir}, and \code{open_generated_files} for file
+#'       path and opening behavior.
+#'     \item \code{"rmd"}: Stores the raw markdown string inside the returned
+#'       object for use in R Markdown documents.
+#'   }
 #' @param save_as Character string specifying the output file path (without extension).
 #'   If a full path is provided, output is saved to that location.
 #'   If only a filename is given, the file is saved in \code{tempdir()}.
@@ -22,12 +36,17 @@
 #'   Defaults to \code{file.path(tempdir(), "dataname_summary.pdf")}.
 #' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.
 
-#' @return An object of class 'f_kruskal_test' containing:
-#' \itemize{
-#' \item Kruskal-Wallis test results for each combination of response and predictor variables.
-#' \item Dunn's test analysis results (if applicable).
-#' \item Summary tables with compact letter displays for significant group differences.
-#' }
+#' @return An object of class 'f_kruskal_test' (a named list, one entry per
+#'   response-predictor combination) containing:
+#'   \describe{
+#'     \item{kruskal.test}{The \code{htest} object from \code{kruskal.test()}.}
+#'     \item{dunn_test}{Data frame of pairwise Dunn's test results from \code{rstatix::dunn_test()}.}
+#'     \item{summary_table}{Descriptive statistics with compact letter display (Letters column).}
+#'     \item{alpha}{The significance level used.}
+#'     \item{DunnTest_adjust}{The p-value adjustment method used.}
+#'     \item{distributions}{ggplot density plot (if \code{plot = TRUE}).}
+#'     \item{Boxplot}{ggplot boxplot with CLD letters (if \code{plot = TRUE}).}
+#'   }
 #'
 #' Using the option \code{output_type}, it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and plot methods for 'f_kruskal_test' objects.
 #'
@@ -36,11 +55,11 @@
 #' \itemize{
 #' \item Assumption Checks: Optionally includes a summary of assumptions in the output.
 #' \item Visualization: Generates density plots and boxplots to visualize group distributions.
-#' \item Post-hoc Analysis: Conducts Dunn's test with specified correction methods if significant differences are found.
+#' \item Post hoc Analysis: Conducts Dunn's test with specified correction methods if significant differences are found.
 #'}
 #'-----------\cr
 #'
-#' Output files are generated in the format specified by \code{output_type =} and saved to the working directory, options are \code{"pdf", "word"} or \code{"excel"}. If \code{output_type = "rmd"} is used it is adviced to use it in a chunk with \{r, echo=FALSE, results='asis'\}
+#' Output files are generated in the format specified by \code{output_type =} and saved to the working directory, options are \code{"pdf", "word"} or \code{"excel"}. If \code{output_type = "rmd"} is used it is advised to use it in a chunk with \{r, echo=FALSE, results='asis'\}
 #'
 #' This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
 #'\itemize{
@@ -50,6 +69,20 @@
 #'
 #' \item If Pandoc is not found, this function may not work as intended.
 #' }
+#'
+#' @section Multiple Testing Across Response Variables:
+#' When several response variables are analysed in a single call
+#' (e.g. \code{y1 + y2 + y3 ~ treatment}), each Kruskal-Wallis test is an
+#' independent null-hypothesis test at level \code{alpha}. The post hoc
+#' adjustment (e.g. \code{adjust = "bonferroni"}) only controls the
+#' family-wise error rate \strong{within} one test (across pairwise Dunn
+#' comparisons for that response). It does \strong{not} protect against
+#' the inflation of Type I error \strong{across} the set of responses.
+#'
+#' \strong{Practical implication:} With \eqn{k} independent response
+#' variables all tested at \eqn{\alpha = 0.05}, the probability of
+#' obtaining at least one false positive is
+#' \eqn{1 - (1 - 0.05)^k}, which reaches ~40\% for \eqn{k = 10}.
 #'
 #' @author
 #' Sander H. van Delden  \email{plantmind@proton.me} \cr
@@ -81,18 +114,18 @@
 #'
 #' @export
 f_kruskal_test <- function(
-  formula,              # Kruskall-Wallis function formula
-  data = NULL,          # data.frame used for Kruskall-Wallis
-  plot = TRUE,          # Show plots in output files
-  alpha = 0.05,         # Set significance level alpha for Kruskall and dunn_test
-  output_type = "off",
-  save_as = NULL,       # Specify the name of the file.
-  save_in_wdir = FALSE, # Save file output in the working directory.
-  intro_text = TRUE, # Print a short explanation about Kruskall-Wallis assumptions in the pdf or word output file
-  adjust = "bonferroni",           # Correction Method for pairwise comparisson in dunn_test.
-  close_generated_files = FALSE,   # Closes either open excel or word files depending on the output format.
-  open_generated_files = TRUE      # Open files after creation
- )
+    formula,              # Kruskall-Wallis function formula
+    data = NULL,          # data.frame used for Kruskall-Wallis
+    plot = TRUE,          # Show plots in output files
+    alpha = 0.05,         # Set significance level alpha for Kruskall and dunn_test
+    output_type = "default",
+    save_as = NULL,       # Specify the name of the file.
+    save_in_wdir = FALSE, # Save file output in the working directory.
+    intro_text = TRUE, # Print a short explanation about Kruskall-Wallis assumptions in the pdf or word output file
+    adjust = "bonferroni",           # Correction Method for pairwise comparisson in dunn_test.
+    close_generated_files = FALSE,   # Closes either open excel or word files depending on the output format.
+    open_generated_files = TRUE      # Open files after creation
+)
 {
 
   ########## Reset initial settings on exit ##################################
@@ -157,12 +190,40 @@ f_kruskal_test <- function(
 
   # Create the output file "output.Rmd" in tempdir()
   file.create(temp_output_file)
+  # Create a file_extension switch
+  file_extension <- NULL
 
   # Wrap lines in rmd output document
   f_wrap_lines()
 
-  if( !(output_type %in% c("pdf", "word", "excel", "rmd", "console" , "off")) ){
-    stop("Character string specifying the output format (output_type = ) should be either: 'pdf', 'word', 'excel', 'console','rmd', 'off'")
+  # match.arg() validates string args and gives clear error messages (CRAN standard)
+  output_type <- match.arg(output_type,
+                           choices = c("default", "console", "pdf", "word", "excel", "rmd"))
+
+
+  adjust <- tolower(adjust)   # accept "BH", "bh", "BY", "by" etc.
+  adjust <- match.arg(adjust,
+                      choices = c("holm", "hommel", "bonferroni",
+                                  "hochberg", "bh", "by", "fdr", "none"))
+
+  # Normalize to what base p.adjust() requires
+  adjust <- switch(adjust,
+                   "bh" = "BH",
+                   "by" = "BY",
+                   adjust        # everything else passes through unchanged
+  )
+
+  # "sidak" and "hs" require rstatix >= 0.7.2
+  if (adjust %in% c("sidak", "hs")) {
+    if (utils::packageVersion("rstatix") < "0.7.2") {
+      stop("adjust = '", adjust, "' requires rstatix >= 0.7.2. ",
+           "Please run: install.packages('rstatix')")
+    }
+  }
+
+  # Parameter validation alpha
+  if (!is.numeric(alpha) || length(alpha) != 1 || alpha <= 0 || alpha >= 1) {
+    stop("'alpha' must be a single numeric value strictly between 0 and 1 (e.g. 0.05).")
   }
 
   ##### Handle option "save_as = " #####
@@ -192,7 +253,7 @@ f_kruskal_test <- function(
       }
     }
 
-    if(!exists("file_extension") && output_type %in% c("console", "off")){
+    if(is.null(file_extension) && output_type %in% c("console", "default")){
       # use helper get_save_path() to create output_path
       output_path <- get_save_path(save_as = save_as,
                                    default_name = paste(data_name, "Kruskal_Wallis_output", sep = "_"),
@@ -203,7 +264,7 @@ f_kruskal_test <- function(
       output_type <- "pdf"
 
     }
-    else if(!exists("file_extension") && output_type %in% c("pdf", "word", "excel", "rmd")){
+    else if(is.null(file_extension) && output_type %in% c("pdf", "word", "excel", "rmd")){
 
       #create extension based on input_type
       file.ext <- unname(output_type_map[output_type])
@@ -219,7 +280,7 @@ f_kruskal_test <- function(
 
 
     }
-    else if(exists("file_extension")) {
+    else if(!is.null(file_extension)) {
 
       # use helper get_save_path() to create output_path
       output_path <- get_save_path(save_as = save_as,
@@ -249,22 +310,25 @@ f_kruskal_test <- function(
 
 
   # Prevent output to console and keep files open when output is "rmd" format
-  if(output_type == "rmd"){
-    close_generated_files <- FALSE
-  }
+  if (output_type == "rmd") close_generated_files <- FALSE
 
-  if(output_type != "rmd"){
-
-    if(close_generated_files == TRUE && output_type == "word"){
-      # Close all MS Word files to avoid conflicts (so save your work first)
-      system("taskkill /im WINWORD.EXE /f")
+  # Cross-platform close_generated_files (was Windows-only taskkill)
+  if (output_type != "rmd" && isTRUE(close_generated_files)) {
+    close_app <- function(win_proc, mac_name, linux_name) {
+      sysname <- Sys.info()[["sysname"]]
+      if (.Platform$OS.type == "windows") {
+        system(paste0("taskkill /im ", win_proc, " /f"),
+               ignore.stdout = TRUE, ignore.stderr = TRUE)
+      } else if (sysname == "Darwin") {
+        system(paste0("pkill -f '", mac_name, "'"),
+               ignore.stdout = TRUE, ignore.stderr = TRUE)
+      } else {
+        system(paste0("pkill -f ", linux_name),
+               ignore.stdout = TRUE, ignore.stderr = TRUE)
+      }
     }
-
-    if(close_generated_files == TRUE && output_type == "excel"){
-      # Close all MS Word files to avoid conflicts (so save your work first)
-      system("taskkill /im EXCEL.EXE /f")
-    }
-
+    if (output_type == "word")  close_app("WINWORD.EXE", "Microsoft Word",  "soffice")
+    if (output_type == "excel") close_app("EXCEL.EXE",   "Microsoft Excel", "soffice")
   }
 
   # Create a list to store all outputs in this function
@@ -283,14 +347,14 @@ f_kruskal_test <- function(
   for (response in lhs) {
     if (!(response %in% names(data))) {
       stop(paste("Response variable", response, "not found in the data."))
-      }
+    }
   }
 
 
   for (predictor in rhs) {
     if (!(predictor %in% names(data))) {
       stop(paste("Predictor variable", predictor, "not found in the data."))
-     }
+    }
 
     # Ensure all predictor variables are factors
     data[[predictor]] <- as.factor(data[[predictor]])
@@ -300,22 +364,22 @@ f_kruskal_test <- function(
 
   generate_report <- function(output = TRUE) {
 
-  # This text reminds the user of the assumptions of an intro_text it its show by default
-  # but can be hidden.
+    # This text reminds the user of the assumptions of an intro_text it its show by default
+    # but can be hidden.
     if(intro_text == TRUE){
 
       cat("
 # Assumptions of the Kruskal-Wallis Test
-The Kruskal-Wallis test is a non-parametric test used to assess whether there are statistically significant differences between the medians of three or more independent groups. It does not require the data to be normally distributed, making it suitable for ordinal or skewed continuous data. However, the test assumes that data within each group are similarly distributed. Below are its key assumptions:  \n   \n
+The Kruskal-Wallis test is a non-parametric test used to assess whether there are statistically significant differences in the distributions (mean ranks) of three or more independent groups. It does not require the data to be normally distributed, making it suitable for ordinal or skewed continuous data. However, the test assumes that data within each group are similarly distributed. Below are its key assumptions:  \n   \n  \n   \n
 
 1.	**Independence of Observations:**
-Data points must be independent within and across groups, with no overlap or relationships between groups.
+Data points must be independently sampled within and across groups (no repeated measures, no clustering).
 
 2.	**Measurement Scale:**
 The dependent variable should be ordinal or continuous (interval or ratio), but not nominal.
 
 3.	**Similar Distribution Shapes:**
-The dependent variable should have a similar distribution shape across groups, as differing shapes can affect median comparisons. If this assumption is violated, the test may not accurately compare medians but instead reflect differences in overall distributions.
+The dependent variable should have a similar distribution shape across groups. If this assumption holds, the test can be interpreted as a comparison of medians. If shapes or spreads differ substantially, the result reflects differences in mean ranks (overall distributions) rather than medians specifically.
 
 4.	**Random Sampling:**
 Samples should be randomly drawn from their populations to ensure representativeness.
@@ -327,6 +391,39 @@ Each group should ideally include at least five observations for reliable result
 <div style=\"page-break-after: always;\"></div>
 \\newpage")
     }
+
+    # Multiple-response/predictor warning: shown when > 1 independent test is run.
+    # Fires regardless of intro_text so the user always sees it in this situation.
+    k_tests <- length(lhs) * length(rhs)
+    if (k_tests > 1) {
+      fwer_pct   <- round((1 - (1 - alpha)^k_tests) * 100, 1)
+      bonf_alpha <- round(alpha / k_tests, 4)
+      cat(paste0(
+        "\n\n***\n\n",
+        "\u26a0 **NOTE \u2014 Multiple Testing Across ", k_tests, " Kruskal-Wallis Tests**  \n\n",
+        "This report runs **", k_tests, "** independent Kruskal-Wallis tests ",
+        "(", length(lhs), " response", if (length(lhs) > 1) "s" else "", " \u00d7 ",
+        length(rhs), " predictor", if (length(rhs) > 1) "s" else "", ") on the same dataset. ",
+        "The **", adjust,"** correction keeps each individual test honest, it guards against ",
+        "false positives among the pairwise group comparisons, but it offers no protection ",
+        " against the accumulation of error across all ",k_tests," tests combined. ",
+
+        "\n At \u03b1 = ", alpha, " per test, the probability of obtaining at least one ",
+        "spurious significant result across all ", k_tests, " tests is approximately ",
+        "**", fwer_pct, "%** (1\u2212(1\u2212", alpha, ")^", k_tests, ", assuming independence). ",
+        "This risk is highest in exploratory studies; it is less of a concern when ",
+        "each response has a clear a priori hypothesis.  \n\n",
+        "**Possible remedies:**  \n",
+        "\n-  **Bonferroni** (conservative): re-run with `alpha = ", bonf_alpha,
+        "` (\u03b1 / ", k_tests, ").  \n",
+        "\n-  **False Discovery Rate (FDR)**: apply `p.adjust(p_values, method = \"fdr\")` to the ",
+        k_tests, " Kruskal-Wallis p-values after the fact.  \n",
+        "\n-  **Pre-registration**: if each response-predictor combination was a pre-specified ",
+        "study outcome, correction may not be required; document this decision explicitly.  \n",
+        "\n\n***\n\n"
+      ))
+    }
+
     #create count to remove last page break
     i <- 0
     #Main loop starts here
@@ -337,185 +434,254 @@ Each group should ideally include at least five observations for reliable result
         letter_df <- NULL
         cld_letters <- NULL
         i <- i+1
-      # Create a new formula for each response
-      current_formula <- as.formula(paste0(response_name, "~", predictor_name))
+        # Create a new formula for each response
+        current_formula <- as.formula(paste0(response_name, "~", predictor_name))
 
-      cat("   \n#  Analysis of: ", response_name, " by ", predictor_name,"  \n")
-      cat("   \n     \n&nbsp;  \n   \n ")
+        cat("   \n#  Analysis of: ", response_name, " by ", predictor_name,"  \n")
+        cat("   \n     \n&nbsp;  \n   \n ")
 
-      if(plot == TRUE){
-      cat("  \n## Visual check on similarity of distributions  \n")
+        if(plot == TRUE){
+          cat("  \n## Visual check on similarity of distributions  \n")
 
-      d <- ggplot(data, aes(x = !!sym(response_name), fill = factor(!!sym(predictor_name)))) +
-        geom_density(alpha = 0.4) +
-        labs(title = "Density Plot by Group", x = predictor_name)
+          d <- ggplot(data, aes(x = !!sym(response_name), fill = factor(!!sym(predictor_name)))) +
+            geom_density(alpha = 0.4) +
+            labs(title = "Density Plot by Group", x = response_name, fill = predictor_name) +
+            theme_bw()
 
-      # Print d, i.e. distributions plot
-      # Create a temporary file path with a .png extension
-      temp_file_path_d <- tempfile(fileext = ".png")
+          # Print d, i.e. distributions plot
+          # Create a temporary file path with a .png extension
+          temp_file_path_d <- tempfile(fileext = ".png")
 
-      # Save the plot, specifying the device as "pdf"
-      suppressMessages(ggsave(filename = temp_file_path_d, plot = d))
+          # Save the plot, specifying the device as "pdf"
+          suppressMessages(ggsave(filename = temp_file_path_d, plot = d))
 
-      # Include the saved plot in R Markdown
-      cat(paste0("![](", temp_file_path_d, ")"), "   \n  \n")
-      cat("&nbsp;\n   \n")
+          # Include the saved plot in R Markdown
+          cat(paste0("![](", temp_file_path_d, ")"), "   \n  \n")
+          cat("&nbsp;\n   \n")
 
-      }
+        }
 
-      output_list[[paste0(response_name,"_",predictor_name)]][["distributions"]] <- d
-      # Store alpha and adjust for print.class function
-      output_list[[paste0(response_name,"_",predictor_name)]][["alpha"]]          <- alpha
-      output_list[[paste0(response_name,"_",predictor_name)]][["DunnTest_adjust"]]<- adjust
+        output_list[[paste0(response_name,"_",predictor_name)]][["distributions"]] <- d
+        # Store alpha and adjust for print.class function
+        output_list[[paste0(response_name,"_",predictor_name)]][["alpha"]]          <- alpha
+        output_list[[paste0(response_name,"_",predictor_name)]][["DunnTest_adjust"]]<- adjust
 
-      # cat("   \n     \n&nbsp;  \n   \n ")
-      if(output_type != "rmd"){
-        # Pagebreak
-        cat("
+        # cat("   \n     \n&nbsp;  \n   \n ")
+        if(output_type != "rmd"){
+          # Pagebreak
+          cat("
 <div style=\"page-break-after: always;\"></div>
 \\newpage")
-      }
+        }
 
-      cat("
+        cat("
 \n## Result of Kruskal-Wallis rank sum test  \n  \n")
-      # Perform the Kruskal-Wallis test
-      kruskal.test_result <- kruskal.test(current_formula, data = data)
-      # Show kruskal.test_result in ouput document
-      f_pander(kruskal.test_result)
-#       # Pagebreak
-#       cat("   \n   \n
-# <div style=\"page-break-after: always;\"></div>
-# \\newpage
-#       ")
-      # Store Kruskal-Wallis test in ouput
-      output_list[[paste0(response_name,"_",predictor_name)]][["kruskal.test"]] <- kruskal.test_result
+        cat("&nbsp;\n   \n")
 
-      # Create data summary table for output and store in output_list
-      summary_table <- f_summary(data,
-                                 response_name,
-                                 predictor_name,
-                                 show_sd = FALSE,
-                                 show_se = FALSE,
-                                 eval_input = TRUE,
-                                 digits = NULL
-                                 )$output_df
-      output_list[[paste0(response_name,"_",predictor_name)]][["summary_table"]] <- summary_table
+        # Perform the Kruskal-Wallis test
+        kruskal.test_result <- kruskal.test(current_formula, data = data)
 
-      if(kruskal.test_result$p.value < alpha){
+        # Format p-value
+        kw_p_fmt <- if (kruskal.test_result$p.value < 0.001) "< 0.001" else
+          round(kruskal.test_result$p.value, 4)
 
-      cat("
-  \n  \n## Result of Dunn's test post-hoc test  \n   \n")
-      # Conduct Dunn's test for post-hoc analysis
-      dunn_test_result <- rstatix::dunn_test(current_formula,
-                                    data = data,
-                                    p.adjust.method = adjust)
-      cat("
+        # Show formatted result in output document
+        cat(paste0(
+          "**Kruskal-Wallis rank sum test** of ", response_name, " by ", predictor_name, ":  \n",
+          "\u03c7\u00b2 = ", round(kruskal.test_result$statistic, 3),
+          ", df = ", kruskal.test_result$parameter,
+          ", p = **", kw_p_fmt, "**",
+          if (kruskal.test_result$p.value < alpha) {
+            paste0("  \nThe test is **significant** (\u03b1 = ", alpha,
+                   "), indicating that at least one group differs from the others.")
+          } else {
+            paste0("  \nThe test is **not significant** (\u03b1 = ", alpha,
+                   "). There is insufficient evidence to conclude that the groups differ.")
+          },
+          "\n\n&nbsp;\n   \n"
+        ))
+        # Store Kruskal-Wallis test in ouput
+        output_list[[paste0(response_name,"_",predictor_name)]][["kruskal.test"]] <- kruskal.test_result
+
+        # Create data summary table for output and store in output_list
+        summary_table <- f_summary(data,
+                                   response_name,
+                                   predictor_name,
+                                   show_name = FALSE,
+                                   show_sd = FALSE,
+                                   show_se = FALSE,
+                                   digits = NULL
+        )$output_df
+
+        # Conduct Dunn's test for post hoc analysis (always computed for CLD letters)
+        dunn_test_result <- rstatix::dunn_test(current_formula,
+                                               data = data,
+                                               p.adjust.method = adjust)
+
+        if(kruskal.test_result$p.value < alpha){
+          cat("
+\n  \n## Post hoc Analysis of:  `", deparse(current_formula),"`   \n")
+              cat("\nBecause the overall Kruskal–Wallis test was significant, a Dunn’s (1964) test was conducted to identify which specific groups differ from one another.\n")
+              cat("&nbsp;\n   \n&nbsp;\n   \n")
+              cat("
+       \n**How to interpret the results:**\n
+       \n- **Dunn's Test compares ranks, not medians.** Although Dunn’s test is often discussed in terms of median differences, it actually compares the mean ranks of groups. In other words, it tests whether observations in one group tend to have higher values than those in another (stochastic dominance).
+       \n- **Caution about medians.** You can interpret group differences as differences in medians only if the distributions have similar shapes (see boxplots below and distribution graphs above).
+       If one distribution is skewed and another is symmetric, Dunn’s test may indicate a difference even when their medians are the same.
+       \n")
+          cat("&nbsp;\n   \n")
+          cat("
 Dunn (1964) Kruskal-Wallis multiple comparison.  \n")
-      f_pander(dunn_test_result)
-      cat("
-  \n   \np-values (p) were adjusted with ", adjust, " (p.adj) \n")
-      cat("
+          # Drop the .y. column (just repeats response name on every row)
+          dunn_print <- dunn_test_result[, !names(dunn_test_result) %in% c(".y.", "y"), drop = FALSE]
+          f_pander(dunn_print)
+          cat("p-values (p) were adjusted with ", adjust, " (p.adj) \n")
+          cat("
 Group 1 and group 2 indicate the compared groups with respectively n1 and n2 replicates. The **statistic** column represents the z-test statistic for each pairwise comparison in the Dunn test. This statistic is derived by standardizing the difference in mean ranks between two groups using the pooled standard error. It follows the standard normal distribution under the null hypothesis, which assumes no difference in ranks between groups.
 
 - A **positive Z** value indicates that the first group in the comparison has higher ranks (on average) than the second group.
 - A **negative Z** value indicates that the second group has higher ranks (on average) than the first group.    \n   \n")
 
-      if(output_type != "rmd"){
-        # Pagebreak
-        cat("
+          if(output_type != "rmd"){
+            # Pagebreak
+            cat("
 <div style=\"page-break-after: always;\"></div>
 \\newpage")
-      }
+          }
+        } # end if KW significant (Dunn output)
 
-      # Store dunn_test_result in ouput
-      output_list[[paste0(response_name,"_",predictor_name)]][["dunn_test"]] <- dunn_test_result
+        # Store dunn_test_result in ouput
+        output_list[[paste0(response_name,"_",predictor_name)]][["dunn_test"]] <- dunn_test_result
 
-      # Extract p-values and convert to a compact letter display
-      dunn_pvalues <- dunn_test_result$p.adj
-      names(dunn_pvalues) <- paste0(dunn_test_result$group1,"-",dunn_test_result$group2)
+        # Extract p-values and convert to a compact letter display
+        dunn_pvalues <- dunn_test_result$p.adj
+        names(dunn_pvalues) <- paste0(dunn_test_result$group1,"-",dunn_test_result$group2)
 
-      # Can be that spaces are added to names in group remove these by:
-      names(dunn_pvalues) <- lapply(names(dunn_pvalues), function(x) gsub(" ", "", x))
-      cld <- multcompLetters(dunn_pvalues, threshold = alpha)
+        # Can be that spaces are added to names in group remove these by:
+        names(dunn_pvalues) <- lapply(names(dunn_pvalues), function(x) gsub(" ", "", x))
+        cld <- multcompLetters(dunn_pvalues, threshold = alpha)
 
-      # Create a data frame with letters for each group
-      letter_df <- as.data.frame(cld$Letters)
-      letter_df[[predictor_name]] <- row.names(letter_df)
-      colnames(letter_df)[colnames(letter_df) == "cld$Letters"] <- "cld_letters"
+        # Create a data frame with letters for each group
+        letter_df <- as.data.frame(cld$Letters)
+        letter_df[[predictor_name]] <- row.names(letter_df)
+        colnames(letter_df)[colnames(letter_df) == "cld$Letters"] <- "Letters"
+
+        # Build footnote text (used after summary table)
+        footnote <- paste0("
+\n-  **Note 1 (Assumptions):** Dunn's test does not assume normality, but implies a
+      test for difference in medians only if distribution shapes are similar across groups.
+      If shapes or spreads differ substantially (check side-by-side boxplots and density plots),
+      the result reflects a difference in mean ranks rather than medians.
+\n-  **Note 2 (Results):** Groups sharing the same letter are not significantly different (\u03b1 = ", alpha, ").
+      This indicates insufficient evidence to claim a difference, but it does not prove the groups are identical.",
+                           if(adjust == "none"){paste0("\n**WARNING**: No p-value correction was applied. This increases the risk of finding \"significant\" differences that generally exist only by chance.")
+                           } else {paste0(" P-values were adjusted with ", adjust,".")
+                           })
+
+        # Store adjust method in output
+        output_list[[paste0(response_name,"_",predictor_name)]][["adjust"]] <- adjust
+
+        if(plot == TRUE){
+
+          cat("  \n## Boxplot of: ", response_name, " by ", predictor_name,"  and Dunn's test post hoc test  \n  \n")
+          # Add the compact letter display to the data
+          data2 <- merge(data, letter_df, by = predictor_name, all.x = TRUE)
+
+          # Set the location for the letters in the boxplot.
+          y_max <- max(data[[response_name]], na.rm = TRUE)
+          y_min <- min(data[[response_name]], na.rm = TRUE)
+
+          # Calculate a proportional position above the top of the plot
+          y_position <- y_max + 0.08 * (y_max - y_min)  # 5% above ymax
+
+          # Create the boxplot
+          p <- ggplot(data2, aes(x = !!sym(predictor_name), y = !!sym(response_name), fill = factor(!!sym(predictor_name)))) +
+            geom_boxplot(alpha = 0.4) +
+            geom_jitter(width = 0.2,
+                        color = "steelblue",
+                        height = 0,    # usually 0 for boxplots (don't distort y-axis values)
+                        alpha = 0.5) +
+            geom_text(
+              data = letter_df,
+              aes(y = y_position, label = Letters[match(!!sym(predictor_name),  !!sym(predictor_name))])
+            ) +
+            labs(x = predictor_name, y = response_name) +
+            theme_bw()
+
+          # Create a temporary file path with a .png extension
+          temp_file_path_p <- tempfile(fileext = ".png")
+
+          # Save the plot, specifying the device as "pdf"
+          suppressMessages(ggsave(filename = temp_file_path_p, plot = p))
+
+          # Include the saved plot in R Markdown
+          cat(paste0("![](", temp_file_path_p, ")"), "   \n  \n")
+          cat("&nbsp;\n   \n")
+
+          output_list[[paste0(response_name,"_",predictor_name)]][["Boxplot"]] <- p
+        }
+
+        # Create data summary with letters table for output and store in output_list
+        summary_table <- merge(summary_table, letter_df, by = predictor_name, all.x = TRUE)
+
+        if(kruskal.test_result$p.value > alpha){
+          summary_table$Letters <- "ns"
+        }
+
+        # Reorder columns: Letters next to group labels (indicates distribution differences),
+        # median-centric layout for non-parametric test, mean last (de-emphasized)
+        col_order <- c(predictor_name, "Letters", "n", "min", "Q1", "median", "Q3", "max", "mean")
+        col_order <- col_order[col_order %in% names(summary_table)]
+        # Append any remaining columns not in col_order
+        remaining <- setdiff(names(summary_table), col_order)
+        summary_table <- summary_table[, c(col_order, remaining), drop = FALSE]
+
+        output_list[[paste0(response_name,"_",predictor_name)]][["summary_table"]] <- summary_table
+
+        # Helper: bold the median column for markdown/pander display only
+        bold_median <- function(tbl) {
+          if ("median" %in% names(tbl)) {
+            tbl$median <- paste0("**", tbl$median, "**")
+          }
+          tbl
+        }
 
 
-
-      if(plot == TRUE){
-
-      cat("  \n## Boxplot of: ", response_name, " by ", predictor_name,"  and Dunn's test post-hoc test  \n  \n")
-      # Add the compact letter display to the data
-      data2 <- merge(data, letter_df, by = predictor_name, all.x = TRUE)
-
-      # Set the location for the letters in the boxplot.
-      y_max <- max(data[[response_name]], na.rm = TRUE)
-      y_min <- min(data[[response_name]], na.rm = TRUE)
-
-      # Calculate a proportional position above the top of the plot
-      y_position <- y_max + 0.08 * (y_max - y_min)  # 5% above ymax
-
-      # Create the boxplot
-      p <- ggplot(data2, aes(x = !!sym(predictor_name), y = !!sym(response_name))) +
-        geom_boxplot() +
-        geom_jitter(width = 0.2, alpha = 0.5) +
-        geom_text(
-          data = letter_df,
-          aes(y = y_position, label = cld_letters[match(!!sym(predictor_name),  !!sym(predictor_name))])
-        ) +
-        labs(x = predictor_name, y = response_name) +
-        theme_bw()
-
-      # Create a temporary file path with a .png extension
-      temp_file_path_p <- tempfile(fileext = ".png")
-
-      # Save the plot, specifying the device as "pdf"
-      suppressMessages(ggsave(filename = temp_file_path_p, plot = p))
-
-      # Include the saved plot in R Markdown
-      cat(paste0("![](", temp_file_path_p, ")"), "   \n  \n")
-      cat("&nbsp;\n   \n")
-
-      output_list[[paste0(response_name,"_",predictor_name)]][["Boxplot"]] <- p
-      cat("   \n   \np-values were adjusted with ", adjust," and a significance level of $\\alpha$ = ", alpha, " was used.  \n")
-      cat("   \n   \n**NOTE 1:** Dunn's test does not assume normality but requires similar distribution shapes, differing only in location or median. If distributions vary in shape or spread, the results may be less reliable.   \n")
-      cat("**NOTE 2:** Dunn's tests compares medians  not means. If two or more medians share the same grouping letter, we cannot show them to be different ($\\alpha$ =", alpha,"). Yet, we also did not show them to be the same.   \n")
-
-      }
-
-      # Create data summary with letters table for output and store in output_list
-       summary_table <- merge(summary_table, letter_df, by = predictor_name, all.x = TRUE)
-       output_list[[paste0(response_name,"_",predictor_name)]][["summary_table"]] <- summary_table
-      } else {
-        cat("No significant differences found based on Kruskal-Wallis rank sum test.\n")
-      }
-
-      if(output_type != "rmd"){
-        # Pagebreak
-        cat("
-<div style=\"page-break-after: always;\"></div>
-\\newpage")
-      }
-
-      cat("  \n## Data summary table  \n")
-      f_pander(f_conditional_round(summary_table, digits = 2), line_break = 9)
-      cat("   \n   \np-values were adjusted with ", adjust," and a significance level of $\\alpha$ = ", alpha, " was used.  \n")
-      cat("**NOTE 1:** Dunn's test does not assume normality but requires similar distribution shapes, differing only in location or median. If distributions vary in shape or spread, the results may be less reliable.   \n")
-      cat("**NOTE 2:** Dunn's tests compares medians not means. If two or more medians share the same grouping letter, we cannot show them to be different($\\alpha$ =", alpha,"). Yet, we also did not show them to be the same.   \n")
+#         if(output_type != "rmd"){
+#           # Pagebreak
+#           cat("
+# <div style=\"page-break-after: always;\"></div>
+# \\newpage")
+#         }
 
 
-      if(output_type != "rmd" &&  i < length(lhs)){
-        # Pagebreak
-        cat("
+        if(kruskal.test_result$p.value < alpha){
+          cat("&nbsp;\n   \n")
+          cat("  \n## Summary Statistics of: ", response_name, " by ", predictor_name,"  and Dunn's test post hoc test  \n  \n")
+          cat("&nbsp;\n   \n")
+          cat(paste("  \nSummary Statistics with Dunn's post hoc Comparison, `Model:", deparse(current_formula),"`  \n"))
+          f_pander(bold_median(f_conditional_round(summary_table, digits = 2)), col_width = 9)
+
+          cat(footnote)
+
+        } else {
+          cat("  \n## Data Summary Table of: ", response_name,"
+      \n
+        Since the Kruskal-Wallis test was **NOT** significant, no post hoc test was performed.\n   \n")
+
+          cat(paste("\n**Summary Statistics** `Model:", deparse(current_formula),"`  \n"))
+          f_pander(bold_median(f_conditional_round(summary_table, digits = 2)), col_width = 9)
+        }
+
+        if(output_type != "rmd" &&  i < length(lhs)){
+          # Pagebreak
+          cat("
 \n    \n
 <div style=\"page-break-after: always;\"></div>
 \\newpage
         ")
+        }
       }
-     }
     } #Main loop end
     if (output == TRUE) {
       return(output_list)
@@ -523,10 +689,14 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 rep
   } # End generate report function.
 
   # Execute analysis and return results but hide this from console.
-  sink(tempfile())
-  capture.output(output_list <- generate_report())
+  suppressMessages(
+    utils::capture.output(
+      output_list <- generate_report(),
+      file = nullfile()
+    )
+  )
   class(output_list) <- "f_kruskal_test"
-  sink()
+
 
 
   # Here the documents are constructed.
@@ -548,8 +718,15 @@ output:
         latex_engine: pdflatex
 header-includes:
   - \\usepackage[utf8]{inputenc}
-  - \\DeclareUnicodeCharacter{03BB}{\\ensuremath{\\lambda}}
-  - \\DeclareUnicodeCharacter{03B1}{\\ensuremath{\\alpha}}
+  - \\usepackage{textcomp}
+  - \\DeclareUnicodeCharacter{03BB}{\\ensuremath{\\lambda}}  # Lambda
+  - \\DeclareUnicodeCharacter{03B1}{\\ensuremath{\\alpha}}   # Alpha
+  - \\DeclareUnicodeCharacter{03C7}{\\ensuremath{\\chi}}     # Chi
+  - \\DeclareUnicodeCharacter{2212}{\\textminus}             # Minus sign
+  - \\DeclareUnicodeCharacter{00B2}{\\ensuremath{^2}}        # Superscript 2
+  - \\DeclareUnicodeCharacter{2014}{\\textemdash}            # Em dash
+  - \\DeclareUnicodeCharacter{00D7}{\\ensuremath{\\times}}   # Multiplication si
+  - \\DeclareUnicodeCharacter{26A0}{\\textbf{!}}             # Warning sign
 ---
 ")}
 
@@ -581,8 +758,8 @@ header-includes:
     )
 
     if(open_generated_files == TRUE){
-    # Open the file with default program
-    f_open_file(output_path)
+      # Open the file with default program
+      f_open_file(output_path)
     }
 
     return(invisible(output_list))
@@ -624,7 +801,7 @@ header-includes:
 
     return(invisible(output_list))
 
-  } else if (output_type == "off"){
+  } else if (output_type == "default"){
     #Nothing to show output will be output_list.
     return(output_list)
 
@@ -644,45 +821,113 @@ header-includes:
 
 }
 
+
 #' @export
 print.f_kruskal_test <- function(x, ...) {
-
   # Create a flag to now if Dunn Test expl. should be printed.
   flag_dunnTest_used <- FALSE
-  # Loop over each category (a, b, etc.)
+
+  # get the line with from user
+    line_width <- 72
+
+
+
+
+# Loop over each category (a, b, etc.)
   for (category in names(x)) {
     # Get the sublist for this category
     sublist <- x[[category]]
 
-  cat("-------------------------------------------------\n")
-  cat("Results of testing", sublist$kruskal.test$data.name)
-  cat("\n-------------------------------------------------")
+    # Skip non-result entries (e.g. the "rmd" character string)
+    if (!is.list(sublist)) next
 
-  print(sublist$kruskal.test)
+    cat("\n==========================================================\n")
+    cat("Results of testing", sublist$kruskal.test$data.name)
+    cat("\n==========================================================\n")
 
-  if(sublist$kruskal.test$p.value < 0.05){
-  cat("\nSummary table with Dunn-Test Post-Hoc:", sublist$kruskal.test$data.name,"\n   \n")
-  flag_dunnTest_used <- TRUE
-  } else {
-  cat("\nNo differences found, summary table of:", sublist$kruskal.test$data.name,"\n   \n")
+    print(sublist$kruskal.test)
+
+    if (sublist$kruskal.test$p.value < sublist$alpha) {
+      cat(
+        "\nSummary table with Dunn-Test Post Hoc:",
+        sublist$kruskal.test$data.name,
+        "\n"
+      )
+      flag_dunnTest_used <- TRUE
+    } else {
+      cat(
+        "\nNo differences found, summary table of:",
+        sublist$kruskal.test$data.name,
+        "\n"
+      )
+    }
+
+    f_pander(sublist$summary_table, col_width = 7)
+    if (flag_dunnTest_used == TRUE) {
+
+
+      dunnTest_used <- paste0("
+Note 1 (Assumptions): Dunn's test does not assume normality, but implies a test for difference in medians only if distribution shapes are similar across groups. If shapes or spreads differ substantially (check boxplots and density plots using, plot(...)), the result reflects a difference in mean ranks rather than medians.\n
+Note 2 (Results): Groups sharing the same letter are not significantly different (\u03B1 =",
+        sublist$alpha,
+        "). While this means we cannot reject the hypothesis that they are different, it does not prove they are identical. ",
+        if (sublist$adjust == "none") {
+          paste0(
+            "\n**WARNING**: No p-value correction was applied. This increases the risk of finding \"significant\" differences that generally exist only by chance."
+          )
+        } else {
+          paste0("P-values were adjusted with ", sublist$adjust, ".")
+        }
+        )
+
+      # Wrap the text
+      wrapped_text <- strwrap(dunnTest_used, width = line_width)
+
+      # Print the text with newlines collapsing the vector
+      cat(paste(wrapped_text, collapse = "\n"), "\n")
+    }
+  }
+}
+
+
+
+#' Plot method for f_kruskal_test objects
+#'
+#' Displays the density plot and/or boxplot stored in an \code{f_kruskal_test}
+#' object. Plots are only available when the original call used \code{plot = TRUE}.
+#'
+#' @param x An object of class \code{f_kruskal_test}.
+#' @param which Character vector indicating which plots to show. Options are
+#'   \code{"distributions"} (density plot), \code{"Boxplot"}, or both (default).
+#' @param ... Additional arguments (currently ignored).
+#'
+#' @return Returns \code{x} invisibly.
+#'
+#' @examples
+#' result <- f_kruskal_test(Sepal.Width ~ Species, data = iris,
+#'                          output_type = "default")
+#' plot(result)                          # both plots
+#' plot(result, which = "Boxplot")       # boxplot only
+#'
+#' @export
+plot.f_kruskal_test <- function(x, which = c("distributions", "Boxplot"), ...) {
+
+  which <- match.arg(which, choices = c("distributions", "Boxplot"), several.ok = TRUE)
+
+  for (category in names(x)) {
+    sublist <- x[[category]]
+
+    # Skip non-result entries (e.g. the "rmd" character string)
+    if (!is.list(sublist)) next
+
+    for (plt_name in which) {
+      if (!is.null(sublist[[plt_name]])) {
+        print(sublist[[plt_name]])
+      }
+    }
   }
 
-  # summary_table <- sublist$summary_table
-  # names(summary_table) <- insert_newline(names(summary_table), 8)
-  # table_text <- knitr::kable(summary_table, format = "simple")
-  # cat(table_text, sep = "\n")
-
-  f_pander(sublist$summary_table, line_break = 7)
-  cat("\n")
-  }
-
-cat("-------------------------------------------------\n")
-if(flag_dunnTest_used == TRUE){
-
-  cat("all p-values were", sublist$DunnTest_adjust,"adjusted, and a significance level of \U03B1 = ", sublist$alpha, " was used.  \n  \n")
-    cat("NOTE 1: Dunn's test does not assume normality but requires similar distribution shapes, \ndiffering only in location or median. \nIf distributions vary in shape or spread, the results may be less reliable.   \n  \n")
-    cat("NOTE 2: Dunn's tests compares medians not means. \nIf two or more medians share the same grouping letter, we cannot show them to be different. \nYet, we also did not show them to be the same.   \n")
-  }
+  invisible(x)
 }
 
 

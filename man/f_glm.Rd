@@ -2,7 +2,7 @@
 % Please edit documentation in R/fglm.R
 \name{f_glm}
 \alias{f_glm}
-\title{Perform multiple \code{glm()} functions with diagnostics, assumption checking, and post-hoc analysis}
+\title{Perform multiple \code{glm()} functions with diagnostics, assumption checking, and post hoc analysis}
 \usage{
 f_glm(
   formula,
@@ -14,7 +14,7 @@ f_glm(
   type = "response",
   intro_text = TRUE,
   dispersion_test = TRUE,
-  output_type = "off",
+  output_type = "default",
   save_as = NULL,
   save_in_wdir = FALSE,
   close_generated_files = FALSE,
@@ -48,13 +48,32 @@ for multiple comparisons. Available methods include:
   \item{"fdr"}{False Discovery Rate adjustment}
 } Default is \code{"sidak"}.}
 
-\item{type}{specifying the scale on which the emmeans posthoc results are presented, e.g. "link" to show results on the scale for which the variables are linear and "response" when you want to back transform the data to interpret results in the units of your original data (e.g., probabilities, counts, or untransformed measurements). Default is \code{"response"}.}
+\item{type}{Character string specifying the scale of emmeans post hoc results:
+\code{"response"} (back-transformed to original units, e.g. probabilities, counts)
+or \code{"link"} (on the linear predictor scale, e.g. log-odds). Default is \code{"response"}.}
 
 \item{intro_text}{Logical. If \code{TRUE}, includes a short explanation about GLM assumptions in the output file.}
 
-\item{dispersion_test}{Logical for overdispersion test (default: TRUE).}
+\item{dispersion_test}{Logical. If \code{TRUE}, includes a dispersion diagnostic
+section in the output: a DHARMa simulation-based test for overdispersion
+(Poisson/Binomial), the quasi-dispersion parameter (quasi-families), or a
+note explaining why the test is skipped (Bernoulli data). Default is \code{TRUE}.}
 
-\item{output_type}{Character string specifying the output format: \code{"pdf"}, \code{"word"}, \code{"excel"}, \code{"rmd"}, \code{"console"} or \code{"off"} (no file generated). The option \code{"console"} forces output to be printed, the option \code{"rmd"} saves rmd code in the output object not in a file. Default is \code{"off"}.}
+\item{output_type}{Character string specifying the output format. Default is \code{"default"}.
+\itemize{
+  \item \code{"default"}: Returns the object and lets R decide whether
+    to print; auto-prints if unassigned, silent if assigned to a variable.
+    Use \code{print(result)} or \code{plot(result)} to display the
+    returned object.
+  \item \code{"console"}: Forces immediate printing to the console
+    regardless of object assignment.
+  \item \code{"pdf"}, \code{"word"}, \code{"excel"}: Saves results to a
+    file of the corresponding format. See \code{save_as},
+    \code{save_in_wdir}, and \code{open_generated_files} for file
+    path and opening behavior.
+  \item \code{"rmd"}: Stores the raw markdown string inside the returned
+    object for use in R Markdown documents.
+}}
 
 \item{save_as}{Character string specifying the output file path (without extension).
 If a full path is provided, output is saved to that location.
@@ -63,35 +82,47 @@ If only a directory is specified (providing an existing directory with trailing 
 the file is named "dataname_glm_output" in that directory. If an extension is provided the output format specified with option "output_type" will be overruled.
 Defaults to \code{file.path(tempdir(), "dataname_summary.pdf")}.}
 
-\item{save_in_wdir}{Logical. If \code{TRUE}, saves the file in the working directory.}
+\item{save_in_wdir}{Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.}
 
-\item{close_generated_files}{Logical. If \code{TRUE}, closes open 'Excel' or 'Word' files depending on the output format. This to be able to save the newly generated file by the \code{f_aov()} function. 'Pdf' files should also be closed before using the function and cannot be automatically closed. Default is \code{FALSE}.}
+\item{close_generated_files}{Logical. Closes open Excel or Word (NOT pdf) files before writing, depending on the output format. Works on Windows (taskkill), macOS (pkill) and Linux (pkill/soffice). Default \code{FALSE}. \strong{WARNING:} Always save your work before using this option!!}
 
 \item{open_generated_files}{Logical. If \code{TRUE}, Opens the generated output files ('pdf', 'Word' or 'Excel') files depending on the output format. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.}
 
-\item{influence_threshold}{Leverage threshold (default: 2).}
+\item{influence_threshold}{Numeric multiplier for the leverage threshold. Observations
+with hat values exceeding \code{influence_threshold * mean(hat values)} are flagged
+as high-leverage points. Default is \code{2}, a common rule of thumb.}
 
 \item{...}{Additional arguments passed to \code{glm()}.}
 }
 \value{
-An object of class 'f_glm' containing results from \code{glm()}, diagnostics, and post-hoc tests. Using the option "output_type", it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and plot methods for 'f_glm' objects.
+An object of class 'f_glm' (a named list, one entry per response variable) containing:
+  \describe{
+    \item{model}{The fitted \code{glm} object.}
+    \item{summary}{Output of \code{summary(glm_fit)}.}
+    \item{drop1}{Type II Analysis of Deviance table from \code{stats::drop1()}.}
+    \item{diagnostics}{DHARMa residual checks and hat-value based leverage diagnostics.}
+    \item{posthoc}{Estimated marginal means, pairwise comparisons, CLD letters, and summary table.}
+    \item{sep_flag}{Logical indicating whether complete separation was detected.}
+    \item{lrt_pct_explained}{McFadden's Pseudo-R\eqn{^2}.}
+  }
+  Using the option \code{output_type}, it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and plot methods for 'f_glm' objects.
 }
 \description{
 Performs Generalized Linear Model (GLM) analysis on a given dataset with options for
-diagnostics, assumption checking, and post-hoc analysis. Several response parameters
+diagnostics, assumption checking, and post hoc analysis. Several response parameters
 can be analyzed in sequence and the generated output can be in various formats
 ('Word', 'pdf', 'Excel').
 }
 \details{
 The function first checks if all specified variables are present in the data and ensures that the response variable is numeric.
 
-It performs Analysis of Variance (ANOVA) using the specified formula and data. If \code{shapiro = TRUE}, it checks for normality of residuals using the Shapiro-Wilk test and optionally (\code{transformation = TRUE}) applies a data transformation if residuals are not normal.
+It fits a Generalized Linear Model (GLM) using the specified formula, family, and data. Model diagnostics are performed with DHARMa (simulation-based residual checks including a KS test, dispersion test, and outlier test). High-leverage observations are flagged using hat values.
 
-If significant differences are found in ANOVA, it proceeds with post hoc tests using estimated marginal means from \code{emmeans()} and Sidak adjustment (or another option of \code{adjust =}.
+Significance of each predictor is assessed via Type II Analysis of Deviance (\code{stats::drop1()}). If significant effects are found, post hoc pairwise comparisons are performed using estimated marginal means from \code{emmeans()} with the chosen p-value adjustment method (default: Sidak). When complete separation is detected, the function falls back to likelihood ratio test (LRT) based pairwise comparisons, which are robust to separation.
 
-More response variables can be added using \code{-} or \code{+} (e.g., \code{response1 + response2 ~ predictor}) to do a sequential \code{aov()} for each response parameter captured in one output file.
+More response variables can be added using \code{+} (e.g., \code{response1 + response2 ~ predictor}) to fit a sequential GLM for each response variable, captured in one output file.
 
-Outputs can be generated in multiple formats ("pdf", "word", "excel" and "rmd") as specified by \code{output_type}. The function also closes any open 'Word' files to avoid conflicts when generating 'Word' documents. If \code{output_type = "rmd"} is used it is adviced to use it in a chunk with \{r, echo=FALSE, results='asis'\}
+Outputs can be generated in multiple formats ("pdf", "word", "excel" and "rmd") as specified by \code{output_type}. The function also closes any open 'Word' files to avoid conflicts when generating 'Word' documents. If \code{output_type = "rmd"} is used it is advised to use it in a chunk with \{r, echo=FALSE, results='asis'\}
 
 This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
 \itemize{
@@ -103,19 +134,24 @@ This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (ver
 }
 }
 \examples{
-# GLM Binomial example with output to console and MS Word file
+\donttest{
+# GLM Binomial example with output to console
 mtcars_mod <- mtcars
 mtcars_mod$cyl <- as.factor(mtcars_mod$cyl)
 
 glm_bin <- f_glm(vs ~ cyl,
                  family = binomial,
                  data = mtcars_mod,
-                 output_type = "word",
-                 # Do not automatically open the 'Word' file (Default is to open the file)
-                 open_generated_files = FALSE)
+                 output_type = "default")
 print(glm_bin)
 
-\donttest{
+# GLM Binomial example with output to MS Word file
+glm_bin_word <- f_glm(vs ~ cyl,
+                 family = binomial,
+                 data = mtcars_mod,
+                 output_type = "word",
+                 open_generated_files = FALSE)
+
 # GLM Poisson example with output to rmd text
 data(warpbreaks)
 
@@ -124,7 +160,7 @@ glm_pos <- f_glm(breaks ~ wool + tension,
                  family = poisson(link = "log"),
                  intro_text = FALSE,
                  output_type = "rmd")
-cat(cat(glm_pos$rmd))
+cat(glm_pos$rmd)
 }
 
 }
