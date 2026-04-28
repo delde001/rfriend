@@ -30,7 +30,10 @@
 #'   Defaults to \code{file.path(tempdir(), "data_name_transformed.pdf")}.
 #' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.
 #' @param close_generated_files Logical. Closes open Excel or Word (NOT pdf) files before writing, depending on the output format. Works on Windows (taskkill), macOS (pkill) and Linux (pkill/soffice). Default \code{FALSE}. \strong{WARNING:} Always save your work before using this option!!
-#' @param open_generated_files Logical. If \code{TRUE}, Opens the generated output file, this to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.
+#' @param open_generated_files Logical. Whether to open the generated output
+#'   files after creation. Defaults to \code{TRUE} in an interactive R session
+#'   and \code{FALSE} otherwise (e.g. in scripts or automated pipelines).
+#'   Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.
 #' @param ... Additional arguments passed to bestNormalize.
 #'
 #' @return Returns an object of class `f_bestNormalize` containing:
@@ -55,8 +58,8 @@
 #' This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
 #'\itemize{
 #' \item \bold{Windows:} Install Pandoc and ensure the installation folder \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
-#' \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary’s location is in your PATH.
-#' \item \bold{Linux:} Install Pandoc through your distribution’s package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.
+#' \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.
+#' \item \bold{Linux:} Install Pandoc through your distribution's package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.
 #'
 #' \item If Pandoc is not found, this function may not work as intended.
 #' }
@@ -114,8 +117,8 @@
 #' # Generate a PDF report saved to a custom path.
 #' f_bestNormalize(skewed_data,
 #'                 output_type          = "pdf",
-#'                 save_as              = "my_report",
-#'                 open_generated_files = FALSE)
+#'                 save_as              = "my_report"
+#'                 )
 #'
 #' # Generate R Markdown output for use inside a .Rmd chunk
 #' # (set chunk option results = 'asis').
@@ -132,38 +135,13 @@ f_bestNormalize <- function(data,
                             save_as = NULL,
                             save_in_wdir = FALSE,
                             close_generated_files = FALSE,
-                            open_generated_files = TRUE,
+                            open_generated_files = interactive(),
                             ...) {
-  ########## Reset initial settings on exit ##################################
-  # Save initial settings at the start
-  old_par <- par(no.readonly = TRUE)  # Save graphical parameters
-  old_par$new <- NULL                 # Remove this parameter to prevent warning
-  original_options <- options()       # Save global options
 
-  # Conditionally save panderOptions if the package is loaded
-  original_panderOptions <- if (requireNamespace("pander", quietly = TRUE) && is.function(pander::panderOptions)) {
-    pander::panderOptions()
-  } else {
-    NULL
-  }
 
-  # Single exit handler to restore settings
-  on.exit({
-
-    # Restore saved parameters for par
-    par(old_par)
-
-    # Restore global options
-    options(original_options)
-
-    # Restore panderOptions if they were saved
-    if (!is.null(original_panderOptions)) {
-      for (opt in names(original_panderOptions)) {
-        try(pander::panderOptions(opt, original_panderOptions[[opt]]), silent = TRUE)
-      }
-    }
-  }, add = TRUE)
-
+  ########## Reset initial settings on exit #################################
+  .session_state <- save_session_state()  # Helper function: helper_session_state
+  on.exit(restore_session_state(.session_state), add = TRUE) # Helper function: helper_session_state
 
 
   if( !(output_type %in% c("pdf", "word", "rmd", "console", "default")) ){
@@ -294,15 +272,13 @@ f_bestNormalize <- function(data,
   # Add the data to the arguments list
   args$x <- y_clean
 
-  # Normality check on original data
-
+  # Normality check on original data.
+  # safe_shapiro() returns a shaped htest for all n regimes (real
+  # result for n in [3, 5000], NA p-value with informative method
+  # label otherwise), so downstream display code and stored output
+  # are type-stable regardless of sample size.
   andersonD_original <- nortest::ad.test(y)
-
-  if (n <= 5000) {
-    shapiro_original <- shapiro.test(y)
-  } else {
-    shapiro_original <- list(statistic = NA, p.value = NA)
-  }
+  shapiro_original <- safe_shapiro(y)
 
 
   # Tune setting of bestNormalize based on sample size. Can be overwritten by user options.
@@ -376,12 +352,7 @@ f_bestNormalize <- function(data,
 
   # Normality check on transformed data
   andersonD_transformed <- nortest::ad.test(transformed)
-
-  if (n <= 5000) {
-    shapiro_transformed <- shapiro.test(transformed)
-  } else {
-    shapiro_transformed <- list(statistic = NA, p.value = NA)
-  }
+  shapiro_transformed <- safe_shapiro(transformed)
 
 
 
@@ -410,17 +381,32 @@ f_bestNormalize <- function(data,
 
     cat("\n   \n##  Data transformation of ", data_name, "using `bestNormalize`:", Transf_name,".  \n  \n")
 
-    # Text report
-    cat("**Original Data Shapiro-Wilk Test:**&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")
-    cat("W =", round(shapiro_original$statistic, 4))
-    cat("&nbsp;&nbsp;&nbsp;&nbsp;p-value =", format.pval(shapiro_original$p.value), "\n")
+    # Text report -- original data
+    if (is.na(shapiro_original$p.value)) {
+      cat("**Original Data Shapiro-Wilk Test:**&nbsp;&nbsp;&nbsp;&nbsp;",
+          "skipped (", shapiro_original$method, "), see ",
+          "Anderson-Darling and the plots below to assess normality.  \n",
+          sep = "")
+    } else {
+      cat("**Original Data Shapiro-Wilk Test:**&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")
+      cat("W =", round(shapiro_original$statistic, 4))
+      cat("&nbsp;&nbsp;&nbsp;&nbsp;p-value =", format.pval(shapiro_original$p.value), "\n")
+    }
 
 
     # cat("**Applied Transformation:**&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;", Transf_name, "   \n   \n")
 
-    cat("\n**Transformed Data Shapiro-Wilk Test:** ")
-    cat("W =", round(shapiro_transformed$statistic, 4))
-    cat("&nbsp;&nbsp;&nbsp;&nbsp;p-value =", format.pval(shapiro_transformed$p.value), "\n  \n")
+    # Text report -- transformed data
+    if (is.na(shapiro_transformed$p.value)) {
+      cat("\n**Transformed Data Shapiro-Wilk Test:** ",
+          "skipped (", shapiro_transformed$method, "), see ",
+          "Anderson-Darling and the plots below to assess normality.  \n  \n",
+          sep = "")
+    } else {
+      cat("\n**Transformed Data Shapiro-Wilk Test:** ")
+      cat("W =", round(shapiro_transformed$statistic, 4))
+      cat("&nbsp;&nbsp;&nbsp;&nbsp;p-value =", format.pval(shapiro_transformed$p.value), "\n  \n")
+    }
     cat("&nbsp;   \n  \n")
 
     cat("**Table.** All considered transformations: [Pearson P / df, lower => more normal]",
@@ -580,13 +566,24 @@ header-includes:
 print.f_bestNormalize <- function(x, ...) {
 
   cat("\nData transformation of", x$data_name, "using `bestNormalize`:", x$transformation_name,"\n")
-  # Text report
-  cat("Original Data Shapiro-Wilk Test: ")
-  cat("   W =", round(x$shapiro_original$statistic, 4),
-      "  p-value =", format.pval(x$shapiro_original$p.value, digits = 4), "\n")
-  cat("Transformed Data Shapiro-Wilk Test: ")
-  cat("W =", round(x$shapiro_transformed$statistic, 4),
-      "  p-value =", format.pval(x$shapiro_transformed$p.value, digits = 4), "\n  \n")
+  # Text report -- original
+  if (is.na(x$shapiro_original$p.value)) {
+    cat("Original Data Shapiro-Wilk Test: skipped (",
+        x$shapiro_original$method, ")\n", sep = "")
+  } else {
+    cat("Original Data Shapiro-Wilk Test: ")
+    cat("   W =", round(x$shapiro_original$statistic, 4),
+        "  p-value =", format.pval(x$shapiro_original$p.value, digits = 4), "\n")
+  }
+  # Text report -- transformed
+  if (is.na(x$shapiro_transformed$p.value)) {
+    cat("Transformed Data Shapiro-Wilk Test: skipped (",
+        x$shapiro_transformed$method, ")\n  \n", sep = "")
+  } else {
+    cat("Transformed Data Shapiro-Wilk Test: ")
+    cat("W =", round(x$shapiro_transformed$statistic, 4),
+        "  p-value =", format.pval(x$shapiro_transformed$p.value, digits = 4), "\n  \n")
+  }
   cat("Below are all considered transformations: [Pearson P / df, lower => more normal]",
       paste0("  (n=", x$bestNormalize$chosen_transform$n, ")\n"))
   print(x$norm_stats, row.names = FALSE)
@@ -614,13 +611,11 @@ print.f_bestNormalize <- function(x, ...) {
 
 #' @export
 plot.f_bestNormalize <- function(x, which = 1:2, ask = FALSE,...) {
-  # Save and restore par options
-  old_par <- par(no.readonly = TRUE)
-  old_par$new <- NULL                 # Remove this parameter to prevent warning
-  on.exit({
-    par(old_par)
-    layout(1)  # Reset layout matrix
-  })
+
+  ########## Reset initial settings on exit #################################
+  .session_state <- save_session_state()  # Helper function: helper_session_state
+  on.exit(restore_session_state(.session_state), add = TRUE) # Helper function: helper_session_state
+
 
   par(ask = ask)
 

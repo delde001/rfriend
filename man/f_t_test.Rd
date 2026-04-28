@@ -22,7 +22,7 @@ f_t_test(x, ...)
   alpha = 0.05,
   intro_text = TRUE,
   close_generated_files = FALSE,
-  open_generated_files = TRUE,
+  open_generated_files = interactive(),
   output_type = "default",
   save_as = NULL,
   save_in_wdir = FALSE,
@@ -43,7 +43,7 @@ f_t_test(x, ...)
   alpha = 0.05,
   intro_text = TRUE,
   close_generated_files = FALSE,
-  open_generated_files = TRUE,
+  open_generated_files = interactive(),
   output_type = "default",
   save_as = NULL,
   save_in_wdir = FALSE,
@@ -53,6 +53,17 @@ f_t_test(x, ...)
 \arguments{
 \item{x}{Numeric vector of data values (one-sample or first group for two-sample),
 or a formula of the form \code{response ~ group} or \code{response ~ 1}.}
+
+\item{...}{For the formula method: additional arguments forwarded to
+the row-filtering step. The arguments \code{subset} and
+\code{na.action} are honored: when supplied, they are spliced
+(still unevaluated) into a \code{\link[stats]{model.frame}} call
+built once before the per-response loop, so the \code{subset}
+expression is evaluated in the data's column scope (e.g.
+\code{subset = cyl == 6} works). All responses in a
+multi-response call (\code{y1 + y2 ~ group}) are then tested on
+the identical row set. For the default (vector) method, \code{...}
+is currently unused.}
 
 \item{formula}{A formula specifying the model (alternative to using x/y).
 \itemize{
@@ -107,8 +118,10 @@ assumptions. Default is \code{TRUE}.}
 \item{close_generated_files}{Logical. Closes open Excel/Word files before writing.
 Default \code{FALSE}. \strong{Windows only.}}
 
-\item{open_generated_files}{Logical. Opens the generated file after creation.
-Default \code{TRUE}.}
+\item{open_generated_files}{Logical. Whether to open the generated output
+files after creation. Defaults to \code{TRUE} in an interactive R session
+and \code{FALSE} otherwise (e.g. in scripts or automated pipelines).
+Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.}
 
 \item{output_type}{Character string specifying the output format. Default is \code{"default"}.
 \itemize{
@@ -218,7 +231,7 @@ result[["hp"]]$ci_backtransformed # back-transformed CI if transformed
 \references{
 Delacre, M., Lakens, D., & Leys, C. (2017). Why psychologists should by default
 use Welch's t-test instead of Student's t-test.
-\emph{International Review of Social Psychology}, 30(1), 92–101.
+\emph{International Review of Social Psychology}, 30(1), 92-101.
 \doi{10.5334/irsp.82}
 }
 \author{

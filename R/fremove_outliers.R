@@ -75,7 +75,7 @@
 #' clean_df <- f_remove_outliers(df, bad_rows)
 #' nrow(clean_df)
 #'
-#' # --- Example 4: Selective removal — only act on a subset of outliers ---
+#' # --- Example 4: Selective removal -- only act on a subset of outliers ---
 #' # Find all flagged rows, but only remove the extreme high salaries.
 #' # Step 1: Identify all Salary outliers grouped by Team
 #' bad_rows    <- f_outliers(Salary ~ Team, data = df)
@@ -84,7 +84,7 @@
 #' # Step 2: Filter to keep only the rows where Salary > 90000
 #' really_bad  <- all_flagged[all_flagged$Salary > 90000, ]
 #'
-#' # Step 3: Remove only those rows — low outlier (row 40) is preserved
+#' # Step 3: Remove only those rows -- low outlier (row 40) is preserved
 #' clean_df <- f_remove_outliers(df, really_bad)
 #' range(clean_df$Salary)  # low outlier still present, high one is gone
 #'
@@ -153,7 +153,7 @@ f_remove_outliers <- function(data,
     }
     ids_to_remove <- outliers[[by]]
 
-  } else if (is.vector(outliers)) {
+  } else if (is.vector(outliers) && !is.logical(outliers)) {
     ids_to_remove <- outliers
   } else {
     stop("'outliers' must be a dataframe or a vector of IDs.")

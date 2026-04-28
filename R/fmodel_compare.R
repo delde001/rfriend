@@ -1,6 +1,6 @@
 #' Compare Two Statistical Models
 #'
-#' Compares two statistical models by calculating key metrics such as AIC, BIC, log-likelihood, R-squared,
+#' Compares two statistical models by calculating key metrics such as AIC, BIC, log-likelihood, \eqn{R^2},
 #' and others. Supports comparison of nested models using ANOVA tests.
 #'
 #' @param model1 The first model object. Supported classes include: \code{"lm", "glm", "aov", "lmerMod", "glmerMod", and "nls"}.
@@ -43,10 +43,10 @@
 #'   \itemize{
 #'     \item \bold{AIC/BIC:} Lower values indicate better fit.
 #'     \item \bold{Log-Likelihood:} Higher values (less negative) indicate better fit.
-#'     \item \bold{R-squared:} Proportion of variance explained by the model.
-#'     \item \bold{Adjusted R-squared:} R-squared penalized for the number of parameters (for linear models).
-#'     \item \bold{Nagelkerke R^2:} A pseudo-R^2 for generalized linear models (GLMs).
-#'     \item \bold{Marginal/Conditional R^2:} For mixed models, marginal R^2 reflects fixed effects, while conditional R^2 includes random effects.
+#'     \item \bold{\eqn{R^2}:} Proportion of variance explained by the model.
+#'     \item \bold{Adjusted \eqn{R^2}:} \eqn{R^2} penalized for the number of parameters (for linear models).
+#'     \item \bold{Nagelkerke \eqn{R^2}:} A pseudo-\eqn{R^2} for generalized linear models (GLMs).
+#'     \item \bold{Marginal/Conditional \eqn{R^2}:} For mixed models, marginal \eqn{R^2} reflects fixed effects, while conditional \eqn{R^2} includes random effects.
 #'     \item \bold{Sigma:} Residual standard error.
 #'     \item \bold{Deviance:} Model deviance.
 #'     \item \bold{SSE:} Sum of squared errors.
@@ -64,10 +64,10 @@
 #' @note
 #'   \itemize{
 #'     \item The function supports a variety of model types but may issue warnings if unsupported or partially supported classes are used.
-#'     \item For GLMs, Nagelkerke's R^2 is used as a pseudo-R^2 approximation, computed
+#'     \item For GLMs, Nagelkerke's \eqn{R^2} is used as a pseudo-\eqn{R^2} approximation, computed
 #'       from the model's null deviance to avoid refitting a null model.
-#'     \item For mixed models, the function relies on the 'r.squaredGLMM' function from the 'MuMIn' package for R^2 calculation.
-#'     \item For NLS models, R-squared is provided for convenience but should be interpreted with caution
+#'     \item For mixed models, the function relies on the 'r.squaredGLMM' function from the 'MuMIn' package for \eqn{R^2} calculation.
+#'     \item For NLS models, \eqn{R^2} is provided for convenience but should be interpreted with caution
 #'       as it does not have the same statistical properties as in linear models.
 #'     \item The idea of this function (not the code), I got from Dustin Fife's function \href{https://github.com/dustinfife/flexplot/blob/master/R/model.comparison.R}{'model.comparison'} in the super cool \href{https://github.com/dustinfife/flexplot/}{'flexplot package'}.
 #'   }
@@ -91,7 +91,7 @@
 #' print(comparison)
 #' }
 #'
-#' # Models can be passed in any order — the function auto-swaps if needed.
+#' # Models can be passed in any order - the function auto-swaps if needed.
 #' complex <- lm(mpg ~ wt + hp + qsec, data = mtcars)
 #' simple  <- lm(mpg ~ wt, data = mtcars)
 #' comparison <- f_model_compare(complex, simple)
@@ -277,7 +277,7 @@ f_model_compare <- function(model1, model2, nested = NULL,
 
       # Warn about NLS R-squared limitations
       message(
-        "Note: R-squared for nonlinear models (nls) does not have the same ",
+        "Note: R\u00b2 for nonlinear models (nls) does not have the same ",
         "statistical properties as for linear models. Interpret with caution."
       )
 
@@ -313,7 +313,7 @@ f_model_compare <- function(model1, model2, nested = NULL,
       # For mixed models, calculate marginal and conditional R^2
       tryCatch({
         if (!requireNamespace("MuMIn", quietly = TRUE)) {
-          warning("Package 'MuMIn' is required for R-squared of mixed models. Install it with install.packages('MuMIn').")
+          warning("Package 'MuMIn' is required for R\u00b2 of mixed models. Install it with install.packages('MuMIn').")
         } else {
           r2 <- MuMIn::r.squaredGLMM(model)
           metrics$r.squared     <- r2[1]  # Marginal R^2 (fixed effects)
@@ -340,7 +340,20 @@ f_model_compare <- function(model1, model2, nested = NULL,
     }
 
     # Deviance
-    metrics$deviance <- tryCatch(stats::deviance(model), error = function(e) NA)
+    #
+    # For REML-fit mixed models, stats::deviance() is deprecated (lme4 >= 1.1-28)
+    # and emits a warning. The historical behaviour of deviance() on a REML fit
+    # was to return the REML criterion, so we call lme4::REMLcrit() explicitly.
+    # For ML-fit mixed models and all other model classes, stats::deviance()
+    # is the correct call.
+    metrics$deviance <- tryCatch({
+      if (inherits(model, c("lmerMod", "glmerMod")) &&
+          isTRUE(lme4::isREML(model))) {
+        lme4::REMLcrit(model)
+      } else {
+        stats::deviance(model)
+      }
+    }, error = function(e) NA)
 
     # ---- Degrees of freedom ----
     if (model_class %in% c("lmerMod", "glmerMod")) {
@@ -437,14 +450,14 @@ f_model_compare <- function(model1, model2, nested = NULL,
   # Use model1's class for label selection (model2 should match for nested,
   # and for non-nested comparisons the labels are a best-effort representation)
   metric_labels <- if (m1_class %in% c("glm")) {
-    c("AIC", "BIC", "Log-Likelihood", "Nagelkerke R^2", "",
+    c("AIC", "BIC", "Log-Likelihood", "Nagelkerke R\u00b2", "",
       "Sigma", "Deviance", "SSE", "Parameters (df)", "Residual df", "ANOVA p-value")
   } else if (m1_class %in% c("lmerMod", "glmerMod")) {
-    c("AIC", "BIC", "Log-Likelihood", "Marginal R^2", "Conditional R^2",
+    c("AIC", "BIC", "Log-Likelihood", "Marginal R\u00b2", "Conditional R\u00b2",
       "Sigma", "Deviance", "SSE", "Parameters (df)", "Residual df", "ANOVA p-value")
   } else {
     # Default for lm, aov, nls, and unsupported classes
-    c("AIC", "BIC", "Log-Likelihood", "R-squared", "Adj. R-squared",
+    c("AIC", "BIC", "Log-Likelihood", "R\u00b2", "Adj. R\u00b2",
       "Sigma", "Deviance", "SSE", "Parameters (df)", "Residual df", "ANOVA p-value")
   }
 
@@ -521,20 +534,20 @@ print.f_model_comparison <- function(x, ...) {
   # Print interpretation aids
   cat("\nInterpretation Guide:\n")
   cat("- Lower AIC/BIC values indicate better model fit.\n")
-  cat("- Higher R-squared values indicate better model fit.\n")
+  cat("- Higher R\u00b2 values indicate better model fit.\n")
 
   if (x$model1_class %in% c("lm", "aov")) {
-    cat("- Adj. R-squared is R-squared with a penalty for\n  the number of model parameters used.\n")
+    cat("- Adj. R\u00b2 is R\u00b2 with a penalty for\n  the number of model parameters used.\n")
   }
   if (x$model1_class == "nls") {
-    cat("- R-squared for nonlinear models is approximate and does\n  not have the same statistical properties as for linear models.\n")
-    cat("- Adj. R-squared is R-squared with a penalty for\n  the number of model parameters used.\n")
+    cat("- R\u00b2 for nonlinear models is approximate and does\n  not have the same statistical properties as for linear models.\n")
+    cat("- Adj. R\u00b2 is R\u00b2 with a penalty for\n  the number of model parameters used.\n")
   }
   if (x$model1_class == "glm") {
-    cat("- Nagelkerke's R^2 adapts Cox & Snell's R^2 for GLMs,\n  scaling it to a 0-1 range to serve as a pseudo-R^2\n  approximating explained variance.\n")
+    cat("- Nagelkerke's R\u00b2 adapts Cox & Snell's R\u00b2 for GLMs,\n  scaling it to a 0-1 range to serve as a pseudo-R\u00b2\n  approximating explained variance.\n")
   }
   if (x$model1_class %in% c("lmerMod", "glmerMod")) {
-    cat("- Marginal R^2 reflects variance explained by fixed effects,\n  while conditional R^2 includes both fixed and random effects,\n  representing the model's total explained variance.\n")
+    cat("- Marginal R\u00b2 reflects variance explained by fixed effects,\n  while conditional R\u00b2 includes both fixed and random effects,\n  representing the model's total explained variance.\n")
   }
 
   cat("- A lower Sigma (residual standard error) generally\n  indicates a better fit to the data.\n")

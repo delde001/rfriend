@@ -14,12 +14,14 @@
   histogram = TRUE,
   qqplot = TRUE,
   main_plot = TRUE,
-  digits = 3
+  advice = TRUE,
+  digits = 3,
+  ...
 )
 
-\method{summary}{f_scan}(object, digits = 3)
+\method{summary}{f_scan}(object, digits = 3, ...)
 
-\method{plot}{f_scan}(x, boxplot = TRUE, histogram = TRUE, qqplot = TRUE, main_plot = TRUE)
+\method{plot}{f_scan}(x, boxplot = TRUE, histogram = TRUE, qqplot = TRUE, main_plot = TRUE, ...)
 }
 \arguments{
 \item{x}{An \code{f_scan} object.}
@@ -30,7 +32,16 @@
 
 \item{boxplot, histogram, qqplot, main_plot}{Logical. Which plots to render?}
 
+\item{advice}{Logical. Print statistical test recommendations? Default \code{TRUE} (shown only if \code{advice=TRUE} was used during \code{f_scan}).}
+
 \item{digits}{Integer. Decimal places for printed tables. Default \code{3}.}
+
+\item{...}{Further arguments passed to or from other methods. Currently
+unused by the \code{f_scan} methods themselves, but accepted so the
+methods remain consistent with the base generics \code{print},
+\code{summary}, and \code{plot}.}
+
+\item{object}{f_scan object to make a summary table from.}
 }
 \description{
 Print method for f_scan objects

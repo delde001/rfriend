@@ -42,6 +42,8 @@ An object of class f_chisq_test containing:
   \item \code{adj_p_values}: Vector of adjusted p-values (for vector input).
   \item \code{posthoc_output_table}: Data frame with observed values, expected values,
         standardized residuals, and adjusted p-values (for vector input).
+  \item \code{observed_vs_adj_p_value}: Interleaved table of observed values and adjusted p-values (for table/matrix input).
+  \item \code{stdres_vs_adj_p_value}: Interleaved table of standardized residuals and adjusted p-values (for table/matrix input).
 }
 }
 \description{

@@ -21,6 +21,8 @@
 #'   \item \code{adj_p_values}: Vector of adjusted p-values (for vector input).
 #'   \item \code{posthoc_output_table}: Data frame with observed values, expected values,
 #'         standardized residuals, and adjusted p-values (for vector input).
+#'   \item \code{observed_vs_adj_p_value}: Interleaved table of observed values and adjusted p-values (for table/matrix input).
+#'   \item \code{stdres_vs_adj_p_value}: Interleaved table of standardized residuals and adjusted p-values (for table/matrix input).
 #' }
 #'
 #' @details
@@ -212,10 +214,13 @@ f_chisq_test <-
         output_list[["adj_p_values"]] <- adjusted_p_values
 
         # Make a data.frame for output
-        posthoc_out <- data.frame("Observed"      = chisq.test.output$observed,
-                                  "Expected"      = chisq.test.output$expected,
-                                  "Std.Residuals" = chisq.test.output$residuals,
-                                  "p-value"       = adjusted_p_values)
+        posthoc_out <- data.frame(
+          "Observed"      = chisq.test.output$observed,
+          "Expected"      = chisq.test.output$expected,
+          "Std.Residuals" = stdres,
+          "p-value"       = adjusted_p_values,
+          check.names     = FALSE
+        )
 
 
         output_list[["posthoc_output_table"]] <- posthoc_out

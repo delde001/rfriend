@@ -42,7 +42,7 @@ A list of class "f_model_comparison" containing:
   \item{swapped}{Logical indicating whether the model order was swapped to ensure model1 is the simpler model.}
 }
 \description{
-Compares two statistical models by calculating key metrics such as AIC, BIC, log-likelihood, R-squared,
+Compares two statistical models by calculating key metrics such as AIC, BIC, log-likelihood, \eqn{R^2},
 and others. Supports comparison of nested models using ANOVA tests.
 }
 \details{
@@ -50,10 +50,10 @@ Calculate various metrics to assess model fit:
   \itemize{
     \item \bold{AIC/BIC:} Lower values indicate better fit.
     \item \bold{Log-Likelihood:} Higher values (less negative) indicate better fit.
-    \item \bold{R-squared:} Proportion of variance explained by the model.
-    \item \bold{Adjusted R-squared:} R-squared penalized for the number of parameters (for linear models).
-    \item \bold{Nagelkerke R^2:} A pseudo-R^2 for generalized linear models (GLMs).
-    \item \bold{Marginal/Conditional R^2:} For mixed models, marginal R^2 reflects fixed effects, while conditional R^2 includes random effects.
+    \item \bold{\eqn{R^2}:} Proportion of variance explained by the model.
+    \item \bold{Adjusted \eqn{R^2}:} \eqn{R^2} penalized for the number of parameters (for linear models).
+    \item \bold{Nagelkerke \eqn{R^2}:} A pseudo-\eqn{R^2} for generalized linear models (GLMs).
+    \item \bold{Marginal/Conditional \eqn{R^2}:} For mixed models, marginal \eqn{R^2} reflects fixed effects, while conditional \eqn{R^2} includes random effects.
     \item \bold{Sigma:} Residual standard error.
     \item \bold{Deviance:} Model deviance.
     \item \bold{SSE:} Sum of squared errors.
@@ -71,10 +71,10 @@ is provided to assess whether the more complex model significantly improves fit.
 \note{
 \itemize{
     \item The function supports a variety of model types but may issue warnings if unsupported or partially supported classes are used.
-    \item For GLMs, Nagelkerke's R^2 is used as a pseudo-R^2 approximation, computed
+    \item For GLMs, Nagelkerke's \eqn{R^2} is used as a pseudo-\eqn{R^2} approximation, computed
       from the model's null deviance to avoid refitting a null model.
-    \item For mixed models, the function relies on the 'r.squaredGLMM' function from the 'MuMIn' package for R^2 calculation.
-    \item For NLS models, R-squared is provided for convenience but should be interpreted with caution
+    \item For mixed models, the function relies on the 'r.squaredGLMM' function from the 'MuMIn' package for \eqn{R^2} calculation.
+    \item For NLS models, \eqn{R^2} is provided for convenience but should be interpreted with caution
       as it does not have the same statistical properties as in linear models.
     \item The idea of this function (not the code), I got from Dustin Fife's function \href{https://github.com/dustinfife/flexplot/blob/master/R/model.comparison.R}{'model.comparison'} in the super cool \href{https://github.com/dustinfife/flexplot/}{'flexplot package'}.
   }
@@ -110,7 +110,7 @@ comparison <- f_model_compare(model1, model2)
 print(comparison)
 }
 
-# Models can be passed in any order — the function auto-swaps if needed.
+# Models can be passed in any order - the function auto-swaps if needed.
 complex <- lm(mpg ~ wt + hp + qsec, data = mtcars)
 simple  <- lm(mpg ~ wt, data = mtcars)
 comparison <- f_model_compare(complex, simple)

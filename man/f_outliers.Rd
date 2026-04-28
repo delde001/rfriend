@@ -10,14 +10,14 @@
 \usage{
 f_outliers(x, ...)
 
-\method{f_outliers}{numeric}(data, ...)
+\method{f_outliers}{numeric}(x, ...)
 
-\method{f_outliers}{integer}(data, ...)
+\method{f_outliers}{integer}(x, ...)
 
 \method{f_outliers}{formula}(formula, data, ...)
 
 \method{f_outliers}{data.frame}(
-  data,
+  x,
   columns,
   group_vars = NULL,
   id_var = NULL,
@@ -25,7 +25,7 @@ f_outliers(x, ...)
   digits = NULL,
   export_to_excel = FALSE,
   close_generated_files = FALSE,
-  open_generated_files = TRUE,
+  open_generated_files = interactive(),
   save_as = NULL,
   save_in_wdir = FALSE,
   check_input = TRUE,
@@ -35,11 +35,15 @@ f_outliers(x, ...)
 )
 }
 \arguments{
-\item{data}{A  \code{vector}, \code{data.frame},  \code{data.table}, or  \code{tibble}.}
+\item{x}{A data.frame or formula (dispatches to the right method).}
+
+\item{...}{Further arguments forwarded to \code{f_outliers.data.frame}.}
 
 \item{formula}{A formula specifying the columns (right hand side) to be checked per subgroup(s) (left hand side).
 More columns or groups can be added using \code{-} or \code{+} (e.g., \code{col1 + col2 ~ group1 + group2})
 to do a sequential analysis for each column parameter.}
+
+\item{data}{A  \code{vector}, \code{data.frame},  \code{data.table}, or  \code{tibble}.}
 
 \item{columns}{The numerical columns to analyze if no formula is used. Can be entered
 as a single character string (e.g., \code{"weight"}) or as a character vector \code{c("weight", "length"}).}
@@ -65,7 +69,10 @@ Default is \code{2}. If \code{NULL}, no rounding is applied.
 
 \item{close_generated_files}{Logical. If \code{TRUE}, forces Excel to close before saving (Windows only). Default \code{FALSE}.}
 
-\item{open_generated_files}{Logical. If \code{TRUE}, opens the Excel file after creation. Default \code{TRUE}.}
+\item{open_generated_files}{Logical. Whether to open the generated output
+files after creation. Defaults to \code{TRUE} in an interactive R session
+and \code{FALSE} otherwise (e.g. in scripts or automated pipelines).
+Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.}
 
 \item{save_as}{Character string. Custom path or filename for the Excel export.
 \itemize{
@@ -177,11 +184,11 @@ print(out)
 out_standard <- f_outliers(Salary ~ Team, data = df, coef = 1.5)
 out_extreme  <- f_outliers(Salary ~ Team, data = df, coef = 3.0)
 
-nrow(out_standard$output_df)  # 3 — catches mild + extreme outliers
-nrow(out_extreme$output_df)   # 2 — catches extreme outliers only
+nrow(out_standard$output_df)  # 3 -- catches mild + extreme outliers
+nrow(out_extreme$output_df)   # 2 -- catches extreme outliers only
 
 # --- Example 7: Vector input ---
-# Pass a column directly as a vector — no data.frame needed.
+# Pass a column directly as a vector -- no data.frame needed.
 # The column name is captured automatically from the call.
 
 out <- f_outliers(df$Salary)

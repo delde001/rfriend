@@ -12,7 +12,10 @@
 #' @param adjust Character string. Adjustment method for pairwise comparisons in Dunn's test. Options include \code{"holm", "hommel", "bonferroni", "hochberg", "bh", "by", "fdr"} or \code{"none"}. Default is \code{"bonferroni"}, if you don't want to adjust the p value (not recommended), use \code{adjust = "none"}.
 #' @param intro_text Logical. If \code{TRUE}, includes a section about Kruskal-Wallis test assumptions in the output document. Default is \code{TRUE}.
 #' @param close_generated_files Logical. Closes open Excel or Word (NOT pdf) files before writing, depending on the output format. Works on Windows (taskkill), macOS (pkill) and Linux (pkill/soffice). Default \code{FALSE}. \strong{WARNING:} Always save your work before using this option!!
-#' @param open_generated_files Logical. If \code{TRUE}, Opens the generated output files ('pdf', 'Word' or 'Excel') files depending on the output format. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.
+#' @param open_generated_files Logical. Whether to open the generated output
+#'   files after creation. Defaults to \code{TRUE} in an interactive R session
+#'   and \code{FALSE} otherwise (e.g. in scripts or automated pipelines).
+#'   Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.
 #' @param output_type Character string specifying the output format. Default is \code{"default"}.
 #'   \itemize{
 #'     \item \code{"default"}: Returns the object and lets R decide whether
@@ -35,6 +38,12 @@
 #'   the file is named "dataname_Kruskal_Wallis_output" in that directory. If an extension is provided the output format specified with option "output_type" will be overruled.
 #'   Defaults to \code{file.path(tempdir(), "dataname_summary.pdf")}.
 #' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.
+#' @param ... Additional arguments forwarded to \code{\link[stats]{kruskal.test}}.
+#'   The arguments \code{subset} and \code{na.action} are honored: when
+#'   supplied, they are applied via \code{\link[stats]{model.frame}} so
+#'   that the descriptive summary table, density plot, boxplot, Dunn's
+#'   post hoc test and the Kruskal-Wallis test itself all see the exact
+#'   same row set.
 
 #' @return An object of class 'f_kruskal_test' (a named list, one entry per
 #'   response-predictor combination) containing:
@@ -64,8 +73,8 @@
 #' This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
 #'\itemize{
 #' \item \bold{Windows:} Install Pandoc and ensure the installation folder \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
-#' \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary’s location is in your PATH.
-#' \item \bold{Linux:} Install Pandoc through your distribution’s package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.
+#' \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.
+#' \item \bold{Linux:} Install Pandoc through your distribution's package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.
 #'
 #' \item If Pandoc is not found, this function may not work as intended.
 #' }
@@ -82,7 +91,7 @@
 #' \strong{Practical implication:} With \eqn{k} independent response
 #' variables all tested at \eqn{\alpha = 0.05}, the probability of
 #' obtaining at least one false positive is
-#' \eqn{1 - (1 - 0.05)^k}, which reaches ~40\% for \eqn{k = 10}.
+#' \eqn{1-(1-0.05)^k}, which reaches ~40\% for \eqn{k = 10}.
 #'
 #' @author
 #' Sander H. van Delden  \email{plantmind@proton.me} \cr
@@ -98,8 +107,7 @@
 #'                data = iris,
 #'                plot = FALSE,
 #'                output_type = "word",
-#'                adjust = "holm",
-#'                open_generated_files = FALSE
+#'                adjust = "holm"
 #'                )
 #'
 #' # Save Kruskal-Wallis test and posthoc to Excel sheets: Sepal.Width and Sepal.Length.
@@ -108,8 +116,7 @@
 #'                      data = iris,
 #'                      plot = FALSE,
 #'                      output_type = "excel",
-#'                      adjust = "holm",
-#'                      open_generated_files = FALSE
+#'                      adjust = "holm"
 #'                      )
 #'
 #' @export
@@ -124,39 +131,41 @@ f_kruskal_test <- function(
     intro_text = TRUE, # Print a short explanation about Kruskall-Wallis assumptions in the pdf or word output file
     adjust = "bonferroni",           # Correction Method for pairwise comparisson in dunn_test.
     close_generated_files = FALSE,   # Closes either open excel or word files depending on the output format.
-    open_generated_files = TRUE      # Open files after creation
+    open_generated_files = interactive(),     # Open files after creation
+    ...
+    # Additional arguments forwarded to kruskal.test(). Currently the
+    # arguments `subset` and `na.action` are honored: when supplied, they
+    # are applied via stats::model.frame() so that the descriptive
+    # summary table, density plot, boxplot, Dunn's test, and the KW test
+    # itself all see the exact same row set.
 )
 {
 
-  ########## Reset initial settings on exit ##################################
-  # Save initial settings at the start
-  old_par <- par(no.readonly = TRUE)  # Save graphical parameters
-  old_par$new <- NULL                 # Remove this parameter to prevent warning
-  original_options <- options()       # Save global options
 
-  # Conditionally save panderOptions if the package is loaded
-  original_panderOptions <- if (requireNamespace("pander", quietly = TRUE) && is.function(pander::panderOptions)) {
-    pander::panderOptions()
-  } else {
-    NULL
-  }
 
-  # Single exit handler to restore settings
-  on.exit({
+  ########## Reset initial settings on exit #################################
+  .session_state <- save_session_state()  # Helper function: helper_session_state
+  on.exit(restore_session_state(.session_state), add = TRUE) # Helper function: helper_session_state
 
-    # Restore saved parameters for par
-    par(old_par)
 
-    # Restore global options
-    options(original_options)
 
-    # Restore panderOptions if they were saved
-    if (!is.null(original_panderOptions)) {
-      for (opt in names(original_panderOptions)) {
-        try(pander::panderOptions(opt, original_panderOptions[[opt]]), silent = TRUE)
-      }
-    }
-  }, add = TRUE)
+  ########## Capture ... UNEVALUATED at f_kruskal_test's own frame ##########
+  # Must be done HERE (in the top-level body), not inside
+  # generate_report(), because match.call() captures the call to
+  # whatever function it is called from. Inside generate_report() it
+  # would capture generate_report()'s (empty) call and dots_exprs
+  # would always be NULL  silently dropping subset / na.action.
+  # Lexical scoping makes dots_exprs visible inside generate_report().
+  .mc         <- match.call(expand.dots = FALSE)
+  # Coerce the `...` pairlist to a real named list so dots_exprs$subset
+  # returns the actual expression rather than a `..1` dots-index symbol.
+  dots_exprs  <- as.list(.mc[["..."]])
+
+  # Capture the user's calling environment for resolving subset /
+  # na.action expressions from inside the generate_report() closure,
+  # where parent.frame() would otherwise point at f_kruskal_test itself.
+  caller_env  <- parent.frame()
+
 
 
   ####### Save dataframe name and Handle input from vectors (dataframe column) #####
@@ -335,9 +344,14 @@ f_kruskal_test <- function(
   output_list <- list()
 
 
+  # Warn if LHS has expressions like log(y) before silently stripping them
+  check_lhs_is_names(formula) #use helper_check_lhs.R
+
   # Extract response variables from the left-hand side of the formula
   lhs <- all.vars(formula[[2]])  # Get LHS variables (response)
   response_names <- lhs
+
+
 
   # Extract predictor variables from the right-hand side of the formula
   rhs <- all.vars(formula[[3]])# Get RHS variables (predictors)
@@ -400,7 +414,7 @@ Each group should ideally include at least five observations for reliable result
       bonf_alpha <- round(alpha / k_tests, 4)
       cat(paste0(
         "\n\n***\n\n",
-        "\u26a0 **NOTE \u2014 Multiple Testing Across ", k_tests, " Kruskal-Wallis Tests**  \n\n",
+        "**[!] NOTE Multiple Testing Across ", k_tests, " Kruskal-Wallis Tests**  \n\n",
         "This report runs **", k_tests, "** independent Kruskal-Wallis tests ",
         "(", length(lhs), " response", if (length(lhs) > 1) "s" else "", " \u00d7 ",
         length(rhs), " predictor", if (length(rhs) > 1) "s" else "", ") on the same dataset. ",
@@ -410,7 +424,7 @@ Each group should ideally include at least five observations for reliable result
 
         "\n At \u03b1 = ", alpha, " per test, the probability of obtaining at least one ",
         "spurious significant result across all ", k_tests, " tests is approximately ",
-        "**", fwer_pct, "%** (1\u2212(1\u2212", alpha, ")^", k_tests, ", assuming independence). ",
+        "**", fwer_pct, "%** ( $1-(1-", alpha, ")^{", k_tests, "}$, assuming independence). ",
         "This risk is highest in exploratory studies; it is less of a concern when ",
         "each response has a clear a priori hypothesis.  \n\n",
         "**Possible remedies:**  \n",
@@ -426,6 +440,49 @@ Each group should ideally include at least five observations for reliable result
 
     #create count to remove last page break
     i <- 0
+    # Build the analysis data set ONCE, before the loops, using ALL
+    # responses and ALL predictors. Every response x predictor
+    # combination is then tested on the identical row set, so results
+    # are directly comparable across responses. Rows with NA in ANY
+    # response or predictor are dropped (subject to na.action), and any
+    # subset / na.action passed via `...` is applied here.
+    #
+    # Strategy: pre-evaluate subset eagerly against data first, falling
+    # back to the user's calling environment. Then apply the filter
+    # manually and pass plain values to stats::model.frame via do.call.
+    # This avoids the fragile match.call/substitute dance where spliced
+    # expressions inside a constructed call can end up containing `..N`
+    # dots-index symbols that crash model.frame with "the ... list
+    # contains fewer than 3 elements".
+    combined_formula <- as.formula(
+      paste("~", paste(c(lhs, rhs), collapse = " + "))
+    )
+
+    # Resolve subset expression against data columns + caller env
+    subset_vec <- NULL
+    if (!is.null(dots_exprs$subset)) {
+      subset_vec <- eval(dots_exprs$subset, envir = data, enclos = caller_env)
+      if (is.logical(subset_vec)) subset_vec[is.na(subset_vec)] <- FALSE
+    }
+    if (!is.null(subset_vec)) {
+      data <- data[subset_vec, , drop = FALSE]
+    }
+
+    # Resolve na.action (a function, defaults to na.omit)
+    na_action_fn <- stats::na.omit
+    if (!is.null(dots_exprs$na.action)) {
+      na_action_fn <- eval(dots_exprs$na.action, envir = caller_env)
+    }
+
+    mf_args <- list(
+      formula            = combined_formula,
+      data               = data,
+      drop.unused.levels = TRUE,
+      na.action          = na_action_fn
+    )
+
+    data <- do.call(stats::model.frame, mf_args)
+
     #Main loop starts here
     for (response_name in lhs) {
       for (predictor_name in rhs) {
@@ -446,7 +503,7 @@ Each group should ideally include at least five observations for reliable result
           d <- ggplot(data, aes(x = !!sym(response_name), fill = factor(!!sym(predictor_name)))) +
             geom_density(alpha = 0.4) +
             labs(title = "Density Plot by Group", x = response_name, fill = predictor_name) +
-            theme_bw()
+            theme_bw(base_size = 14)
 
           # Print d, i.e. distributions plot
           # Create a temporary file path with a .png extension
@@ -488,7 +545,7 @@ Each group should ideally include at least five observations for reliable result
         # Show formatted result in output document
         cat(paste0(
           "**Kruskal-Wallis rank sum test** of ", response_name, " by ", predictor_name, ":  \n",
-          "\u03c7\u00b2 = ", round(kruskal.test_result$statistic, 3),
+          "$\\chi^{2}$ = ", round(kruskal.test_result$statistic, 3),
           ", df = ", kruskal.test_result$parameter,
           ", p = **", kw_p_fmt, "**",
           if (kruskal.test_result$p.value < alpha) {
@@ -521,13 +578,13 @@ Each group should ideally include at least five observations for reliable result
         if(kruskal.test_result$p.value < alpha){
           cat("
 \n  \n## Post hoc Analysis of:  `", deparse(current_formula),"`   \n")
-              cat("\nBecause the overall Kruskal–Wallis test was significant, a Dunn’s (1964) test was conducted to identify which specific groups differ from one another.\n")
+              cat("\nBecause the overall Kruskal-Wallis test was significant, a Dunn\u2019s (1964) test was conducted to identify which specific groups differ from one another.\n")
               cat("&nbsp;\n   \n&nbsp;\n   \n")
               cat("
        \n**How to interpret the results:**\n
-       \n- **Dunn's Test compares ranks, not medians.** Although Dunn’s test is often discussed in terms of median differences, it actually compares the mean ranks of groups. In other words, it tests whether observations in one group tend to have higher values than those in another (stochastic dominance).
+       \n- **Dunn's Test compares ranks, not medians.** Although Dunn\u2019s test is often discussed in terms of median differences, it actually compares the mean ranks of groups. In other words, it tests whether observations in one group tend to have higher values than those in another (stochastic dominance).
        \n- **Caution about medians.** You can interpret group differences as differences in medians only if the distributions have similar shapes (see boxplots below and distribution graphs above).
-       If one distribution is skewed and another is symmetric, Dunn’s test may indicate a difference even when their medians are the same.
+       If one distribution is skewed and another is symmetric, Dunn's test may indicate a difference even when their medians are the same.
        \n")
           cat("&nbsp;\n   \n")
           cat("
@@ -572,8 +629,11 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 rep
       test for difference in medians only if distribution shapes are similar across groups.
       If shapes or spreads differ substantially (check side-by-side boxplots and density plots),
       the result reflects a difference in mean ranks rather than medians.
-\n-  **Note 2 (Results):** Groups sharing the same letter are not significantly different (\u03b1 = ", alpha, ").
-      This indicates insufficient evidence to claim a difference, but it does not prove the groups are identical.",
+\n  **Note 2 (Results):** Groups in the \"Letters\" column sharing the same letter are ",
+                           "**not** significantly different (\u03B1 = ", alpha, ".",
+                           "Groups with different letters are significantly different. Sharing a letter ",
+                           "indicates insufficient evidence to claim a difference; it does not ",
+                           "prove the groups are identical.\n",
                            if(adjust == "none"){paste0("\n**WARNING**: No p-value correction was applied. This increases the risk of finding \"significant\" differences that generally exist only by chance.")
                            } else {paste0(" P-values were adjusted with ", adjust,".")
                            })
@@ -583,7 +643,7 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 rep
 
         if(plot == TRUE){
 
-          cat("  \n## Boxplot of: ", response_name, " by ", predictor_name,"  and Dunn's test post hoc test  \n  \n")
+          cat("  \n## Boxplot of: ", response_name, " by ", predictor_name,"  and Dunn's  post hoc test  \n  \n")
           # Add the compact letter display to the data
           data2 <- merge(data, letter_df, by = predictor_name, all.x = TRUE)
 
@@ -603,10 +663,10 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 rep
                         alpha = 0.5) +
             geom_text(
               data = letter_df,
-              aes(y = y_position, label = Letters[match(!!sym(predictor_name),  !!sym(predictor_name))])
+              aes(y = y_position, label = .data[["Letters"]][match(!!sym(predictor_name),  !!sym(predictor_name))])
             ) +
             labs(x = predictor_name, y = response_name) +
-            theme_bw()
+            theme_bw(base_size = 14)
 
           # Create a temporary file path with a .png extension
           temp_file_path_p <- tempfile(fileext = ".png")
@@ -717,16 +777,22 @@ output:
    pdf_document:
         latex_engine: pdflatex
 header-includes:
+  - \\usepackage[T1]{fontenc}
   - \\usepackage[utf8]{inputenc}
   - \\usepackage{textcomp}
-  - \\DeclareUnicodeCharacter{03BB}{\\ensuremath{\\lambda}}  # Lambda
-  - \\DeclareUnicodeCharacter{03B1}{\\ensuremath{\\alpha}}   # Alpha
-  - \\DeclareUnicodeCharacter{03C7}{\\ensuremath{\\chi}}     # Chi
-  - \\DeclareUnicodeCharacter{2212}{\\textminus}             # Minus sign
-  - \\DeclareUnicodeCharacter{00B2}{\\ensuremath{^2}}        # Superscript 2
-  - \\DeclareUnicodeCharacter{2014}{\\textemdash}            # Em dash
-  - \\DeclareUnicodeCharacter{00D7}{\\ensuremath{\\times}}   # Multiplication si
-  - \\DeclareUnicodeCharacter{26A0}{\\textbf{!}}             # Warning sign
+  - \\DeclareUnicodeCharacter{03BB}{\\ensuremath{\\lambda}}
+  - \\DeclareUnicodeCharacter{2264}{\\ensuremath{\\leq}}
+  - \\DeclareUnicodeCharacter{2265}{\\ensuremath{\\geq}}
+  - \\DeclareUnicodeCharacter{2192}{\\ensuremath{\\rightarrow}}
+  - \\DeclareUnicodeCharacter{00D7}{\\ensuremath{\\times}}
+  - \\DeclareUnicodeCharacter{2014}{\\textemdash}
+  - \\DeclareUnicodeCharacter{03B1}{\\ensuremath{\\alpha}}
+  - \\DeclareUnicodeCharacter{2013}{\\textendash}
+  - \\DeclareUnicodeCharacter{2019}{\\textquoteright}
+  - \\DeclareUnicodeCharacter{0160}{\\v{S}}
+  - \\DeclareUnicodeCharacter{00E1}{\\'{a}}
+  - \\usepackage{titling}
+  - \\setlength{\\droptitle}{-2.5cm} % Adjust vertical spacing
 ---
 ")}
 
@@ -868,9 +934,11 @@ print.f_kruskal_test <- function(x, ...) {
 
       dunnTest_used <- paste0("
 Note 1 (Assumptions): Dunn's test does not assume normality, but implies a test for difference in medians only if distribution shapes are similar across groups. If shapes or spreads differ substantially (check boxplots and density plots using, plot(...)), the result reflects a difference in mean ranks rather than medians.\n
-Note 2 (Results): Groups sharing the same letter are not significantly different (\u03B1 =",
-        sublist$alpha,
-        "). While this means we cannot reject the hypothesis that they are different, it does not prove they are identical. ",
+Note 2 (Results): Groups in the \"Letters\" column sharing the same letter are ",
+"**not** significantly different (\u03B1 = ", format(sublist$alpha, nsmall = 3), ".",
+"Groups with different letters are significantly different. Sharing a letter ",
+"indicates insufficient evidence to claim a difference; it does not ",
+"prove the groups are identical.\n",
         if (sublist$adjust == "none") {
           paste0(
             "\n**WARNING**: No p-value correction was applied. This increases the risk of finding \"significant\" differences that generally exist only by chance."

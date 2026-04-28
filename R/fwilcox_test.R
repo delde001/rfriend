@@ -85,8 +85,10 @@
 #' @param close_generated_files Logical. Closes open Excel/Word files before writing.
 #'   Works on Windows (taskkill), macOS (pkill) and Linux (pkill/soffice).
 #'   Default \code{FALSE}. \strong{WARNING:} Always save your work before using this option!
-#' @param open_generated_files Logical. Opens the generated file after creation.
-#'   Default \code{TRUE}.
+#' @param open_generated_files Logical. Whether to open the generated output
+#'   files after creation. Defaults to \code{TRUE} in an interactive R session
+#'   and \code{FALSE} otherwise (e.g. in scripts or automated pipelines).
+#'   Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.
 #' @param output_type Character string specifying the output format. Default is \code{"default"}.
 #'   \itemize{
 #'     \item \code{"default"}: Returns the object and lets R decide whether
@@ -104,6 +106,16 @@
 #'   }
 #' @param save_as Character. Specific path/filename for output.
 #' @param save_in_wdir Logical. Save in working directory.
+#' @param ... For the formula method: additional arguments forwarded to
+#'   the row-filtering step. The arguments \code{subset} and
+#'   \code{na.action} are honored: when supplied, they are spliced
+#'   (still unevaluated) into a \code{\link[stats]{model.frame}} call
+#'   built once before the per-response loop, so the \code{subset}
+#'   expression is evaluated in the data's column scope (e.g.
+#'   \code{subset = cyl == 6} works). All responses in a multi-response
+#'   call (\code{y1 + y2 ~ group}) are then tested on the identical row
+#'   set. For the default (vector) method, \code{...} is currently
+#'   unused.
 #'
 #' @return An object of class \code{'f_wilcox_test'}.
 #'
@@ -134,26 +146,11 @@ f_wilcox_test.formula <- function(formula,
                                   ...) {
 
   # ------------------------------------------------------------------
-  # 1.  Standard setup & exit handlers
+  # 1.  Reset initial settings on exit
   # ------------------------------------------------------------------
-  old_par <- par(no.readonly = TRUE)
-  old_par$new <- NULL
-  original_options <- options()
-  original_panderOptions <- if (requireNamespace("pander", quietly = TRUE) &&
-                                is.function(pander::panderOptions)) {
-    pander::panderOptions()
-  } else {
-    NULL
-  }
-  on.exit({
-    par(old_par)
-    options(original_options)
-    if (!is.null(original_panderOptions)) {
-      for (opt in names(original_panderOptions)) {
-        try(pander::panderOptions(opt, original_panderOptions[[opt]]), silent = TRUE)
-      }
-    }
-  }, add = TRUE)
+
+  .session_state <- save_session_state()  # Helper function: helper_session_state
+  on.exit(restore_session_state(.session_state), add = TRUE) # Helper function: helper_session_state
 
   # ------------------------------------------------------------------
   # 2.  Data & formula parsing
@@ -274,7 +271,11 @@ f_wilcox_test.formula <- function(formula,
   # ------------------------------------------------------------------
   # 4.  Parse LHS and RHS of formula
   # ------------------------------------------------------------------
+  # Warn if LHS has expressions like log(y) before silently stripping them
+  check_lhs_is_names(formula) #use helper_check_lhs.R
+
   lhs <- all.vars(formula[[2]])
+
   if (length(lhs) < 1)
     stop("Formula must specify at least one response variable on the LHS.")
 
@@ -310,6 +311,55 @@ f_wilcox_test.formula <- function(formula,
       stop("Grouping variable must have exactly 2 levels for a Wilcoxon test.")
   }
 
+  ########## Build master analysis frame (one row set, all responses) #######
+  # Hoists row filtering out of the per-response loop so every response
+  # in `y1 + y2 ~ group` is tested on the identical row set, and bakes
+  # in any subset / na.action passed via `...`.
+  #
+  # Strategy: pre-evaluate subset eagerly against data first, falling
+  # back to the user's calling environment. Then apply the filter
+  # manually and pass plain values to stats::model.frame via do.call.
+  # This avoids the fragile match.call/substitute dance where spliced
+  # expressions inside a constructed call can end up containing `..N`
+  # dots-index symbols that crash model.frame with "the ... list
+  # contains fewer than 3 elements".
+  master_vars <- if (is_one_sample) lhs else c(lhs, predictor_name)
+  master_formula <- as.formula(
+    paste("~", paste(master_vars, collapse = " + "))
+  )
+
+  mc          <- match.call(expand.dots = FALSE)
+  dots_exprs  <- as.list(mc[["..."]])
+  caller_env  <- parent.frame()
+
+  # Resolve subset expression against data columns + caller env
+  subset_vec <- NULL
+  if (!is.null(dots_exprs$subset)) {
+    subset_vec <- eval(dots_exprs$subset, envir = data, enclos = caller_env)
+    if (is.logical(subset_vec)) subset_vec[is.na(subset_vec)] <- FALSE
+  }
+  n_before_master <- nrow(data)
+  if (!is.null(subset_vec)) {
+    data <- data[subset_vec, , drop = FALSE]
+  }
+
+  # Resolve na.action (a function, defaults to na.omit)
+  na_action_fn <- stats::na.omit
+  if (!is.null(dots_exprs$na.action)) {
+    na_action_fn <- eval(dots_exprs$na.action, envir = caller_env)
+  }
+
+  mf_args <- list(
+    formula            = master_formula,
+    data               = data,
+    drop.unused.levels = TRUE,
+    na.action          = na_action_fn
+  )
+
+  data <- do.call(stats::model.frame, mf_args)
+  n_after_master  <- nrow(data)
+  ###########################################################################
+
   # Reconcile alpha / conf.level
   if (is.null(conf.level)) {
     conf.level <- 1 - alpha
@@ -329,12 +379,6 @@ f_wilcox_test.formula <- function(formula,
     if (isTRUE(intro_text)) {
       cat("
 # Assumptions of Wilcoxon Rank-Sum / Signed-Rank Tests
-
-> **Note on estimation:** `wilcox.test()` computes confidence intervals and
-> p-values using the **Hodges-Lehmann estimator** (pseudo-median / location
-> shift), not the raw sample median. For symmetric distributions these
-> coincide; for skewed or differently shaped groups they may differ. Sample
-> medians are reported for context only.
 
 ## 1. Independence
 - Observations must not influence each other. This is determined by study
@@ -378,9 +422,9 @@ f_wilcox_test.formula <- function(formula,
 - **Rule of Thumb:** $n \\geq 6$ (paired) or $n_1 + n_2 \\geq 10$
   (two-sample) for adequate power."
       )
-      if (output_type %in% c("pdf", "word")) {
-        cat("<div style=\"page-break-after: always;\"></div>\n\\newpage")
-      }
+      # if (output_type %in% c("pdf", "word")) {
+      #   cat("<div style=\"page-break-after: always;\"></div>\n\\newpage")
+      # }
     }
 
     i <- 0
@@ -393,7 +437,7 @@ f_wilcox_test.formula <- function(formula,
       bonf_alpha <- round(alpha / k, 4)
       cat(paste0(
         "\n\n***\n\n",
-        "\u26a0 **NOTE \u2014 Multiple Testing Across ", k, " Response Variables**  \n\n",
+        "**[!]  NOTE: Multiple Testing Across ", k, " Response Variables**  \n\n",
         "This report runs ", k, " independent Wilcoxon tests on the same dataset. ",
         "Each individual test is valid on its own, but running multiple tests ",
         "simultaneously inflates the risk of obtaining at least one spurious ",
@@ -433,10 +477,9 @@ f_wilcox_test.formula <- function(formula,
         as.formula(paste0(response_name, " ~ ", predictor_name))
       }
 
-      n_before      <- nrow(data)
-      complete_idx  <- complete.cases(data[cols_needed])
-      data_complete <- data[complete_idx, cols_needed, drop = FALSE]
-      n_after       <- sum(complete_idx)
+      n_before      <- n_before_master
+      data_complete <- data[, cols_needed, drop = FALSE]
+      n_after       <- n_after_master
 
       cat("  \n \n# Analysis of: ", response_name, "  \n")
 
@@ -680,7 +723,7 @@ f_wilcox_test.formula <- function(formula,
             round(test_res$conf.int[1], 3),
             ", ",
             round(test_res$conf.int[2], 3),
-            " ]  \n"
+            " ]"
           )
         if (console == TRUE) {
           txt <- gsub("\\*\\*", "", txt)   # remove bold markers
@@ -694,33 +737,36 @@ f_wilcox_test.formula <- function(formula,
       generate_ci_note <- function(is_one_sample, paired, console = FALSE) {
          if (is_one_sample) {
             txt <-paste0(
-              "\n **Note on the CI**: This interval is for the **pseudo-median**; ",
+              "\n  \n**Note on the CI**: \nThis interval is for the **pseudo-median**",
+              " (Hodges-Lehmann estimator); ",
               "the median of all pairwise averages of your data points. Both the ",
               "sample median and the pseudo-median are valid descriptions of your data; ",
-              "they just measure slightly different things (see ?f_wilcox_test for details)."
+              "they just measure slightly different things (see `?f_wilcox_test` for details)."
             )
           } else if (paired) {
             txt <-paste0(
-              "\n **Note on the CI:** In a paired test, the within-pair differences ",
+              "\n  \n**Note on the CI:** \nIn a paired test, the within-pair differences ",
               "(observation 1 minus observation 2 for each pair) are computed first. ",
-              "This interval is then for the **pseudo-median of those differences**; ",
+              "This interval is then for the **pseudo-median of those differences**",
+              " (Hodges-Lehmann estimator);  ",
               "the middle value of all possible pairwise averages of the differences. ",
               "For symmetric differences it equals the median of the raw differences. ",
               "When the differences are skewed the two can diverge, which is why the ",
               "CI may not be centred on the median of the raw differences. ",
               "Both are valid descriptions; they just measure it slightly differently ",
-              "(see ?f_wilcox_test for details).\n"
+              "(see `?f_wilcox_test` for details).\n"
             )
           } else {
             txt <-paste0(
-              "\n **Note on the CI:** This interval is for the **location shift**; ",
+              "\n  \n**Note on the CI:** \nThis interval is for the **location shift**",
+              " (Hodges-Lehmann estimator); ",
               "the median of all possible pairwise differences between your two groups. ",
               "If both groups have the same distributional shape, this equals the raw ",
               "median difference. When shapes differ they can diverge, which is why ",
               "the CI may not be centred on the difference in sample medians. ",
               "Both the raw median difference and the location shift are valid ",
               "descriptions of the gap between groups; they just measure it ",
-              "slightly differently (see ?f_wilcox_test for details).\n"
+              "slightly differently (see `?f_wilcox_test` for details)."
             )
           }
           # prepare text for console usage
@@ -759,7 +805,7 @@ f_wilcox_test.formula <- function(formula,
       #-----------------------------------------------------
       # Write output to Markdown
       #-----------------------------------------------------
-      cat(paste0("  \n## ", test_res$method,"of:", response_name, "  \n"))
+      cat(paste0("  \n## ", test_res$method," of:", response_name, "  \n"))
       cat(paste0("&nbsp;\n  \n**Method:** ",
                  test_res$method, " (", test_res$alternative, ")." ))
       cat(paste0("&nbsp;\n  \n&nbsp;\n  \n**Sample statistics:**\n"))
@@ -774,9 +820,10 @@ f_wilcox_test.formula <- function(formula,
         "&nbsp;\n  \n**Estimate:**\n"))
       cat(estimate_txt)
       cat(ci_txt)
+      cat("&nbsp;\n  \n&nbsp;  \n  \n")
       cat(ci_note)
 
-      cat("&nbsp;\n  \n&nbsp;  \n  \n")
+
 
       if (n_before != n_after)
         cat(paste0("**WARNING** Removed ", n_before - n_after,
@@ -827,7 +874,7 @@ f_wilcox_test.formula <- function(formula,
   } # end generate_report()
 
   # ------------------------------------------------------------------
-  # 6.  Execute — single call captures both output_list and markdown
+  # 6.  Execute -- single call captures both output_list and markdown
   # ------------------------------------------------------------------
 
   md_lines   <- capture.output(output_list <- generate_report())
@@ -853,7 +900,11 @@ f_wilcox_test.formula <- function(formula,
         "     latex_engine: pdflatex\n",
         "header-includes:\n",
         "  - \\usepackage[utf8]{inputenc}\n",
+        "  - \\usepackage[T1]{fontenc}\n",
+        "  - \\usepackage{textcomp}\n",
         "  - \\DeclareUnicodeCharacter{03BB}{\\ensuremath{\\lambda}}\n",
+        "  - \\DeclareUnicodeCharacter{2264}{\\ensuremath{\\leq}}\n",
+        "  - \\DeclareUnicodeCharacter{03B1}{\\ensuremath{\\alpha}}\n",
         "  - \\usepackage{titling}\n",
         "  - \\setlength{\\droptitle}{-2.5cm}\n",
         "---\n"
@@ -910,7 +961,7 @@ f_wilcox_test.formula <- function(formula,
 
   }
 
-  # "default" — return list silently, clean up temp file
+  # "default" -- return list silently, clean up temp file
   invisible(suppressWarnings(file.remove(temp_output_file)))
   return(output_list)
 }
@@ -956,7 +1007,7 @@ f_wilcox_test.default <- function(x,
     df               <- as.data.frame(data_list)
     form             <- as.formula(paste0(col_name, " ~ 1"))
   } else {
-    # Two-sample — convert to long format
+    # Two-sample -- convert to long format
     col_name      <- make.names(paste0(x_name, "_vs_", y_name))
     response_name <- paste0(x_name, "_vs_", y_name)
     grp_levels    <- c(x_name, y_name)

@@ -7,6 +7,7 @@
 #' It returns a dataframe containing only the outlier rows, preserving the original data structure
 #' and adding a \code{row_id} column for traceability.
 #'
+#' @param x A data.frame or formula (dispatches to the right method).
 #' @param formula A formula specifying the columns (right hand side) to be checked per subgroup(s) (left hand side).
 #' More columns or groups can be added using \code{-} or \code{+} (e.g., \code{col1 + col2 ~ group1 + group2})
 #' to do a sequential analysis for each column parameter.
@@ -37,8 +38,12 @@
 #'   }
 #' @param save_in_wdir Logical. If \code{TRUE}, saves to the current working directory. Default \code{FALSE}.
 #' @param close_generated_files Logical. If \code{TRUE}, forces Excel to close before saving (Windows only). Default \code{FALSE}.
-#' @param open_generated_files Logical. If \code{TRUE}, opens the Excel file after creation. Default \code{TRUE}.
+#' @param open_generated_files Logical. Whether to open the generated output
+#'   files after creation. Defaults to \code{TRUE} in an interactive R session
+#'   and \code{FALSE} otherwise (e.g. in scripts or automated pipelines).
+#'   Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.
 #' @param check_input Logical. If \code{TRUE}, performs validation checks on inputs. Default \code{TRUE}.
+#' @param ... Further arguments forwarded to \code{f_outliers.data.frame}.
 #'
 #' @details
 #' \strong{The Outlier Logic (Tukey's Method):}
@@ -129,11 +134,11 @@
 #' out_standard <- f_outliers(Salary ~ Team, data = df, coef = 1.5)
 #' out_extreme  <- f_outliers(Salary ~ Team, data = df, coef = 3.0)
 #'
-#' nrow(out_standard$output_df)  # 3 — catches mild + extreme outliers
-#' nrow(out_extreme$output_df)   # 2 — catches extreme outliers only
+#' nrow(out_standard$output_df)  # 3 -- catches mild + extreme outliers
+#' nrow(out_extreme$output_df)   # 2 -- catches extreme outliers only
 #'
 #' # --- Example 7: Vector input ---
-#' # Pass a column directly as a vector — no data.frame needed.
+#' # Pass a column directly as a vector -- no data.frame needed.
 #' # The column name is captured automatically from the call.
 #'
 #' out <- f_outliers(df$Salary)
@@ -155,12 +160,12 @@ f_outliers <- function(x, ...) {
       x_val <- eval(mc$data, envir = parent.frame())
       dots <- list(...)
       dots[["data"]] <- NULL
-      return(do.call(f_outliers.data.frame, c(list(data = x_val), dots)))
+      return(do.call(f_outliers.data.frame, c(list(x = x_val), dots)))
     } else {
       stop("Argument 'x' (or 'data') is missing.")
     }
   }
-  # Capture name here — deparse(substitute()) is lost after dispatch
+  # Capture name here -- deparse(substitute()) is lost after dispatch
   if (is.numeric(x) || is.integer(x)) {
     raw_name <- deparse(substitute(x))
     # "df$Salary" -> "Salary", "my_vec" -> "my_vec"
@@ -176,8 +181,9 @@ f_outliers <- function(x, ...) {
 
 #' @export
 #' @rdname f_outliers
-f_outliers.numeric <- function(data, ...) {
-  # Extract hidden internal argument — not exposed in the help file
+f_outliers.numeric <- function(x, ...) {
+  # Extract hidden internal argument -- not exposed in the help file
+  data <- x
   dots <- list(...)
   col_name <- if ("internal_col_name" %in% names(dots)) {
     dots[["internal_col_name"]]
@@ -189,11 +195,11 @@ f_outliers.numeric <- function(data, ...) {
 
   df <- setNames(data.frame(data), col_name)
   do.call(f_outliers.data.frame,
-          c(list(data = df, columns = col_name), dots))
+          c(list(x = df, columns = col_name), dots))
 }
 
 
-# Integer piggybacks on numeric — no duplication needed
+# Integer piggybacks on numeric -- no duplication needed
 #' @export
 #' @rdname f_outliers
 f_outliers.integer <- f_outliers.numeric
@@ -207,8 +213,13 @@ f_outliers.formula <- function(formula, data, ...) {
   if (length(formula) < 3)
     stop("Formula must be two-sided: columns ~ group_vars (e.g., Salary ~ Team)")
 
+  # Warn if LHS has expressions like log(y) before silently stripping them
+  check_lhs_is_names(formula) #use helper_check_lhs.R
+
   # Parse LHS (Response Variable)
   lhs_vars <- all.vars(formula[[2]])
+
+
 
   # Parse RHS (Grouping Variables)
   rhs_vars  <- all.vars(formula[[3]])
@@ -222,7 +233,7 @@ f_outliers.formula <- function(formula, data, ...) {
 
 
   # Call the data.frame method
-  f_outliers.data.frame(data = data,
+  f_outliers.data.frame(x = data,
                         columns = lhs_vars,
                         group_vars = rhs_vars,
                         internal_data_name = data_name_str,
@@ -231,7 +242,7 @@ f_outliers.formula <- function(formula, data, ...) {
 
 #' @export
 #' @rdname f_outliers
-f_outliers.data.frame <- function(data,
+f_outliers.data.frame <- function(x,
                                   columns,
                                   group_vars = NULL,
                                   id_var = NULL,
@@ -240,13 +251,14 @@ f_outliers.data.frame <- function(data,
                                   # File Options
                                   export_to_excel = FALSE,
                                   close_generated_files = FALSE,
-                                  open_generated_files = TRUE,
+                                  open_generated_files = interactive(),
                                   save_as = NULL,
                                   save_in_wdir = FALSE,
                                   check_input = TRUE,
                                   digits_excel = NULL,
                                   allow_integer_decimal_mix = FALSE,
                                   ...) {
+  data <- x
 
   # Input Validation & Setup
   if (!is.data.frame(data))
@@ -287,7 +299,7 @@ f_outliers.data.frame <- function(data,
     data_name <- dots[["internal_data_name"]]
   } else {
     # If no internal name, try to grab it from 'data' using:
-    try_name <- try(deparse(substitute(data)), silent = TRUE)
+    try_name <- try(deparse(substitute(x)), silent = TRUE)
     if (!inherits(try_name, "try-error") && length(try_name) == 1 && nchar(try_name) < 50) {
       data_name <- try_name
     }
@@ -440,6 +452,8 @@ f_outliers.data.frame <- function(data,
 #' @param x Object of class f_outliers.
 #' @param col_width Integer. Max characters in header before line break. Default \code{6}.
 #' @param table_width Integer or \code{NULL}. Characters after which table splits. Default \code{90}.
+#' @param digits Integer. Number of decimal digits to use in formatting. Default is \code{3}.
+#' @param allow_integer_decimal_mix Logical. If \code{TRUE}, each individual cell is evaluated: integer values are displayed without decimal places, and non-integer values are displayed with the specified number of decimal places, i.e. \code{digits}. Default is \code{FALSE}, when a column contains a mix of integers and decimal values, all values are displayed with the specified number of decimal places. Note: columns containing only integers are **always** displayed without decimal places, regardless of \code{allow_integer_decimal_mix}.
 #' @param ... Additional arguments passed to \code{pander}.
 #' @return Invisibly returns \code{1}.
 #' @export

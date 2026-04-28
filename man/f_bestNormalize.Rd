@@ -13,7 +13,7 @@ f_bestNormalize(
   save_as = NULL,
   save_in_wdir = FALSE,
   close_generated_files = FALSE,
-  open_generated_files = TRUE,
+  open_generated_files = interactive(),
   ...
 )
 }
@@ -53,7 +53,10 @@ Defaults to \code{file.path(tempdir(), "data_name_transformed.pdf")}.}
 
 \item{close_generated_files}{Logical. Closes open Excel or Word (NOT pdf) files before writing, depending on the output format. Works on Windows (taskkill), macOS (pkill) and Linux (pkill/soffice). Default \code{FALSE}. \strong{WARNING:} Always save your work before using this option!!}
 
-\item{open_generated_files}{Logical. If \code{TRUE}, Opens the generated output file, this to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.}
+\item{open_generated_files}{Logical. Whether to open the generated output
+files after creation. Defaults to \code{TRUE} in an interactive R session
+and \code{FALSE} otherwise (e.g. in scripts or automated pipelines).
+Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.}
 
 \item{...}{Additional arguments passed to bestNormalize.}
 }
@@ -84,8 +87,8 @@ If n >= 200, \code{loo = FALSE}, \code{allow_orderNorm = TRUE}, \code{r = 10}. T
 This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
 \itemize{
 \item \bold{Windows:} Install Pandoc and ensure the installation folder \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
-\item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary’s location is in your PATH.
-\item \bold{Linux:} Install Pandoc through your distribution’s package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.
+\item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.
+\item \bold{Linux:} Install Pandoc through your distribution's package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.
 
 \item If Pandoc is not found, this function may not work as intended.
 }
@@ -136,8 +139,8 @@ f_bestNormalize(skewed_data, output_type = "console")
 # Generate a PDF report saved to a custom path.
 f_bestNormalize(skewed_data,
                 output_type          = "pdf",
-                save_as              = "my_report",
-                open_generated_files = FALSE)
+                save_as              = "my_report"
+                )
 
 # Generate R Markdown output for use inside a .Rmd chunk
 # (set chunk option results = 'asis').

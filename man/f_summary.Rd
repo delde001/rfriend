@@ -29,7 +29,7 @@ f_summary(x, ...)
   digits = NULL,
   export_to_excel = FALSE,
   close_generated_files = FALSE,
-  open_generated_files = TRUE,
+  open_generated_files = interactive(),
   save_as = NULL,
   save_in_wdir = FALSE,
   check_input = TRUE,
@@ -39,6 +39,10 @@ f_summary(x, ...)
 )
 }
 \arguments{
+\item{x}{A data.frame or formula (dispatches to the right method).}
+
+\item{...}{Further arguments forwarded to \code{f_summary.data.frame}.}
+
 \item{data}{A 'data.frame', 'data.table', or 'tibble'.}
 
 \item{columns}{The numerical column(s) to summarize if no formula is used. Can be entered as a single character string (e.g., \code{"weight"}) or as a character vector \code{c("weight", "length"}).}
@@ -78,7 +82,10 @@ Default is \code{2}. If \code{NULL}, no rounding is applied.
 
 \item{close_generated_files}{Logical. If \code{TRUE}, forces Excel to close before saving (Windows only). Default \code{FALSE}.}
 
-\item{open_generated_files}{Logical. If \code{TRUE}, opens the Excel file after creation. Default \code{TRUE}.}
+\item{open_generated_files}{Logical. Whether to open the generated output
+files after creation. Defaults to \code{TRUE} in an interactive R session
+and \code{FALSE} otherwise (e.g. in scripts or automated pipelines).
+Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.}
 
 \item{save_as}{Character string. Custom path or filename for the Excel export.
 \itemize{
@@ -133,8 +140,8 @@ The function computes the following statistics:
 \code{kurt} stands for Excess Kurtosis: Tells you about the "tails" and the peak.
   \itemize{
     \item \code{0}: Same tail heaviness as the normal distribution (mesokurtic).
-    \item \code{> 0}: Heavier tails than normal (Leptokurtic) — indicates frequent outliers.
-    \item \code{< 0}: Lighter tails than normal (Platykurtic) — indicates fewer (or less extreme) outliers than a normal distribution.
+    \item \code{> 0}: Heavier tails than normal (Leptokurtic) -- indicates frequent outliers.
+    \item \code{< 0}: Lighter tails than normal (Platykurtic) -- indicates fewer (or less extreme) outliers than a normal distribution.
  }
 If \code{group_vars} are provided, the statistics are calculated for each group combination.
 When \code{export_to_excel = TRUE}, the file is automatically generated.

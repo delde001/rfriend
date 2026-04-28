@@ -11,7 +11,7 @@ f_scan(x, ...)
 \method{f_scan}{formula}(formula, data, ...)
 
 \method{f_scan}{data.frame}(
-  data,
+  x,
   columns,
   group_vars = NULL,
   summary = TRUE,
@@ -19,8 +19,9 @@ f_scan(x, ...)
   coef = 1.5,
   limit_columns = 7,
   fancy_names = NULL,
+  advice = FALSE,
   close_generated_files = FALSE,
-  open_generated_files = TRUE,
+  open_generated_files = interactive(),
   output_type = "default",
   save_as = NULL,
   save_in_wdir = FALSE,
@@ -29,6 +30,10 @@ f_scan(x, ...)
 )
 }
 \arguments{
+\item{x}{A data.frame or formula (dispatches to the right method).}
+
+\item{...}{Further arguments forwarded to \code{f_scan.data.frame}.}
+
 \item{formula}{A formula specifying the columns (right hand side) to be summarized by maximal 3 groups (left hand side). More columns or groups can be added using \code{-} or \code{+} (e.g., \code{col1 + col2 ~ group1 + group2}) to do a sequential summary for each column parameter.}
 
 \item{data}{A 'data.frame', 'data.table', or 'tibble'.}
@@ -47,9 +52,17 @@ f_scan(x, ...)
 
 \item{fancy_names}{Named character vector or \code{NULL}. Optional mapping of column names to more readable names for display in plots and legends.}
 
+\item{advice}{Logical. If \code{TRUE}, runs \code{f_stat_wizard()} on each response
+column and appends the recommendation to the result. The advice is accessible
+via \code{result[["column_name"]]$advice} and is printed automatically.
+Default \code{FALSE}.}
+
 \item{close_generated_files}{Logical. Closes open Excel or Word (NOT pdf) files before writing, depending on the output format. Works on Windows (taskkill), macOS (pkill) and Linux (pkill/soffice). Default \code{FALSE}. \strong{WARNING:} Always save your work before using this option!!}
 
-\item{open_generated_files}{Logical. If \code{TRUE}, Opens the generated output files ('pdf', 'Word' or 'Excel') files depending on the output format. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.}
+\item{open_generated_files}{Logical. Whether to open the generated output
+files after creation. Defaults to \code{TRUE} in an interactive R session
+and \code{FALSE} otherwise (e.g. in scripts or automated pipelines).
+Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.}
 
 \item{output_type}{Character string specifying the output format. Default is \code{"default"}.
 \itemize{
@@ -98,8 +111,8 @@ This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (ver
 \itemize{
 \item \bold{Windows:} Install Pandoc and ensure the installation folder.
 \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
-\item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary’s location is in your PATH.
-\item \bold{Linux:} Install Pandoc through your distribution’s package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.
+\item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.
+\item \bold{Linux:} Install Pandoc through your distribution's package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.
 
 \item If Pandoc is not found, this function may not work as intended.
 }
@@ -117,6 +130,7 @@ result <- f_scan(
   output_type = "console"
 )
 
+\donttest{
 # 3. Non-formula | 2 groups | Multiple columns | Excel output
  result <- f_scan(
    mtcars,
@@ -145,10 +159,10 @@ result <- f_scan(
  fancy_names = c(mpg = "Fuel Efficiency", hp = "Horsepower",
                  wt  = "Weight",          vs = "Engine Type",
                  am  = "Transmission"),
- summary     = TRUE,
- outliers    = FALSE
+ summary     = TRUE
 )
 print(result)
+
 
 #Create a small reproducible dataset with 3 grouping variables
 set.seed(42)
@@ -159,16 +173,24 @@ plant_data <- data.frame(
   batch     = factor(rep(c("1", "2", "3"), 40))
  )
 
-# 6. Formula | 3 groups | Facet Grid | Saved to working directory
+# 6. Formula | 3 groups | Facet Grid
 result <- f_scan(
   weight ~ species + treatment + batch,
   data         = plant_data,
   coef         = 2.0,
   digits       = 2,
-  save_in_wdir = TRUE,
-  output_type  = "pdf"
+  output_type  = "word"
 )
 print(result)
 
+# 7. With statistical advice
+result <- f_scan(
+  Sepal.Length ~ Species,
+  data    = iris,
+  advice  = TRUE
+)
+#' print(result)
+result[["Sepal.Length"]]$advice$y_type
+}
 
 }

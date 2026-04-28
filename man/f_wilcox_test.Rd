@@ -48,6 +48,17 @@ f_wilcox_test(x, ...)
 \item{x}{Numeric vector of data values (one-sample or first group for two-sample),
 or a formula of the form \code{response ~ group} or \code{response ~ 1}.}
 
+\item{...}{For the formula method: additional arguments forwarded to
+the row-filtering step. The arguments \code{subset} and
+\code{na.action} are honored: when supplied, they are spliced
+(still unevaluated) into a \code{\link[stats]{model.frame}} call
+built once before the per-response loop, so the \code{subset}
+expression is evaluated in the data's column scope (e.g.
+\code{subset = cyl == 6} works). All responses in a multi-response
+call (\code{y1 + y2 ~ group}) are then tested on the identical row
+set. For the default (vector) method, \code{...} is currently
+unused.}
+
 \item{formula}{A formula specifying the model (alternative to using x/y).
 \itemize{
   \item \strong{Two-sample (Independent/Paired):} \code{response ~ group}
@@ -100,8 +111,10 @@ test assumptions.}
 Works on Windows (taskkill), macOS (pkill) and Linux (pkill/soffice).
 Default \code{FALSE}. \strong{WARNING:} Always save your work before using this option!}
 
-\item{open_generated_files}{Logical. Opens the generated file after creation.
-Default \code{TRUE}.}
+\item{open_generated_files}{Logical. Whether to open the generated output
+files after creation. Defaults to \code{TRUE} in an interactive R session
+and \code{FALSE} otherwise (e.g. in scripts or automated pipelines).
+Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.}
 
 \item{output_type}{Character string specifying the output format. Default is \code{"default"}.
 \itemize{

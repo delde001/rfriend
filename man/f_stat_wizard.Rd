@@ -2,24 +2,121 @@
 % Please edit documentation in R/fstat_wizard.R
 \name{f_stat_wizard}
 \alias{f_stat_wizard}
+\alias{f_stat_wizard.formula}
+\alias{f_stat_wizard.data.frame}
 \title{Statistical Test Wizard}
 \usage{
-f_stat_wizard(data, formula, interactive = FALSE)
+f_stat_wizard(x, ...)
+
+\method{f_stat_wizard}{formula}(
+  formula,
+  data,
+  id_col = NULL,
+  run = FALSE,
+  plots = FALSE,
+  output_type = "word",
+  interactive = FALSE,
+  data_name = NULL,
+  ...
+)
+
+\method{f_stat_wizard}{data.frame}(
+  x,
+  formula,
+  id_col = NULL,
+  run = FALSE,
+  plots = FALSE,
+  output_type = "word",
+  interactive = FALSE,
+  data_name = NULL,
+  ...
+)
 }
 \arguments{
-\item{data}{A data frame.}
+\item{x}{A formula (e.g., \code{y ~ x}) or a data frame. When a formula is
+provided, \code{data} must also be supplied. When a data frame is provided,
+\code{formula} must be supplied as the second argument.}
 
-\item{formula}{A formula specifying the relationship.}
+\item{...}{Additional arguments (currently unused).}
+
+\item{formula}{A formula specifying the relationship (used with the data.frame method).}
+
+\item{data}{A data frame containing the variables referenced in the formula.}
+
+\item{id_col}{Character string. Name of the column identifying subjects/blocks
+for paired or repeated-measures designs. When supplied, the wizard (a) verifies
+the pairing structure (each subject should appear in every group exactly once),
+(b) treats the design as paired/repeated measures, and (c) embeds the real column
+name into the generated code. Omit for independent-samples designs. Default \code{NULL}.}
+
+\item{run}{Logical. If \code{TRUE}, the wizard attempts to execute the recommended
+rfriend function and stores the result in \code{$run_result}. Only works for
+unambiguous single-function recommendations (not multi-step or external packages).
+Default \code{FALSE}.}
+
+\item{plots}{Logical. If \code{TRUE}, generates diagnostic plots using
+\code{f_hist()} (histogram of the response) and \code{f_qqnorm()} (QQ-plot
+of model residuals). Plots are stored in the result as \code{$histogram}
+and \code{$qqplot} (\code{recordedplot} objects) and displayed by the
+print method. Default \code{FALSE}.}
+
+\item{output_type}{Character string specifying the output format of the
+recommended rfriend function (when \code{run=TRUE}) and the displayed code
+strings. Passed through to \code{f_aov()}, \code{f_t_test()}, \code{f_glm()},
+etc. Valid values match those of the underlying function (\code{"word"},
+\code{"pdf"}, \code{"excel"}, \code{"console"}, \code{"default"}, \code{"rmd"}).
+Default \code{"word"}.}
 
 \item{interactive}{Logical. If \code{TRUE}, asks the user questions about study design. Default \code{FALSE}.}
+
+\item{data_name}{Character string to name the data base used. Default \code{NULL},
+which automatically derives the data name from the data frame used as input.}
 }
 \value{
-An object of class \code{"f_stat_wizard"} containing the analysis report.
+An object of class \code{"f_stat_wizard"}: a list containing:
+  \describe{
+    \item{formula}{The formula used.}
+    \item{formula_text}{Character string of the formula.}
+    \item{data_name}{Name of the data object as passed by the user.}
+    \item{n}{Effective sample size (after NA removal).}
+    \item{n_dropped}{Number of rows removed due to missing values.}
+    \item{paired}{Logical. Whether a paired/repeated-measures design was detected (via \code{id_col}).}
+    \item{id_col}{Character. Name of the subject/block column supplied, or \code{NULL}.}
+    \item{y_var}{Name of the response variable.}
+    \item{y_type}{Detected type of the response: \code{"binary"}, \code{"count"},
+      \code{"multinomial"}, \code{"ratio_normal"}, \code{"ratio_non_normal"},
+      \code{"ratio_unknown"}, or \code{"unsupported"}.}
+    \item{x_vars}{Character vector of explanatory variable names.}
+    \item{x_types}{Character vector of detected types (\code{"nominal"},
+      \code{"ordinal"}, \code{"ratio"}).}
+    \item{n_groups}{Number of groups (for single categorical X), or \code{NULL}.}
+    \item{group_sizes}{Table of per-group sample sizes, or \code{NULL}.}
+    \item{is_ancova}{Logical. \code{TRUE} if the model mixes nominal and ratio predictors.}
+    \item{has_interaction}{Logical. \code{TRUE} if interaction terms were detected.}
+    \item{normality}{A list with \code{p_value} (Shapiro-Wilk) and \code{is_normal} (logical or \code{NA}).}
+    \item{variance}{A list with \code{test_used} (\code{"Levene"} or \code{"Bartlett"}),
+      \code{p_value}, and \code{is_equal} (logical).}
+    \item{boxcox}{A list with \code{attempted} (logical), \code{can_fix} (logical),
+      and \code{p_value_after} (numeric or \code{NA}).}
+    \item{overdispersion}{A list with \code{is_overdispersed} (logical, from
+      DHARMa dispersion test) and \code{p_value}. Only meaningful for count data.}
+    \item{recommended_call}{A language object representing the rfriend function call,
+      or \code{NULL} if no single function could be determined.}
+    \item{run_result}{The result of executing the recommended test (when \code{run=TRUE}),
+      or \code{NULL}.}
+    \item{histogram}{A \code{recordedplot} from \code{f_hist()} (when \code{plots=TRUE}),
+      or \code{NULL}.}
+    \item{qqplot}{A \code{recordedplot} from \code{f_qqnorm()} of model residuals
+      (when \code{plots=TRUE} and Y is continuous), or \code{NULL}.}
+    \item{report}{Character vector of the human-readable report lines (used by
+      \code{print.f_stat_wizard}).}
+  }
 }
 \description{
 Analyzes your data structure based on a formula and recommends the appropriate statistical test.
 Checks variable types, normality of residuals, homogeneity of variance, and checks if f_boxcox
-transformation can fix non-normality. Returns a text object that can be printed or stored.
+transformation can fix non-normality. Recommends rfriend functions as primary code, with
+base R alternatives shown as fallback.
 
 Supports standard formulas including \code{y ~ .}, \code{y ~ as.factor(x)}, and interaction
 terms. Formulas with random effects (e.g. \code{(1|ID)}) are detected and handled separately.
@@ -27,5 +124,25 @@ Multivariate responses (e.g. \code{cbind(y1, y2) ~ x}) and transformed responses
 (e.g. \code{log(y) ~ x}) are not supported.
 }
 \examples{
+# Formula interface (recommended)
+f_stat_wizard(Sepal.Length ~ Species, data = iris)
+
+# Data-first interface (backward compatible)
 f_stat_wizard(iris, Sepal.Length ~ Species)
+
+# Paired design -- supply the id_col that identifies matched subjects
+f_stat_wizard(extra ~ group, data = sleep, id_col = "ID")
+
+# With diagnostic plots
+f_stat_wizard(Sepal.Length ~ Species, data = iris, plots = TRUE)
+
+# Run the recommended test directly
+result <- f_stat_wizard(Sepal.Length ~ Species, data = iris, run = TRUE)
+result$run_result
+
+# Inspect metadata
+result <- f_stat_wizard(Sepal.Length ~ Species, data = iris)
+result$y_type
+result$normality
+result$group_sizes
 }

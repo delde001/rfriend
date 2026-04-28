@@ -4,6 +4,7 @@
 #' Creates a 3-panel diagnostic dashboard to check data distribution and assumptions. It can also output a data summary table and identify outliers.
 #'
 #'
+#' @param x A data.frame or formula (dispatches to the right method).
 #' @param formula A formula specifying the columns (right hand side) to be summarized by maximal 3 groups (left hand side). More columns or groups can be added using \code{-} or \code{+} (e.g., \code{col1 + col2 ~ group1 + group2}) to do a sequential summary for each column parameter.
 #' @param data A 'data.frame', 'data.table', or 'tibble'.
 #' @param columns The numerical column(s) to summarize if no formula is used. Can be entered as a single character string (e.g., \code{"weight"}) or as a character vector \code{c("weight", "length"}).
@@ -13,8 +14,15 @@
 #' @param coef Numeric. The multiplier for the Interquartile Range (IQR) used for outlier detection. Default \code{1.5}.
 #' @param limit_columns Integer or \code{NULL}. Defines the number of columns shown in the outlier table. Default = \code{7}. \code{NULL} = all columns are shown.
 #' @param fancy_names Named character vector or \code{NULL}. Optional mapping of column names to more readable names for display in plots and legends.
+#' @param advice Logical. If \code{TRUE}, runs \code{f_stat_wizard()} on each response
+#'   column and appends the recommendation to the result. The advice is accessible
+#'   via \code{result[["column_name"]]$advice} and is printed automatically.
+#'   Default \code{FALSE}.
 #' @param close_generated_files Logical. Closes open Excel or Word (NOT pdf) files before writing, depending on the output format. Works on Windows (taskkill), macOS (pkill) and Linux (pkill/soffice). Default \code{FALSE}. \strong{WARNING:} Always save your work before using this option!!
-#' @param open_generated_files Logical. If \code{TRUE}, Opens the generated output files ('pdf', 'Word' or 'Excel') files depending on the output format. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.
+#' @param open_generated_files Logical. Whether to open the generated output
+#'   files after creation. Defaults to \code{TRUE} in an interactive R session
+#'   and \code{FALSE} otherwise (e.g. in scripts or automated pipelines).
+#'   Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.
 #' @param output_type Character string specifying the output format. Default is \code{"default"}.
 #'   \itemize{
 #'     \item \code{"default"}: Returns the object and lets R decide whether
@@ -38,6 +46,7 @@
 #'   Defaults to \code{file.path(tempdir(), "dataname_fscan.pdf")}.
 #' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.
 #' @param digits Integer. Decimal places for printed tables in 'pdf' and 'Word' output files. Default \code{3}.
+#' @param ... Further arguments forwarded to \code{f_scan.data.frame}.
 #'
 #' @return A list of class \code{f_scan} containing plots, the summary table, and the outlier table. Using the option "output_type", it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print, summary and plot methods for 'f_scan' objects.
 #'
@@ -55,8 +64,8 @@
 #'\itemize{
 #' \item \bold{Windows:} Install Pandoc and ensure the installation folder.
 #' \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
-#' \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary’s location is in your PATH.
-#' \item \bold{Linux:} Install Pandoc through your distribution’s package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.
+#' \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.
+#' \item \bold{Linux:} Install Pandoc through your distribution's package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.
 #'
 #' \item If Pandoc is not found, this function may not work as intended.
 #' }
@@ -74,6 +83,7 @@
 #'   output_type = "console"
 #' )
 #'
+#' \donttest{
 #' # 3. Non-formula | 2 groups | Multiple columns | Excel output
 #'  result <- f_scan(
 #'    mtcars,
@@ -102,10 +112,10 @@
 #'  fancy_names = c(mpg = "Fuel Efficiency", hp = "Horsepower",
 #'                  wt  = "Weight",          vs = "Engine Type",
 #'                  am  = "Transmission"),
-#'  summary     = TRUE,
-#'  outliers    = FALSE
+#'  summary     = TRUE
 #' )
 #' print(result)
+#'
 #'
 #' #Create a small reproducible dataset with 3 grouping variables
 #' set.seed(42)
@@ -116,17 +126,25 @@
 #'   batch     = factor(rep(c("1", "2", "3"), 40))
 #'  )
 #'
-#' # 6. Formula | 3 groups | Facet Grid | Saved to working directory
+#' # 6. Formula | 3 groups | Facet Grid
 #' result <- f_scan(
 #'   weight ~ species + treatment + batch,
 #'   data         = plant_data,
 #'   coef         = 2.0,
 #'   digits       = 2,
-#'   save_in_wdir = TRUE,
-#'   output_type  = "pdf"
+#'   output_type  = "word"
 #' )
 #' print(result)
 #'
+#' # 7. With statistical advice
+#' result <- f_scan(
+#'   Sepal.Length ~ Species,
+#'   data    = iris,
+#'   advice  = TRUE
+#' )
+#' #' print(result)
+#' result[["Sepal.Length"]]$advice$y_type
+#' }
 #'
 #' @export
 f_scan <- function(x, ...) {
@@ -155,8 +173,13 @@ f_scan <- function(x, ...) {
 f_scan.formula <- function(formula, data, ...) {
   # x is the formula (e.g., y ~ B0 + B1)
   x <- formula
+
+  # Warn if LHS has expressions like log(y) before silently stripping them
+  check_lhs_is_names(x) #use helper_check_lhs.R
+
   # Parse LHS (Response Variable)
   lhs_vars <- all.vars(x[[2]])
+
 
   # Parse RHS (Grouping Variables)
   rhs_vars  <- all.vars(x[[3]])
@@ -172,7 +195,7 @@ f_scan.formula <- function(formula, data, ...) {
 
   # Pass it to the data.frame method
   f_scan.data.frame(
-    data = data,
+    x = data,
     columns = lhs_vars,
     group_vars = rhs_vars,
     internal_data_name = data_name_str,
@@ -183,7 +206,7 @@ f_scan.formula <- function(formula, data, ...) {
 #'
 #' @export
 #' @rdname f_scan
-f_scan.data.frame <- function(data,
+f_scan.data.frame <- function(x,
                               columns,
                               group_vars = NULL,
                               summary = TRUE,
@@ -191,15 +214,16 @@ f_scan.data.frame <- function(data,
                               coef = 1.5,
                               limit_columns = 7,
                               fancy_names = NULL,
+                              advice = FALSE,
                               close_generated_files = FALSE,
-                              open_generated_files = TRUE,
+                              open_generated_files = interactive(),
                               output_type = "default",
                               save_as = NULL,
                               save_in_wdir = FALSE,
                               digits = NULL,
                               ...) {
   # Map 'x' (S3 standard) back to 'data' (Internal logic)
-  # data <- x
+  data <- x
 
   # Input Validation & Setup
   if (!is.data.frame(data)) {
@@ -426,7 +450,7 @@ f_scan.data.frame <- function(data,
 
   # This is the main function that generates the content for all the output types
   # render = TRUE: also produces ggsave PNGs + markdown (needed for word/pdf/rmd)
-  # render = FALSE: only builds the R objects (plots, tables) — much faster
+  # render = FALSE: only builds the R objects (plots, tables) -- much faster
   generate_report <- function(render = FALSE) {
     for (target_col in target_cols) {
       # Prepare Plot Data
@@ -473,7 +497,7 @@ f_scan.data.frame <- function(data,
         return(legend)
       }
 
-      # Define the trendline layer conditionally — NULL skips it in ggplot2
+      # Define the trendline layer conditionally -- NULL skips it in ggplot2
       trendline_layer <- if (main_cat != "All Data") {
         stat_summary(
           fun      = mean,
@@ -526,7 +550,7 @@ f_scan.data.frame <- function(data,
           shape = 18,
           na.rm = TRUE
         ) +
-        labs(title = "A. Overview: Data Spread, Mean (se) & Trendline", y = target_col, x = "") +
+        labs(title = "A. Overview: Data Spread, Mean (SE) & Trendline", y = target_col, x = "") +
         my_theme +
         theme(legend.position = "top", legend.title = element_blank()) +
         #use this to get the legend in one row
@@ -750,7 +774,7 @@ f_scan.data.frame <- function(data,
 
   # --- Execute generate_report() exactly ONCE ---
   # For word/pdf/rmd: render = TRUE  (builds R objects + ggsave/markdown)
-  # For everything else: render = FALSE (builds R objects only — much faster)
+  # For everything else: render = FALSE (builds R objects only -- much faster)
   needs_render <- output_type %in% c("word", "pdf", "rmd")
 
   if (needs_render) {
@@ -770,6 +794,31 @@ f_scan.data.frame <- function(data,
     )
   }
   class(output_list) <- "f_scan"
+
+  # --- STATISTICAL ADVICE (optional) ---
+  if (advice) {
+    for (col in target_cols) {
+      tryCatch({
+        # Build formula: column ~ group_vars (or column ~ 1 if no groups)
+        if (!is.null(group_vars) && length(group_vars) > 0) {
+          wizard_formula <- as.formula(paste(col, "~", paste(group_vars, collapse = " + ")))
+        } else {
+          wizard_formula <- as.formula(paste(col, "~ 1"))
+        }
+        wizard_result <- f_stat_wizard(
+          formula     = wizard_formula,
+          data        = data,
+          data_name   = data_name,      # <- pass user's name (was being overridden post-hoc)
+          output_type = output_type,    # <- forward f_scan's output_type
+          interactive = FALSE
+        )
+        output_list[[col]][["advice"]] <- wizard_result
+      }, error = function(e) {
+        output_list[[col]][["advice"]] <<- paste("Wizard could not analyse", col, ":", conditionMessage(e))
+      })
+    }
+    class(output_list) <- "f_scan"
+  }
 
 
 
@@ -803,7 +852,7 @@ header-includes:
     # Prevent ## before printed output
     knitr::opts_chunk$set(comment = "")
 
-    # Reuse the markdown already captured above — no second generate_report() call
+    # Reuse the markdown already captured above -- no second generate_report() call
     rmd_content <- paste(
       word_pdf_preamble(),
       paste(generated_markdown, collapse = "\n"),
@@ -872,7 +921,7 @@ header-includes:
       opts_knit$set(output.dir = tempdir())
     }
 
-    # Reuse the markdown already captured above — no extra generate_report() call
+    # Reuse the markdown already captured above -- no extra generate_report() call
     clean_rmd_output <- paste(generated_markdown, collapse = "\n")
 
     output_list[["rmd"]] <- clean_rmd_output
@@ -910,7 +959,12 @@ header-includes:
 #' @param summary Logical. Print summary statistics table? Default \code{TRUE}.
 #' @param outliers Logical. Print outlier table? Default \code{TRUE}.
 #' @param boxplot,histogram,qqplot,main_plot Logical. Which plots to print? All default \code{TRUE}.
+#' @param advice Logical. Print statistical test recommendations? Default \code{TRUE} (shown only if \code{advice=TRUE} was used during \code{f_scan}).
 #' @param digits Integer. Decimal places for printed tables. Default \code{3}.
+#' @param ... Further arguments passed to or from other methods. Currently
+#'   unused by the \code{f_scan} methods themselves, but accepted so the
+#'   methods remain consistent with the base generics \code{print},
+#'   \code{summary}, and \code{plot}.
 
 #' @export
 #' @method print f_scan
@@ -921,7 +975,9 @@ print.f_scan <- function(x,
                          histogram = TRUE,
                          qqplot = TRUE,
                          main_plot = TRUE,
-                         digits = 3
+                         advice = TRUE,
+                         digits = 3,
+                         ...
                          ) {
   # Loop over each category (a, b, etc.)
   for (category in names(x)) {
@@ -979,16 +1035,32 @@ print.f_scan <- function(x,
         print(sublist[["main_plot"]])
       }
     }
+
+    # Print Statistical Advice (from f_stat_wizard)
+    if (advice && !is.null(sublist[["advice"]])) {
+      advice_obj <- sublist[["advice"]]
+      if (inherits(advice_obj, "f_stat_wizard")) {
+        cat("\n")
+        print(advice_obj)
+        cat("\n")
+      } else if (is.character(advice_obj)) {
+        cat("\n--- Statistical Advice ---\n")
+        cat(advice_obj, "\n")
+      }
+    }
   }
   invisible(x)
 }
 
 #' Summary method for f_scan objects
 #' @rdname print.f_scan
+#' @param object f_scan object to make a summary table from.
+#'
 #' @export
 #' @method summary f_scan
 summary.f_scan <- function(object,
-                           digits = 3) {
+                           digits = 3,
+                           ...) {
   # Loop over each category (a, b, etc.)
   for (category in names(object)) {
     # Get the sublist for this category
@@ -1015,7 +1087,8 @@ plot.f_scan <- function(x,
                         boxplot = TRUE,
                         histogram = TRUE,
                         qqplot = TRUE,
-                        main_plot = TRUE
+                        main_plot = TRUE,
+                        ...
                         ) {
   # Loop over each category (a, b, etc.)
   for (category in names(x)) {

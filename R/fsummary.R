@@ -8,6 +8,7 @@
 #' The function returns a formatted data frame and includes options to export
 #' the results directly to an 'Excel' file.
 #'
+#' @param x A data.frame or formula (dispatches to the right method).
 #' @param formula A formula specifying the columns (right hand side) to be summarized by groups (left hand side). More columns or groups can be added using \code{-} or \code{+} (e.g., \code{col1 + col2 ~ group1 + group2}) to do a sequential summary for each column parameter.
 #' @param data A 'data.frame', 'data.table', or 'tibble'.
 #' @param columns The numerical column(s) to summarize if no formula is used. Can be entered as a single character string (e.g., \code{"weight"}) or as a character vector \code{c("weight", "length"}).
@@ -39,8 +40,12 @@
 #'   }
 #' @param save_in_wdir Logical. If \code{TRUE}, saves to the current working directory. Default \code{FALSE}.
 #' @param close_generated_files Logical. If \code{TRUE}, forces Excel to close before saving (Windows only). Default \code{FALSE}.
-#' @param open_generated_files Logical. If \code{TRUE}, opens the Excel file after creation. Default \code{TRUE}.
+#' @param open_generated_files Logical. Whether to open the generated output
+#'   files after creation. Defaults to \code{TRUE} in an interactive R session
+#'   and \code{FALSE} otherwise (e.g. in scripts or automated pipelines).
+#'   Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.
 #' @param check_input Logical. If \code{TRUE}, performs validation checks on inputs. Default \code{TRUE}.
+#' @param ... Further arguments forwarded to \code{f_summary.data.frame}.
 #'
 #'
 #' @details
@@ -68,8 +73,8 @@
 #' \code{kurt} stands for Excess Kurtosis: Tells you about the "tails" and the peak.
 #'   \itemize{
 #'     \item \code{0}: Same tail heaviness as the normal distribution (mesokurtic).
-#'     \item \code{> 0}: Heavier tails than normal (Leptokurtic) — indicates frequent outliers.
-#'     \item \code{< 0}: Lighter tails than normal (Platykurtic) — indicates fewer (or less extreme) outliers than a normal distribution.
+#'     \item \code{> 0}: Heavier tails than normal (Leptokurtic) -- indicates frequent outliers.
+#'     \item \code{< 0}: Lighter tails than normal (Platykurtic) -- indicates fewer (or less extreme) outliers than a normal distribution.
 #'  }
 #' If \code{group_vars} are provided, the statistics are calculated for each group combination.
 #' When \code{export_to_excel = TRUE}, the file is automatically generated.
@@ -146,6 +151,9 @@ f_summary <- function(x, ...) {
 f_summary.formula <- function(x, data, ...) {
   # x is the formula (e.g., y ~ B0 + B1)
 
+  # Warn if LHS has expressions like log(y) before silently stripping them
+  check_lhs_is_names(x) #use helper_check_lhs.R
+
   # Parse LHS (Response Variable)
   lhs_vars <- all.vars(x[[2]])
 
@@ -189,7 +197,7 @@ f_summary.data.frame <- function(x,
                                  # File Options
                                  export_to_excel = FALSE,
                                  close_generated_files = FALSE,
-                                 open_generated_files = TRUE,
+                                 open_generated_files = interactive(),
                                  save_as = NULL,
                                  save_in_wdir = FALSE,
                                  check_input = TRUE,
@@ -375,6 +383,8 @@ f_summary.data.frame <- function(x,
 #' @param x Object of class f_summary.
 #' @param col_width Integer. Max characters in header before line break. Default \code{6}.
 #' @param table_width Integer or \code{NULL}. Characters after which table splits. Default \code{90}.
+#' @param digits Integer. Number of decimal digits to use in formatting. Default is \code{3}.
+#' @param allow_integer_decimal_mix Logical. If \code{TRUE}, each individual cell is evaluated: integer values are displayed without decimal places, and non-integer values are displayed with the specified number of decimal places, i.e. \code{digits}. Default is \code{FALSE}, when a column contains a mix of integers and decimal values, all values are displayed with the specified number of decimal places. Note: columns containing only integers are **always** displayed without decimal places, regardless of \code{allow_integer_decimal_mix}.
 #' @param ... Additional arguments passed to \code{pander}.
 #' @return Invisibly returns \code{1}.
 #' @export

@@ -50,8 +50,10 @@
 #'   assumptions. Default is \code{TRUE}.
 #' @param close_generated_files Logical. Closes open Excel/Word files before writing.
 #'   Default \code{FALSE}. \strong{Windows only.}
-#' @param open_generated_files Logical. Opens the generated file after creation.
-#'   Default \code{TRUE}.
+#' @param open_generated_files Logical. Whether to open the generated output
+#'   files after creation. Defaults to \code{TRUE} in an interactive R session
+#'   and \code{FALSE} otherwise (e.g. in scripts or automated pipelines).
+#'   Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.
 #' @param output_type Character string specifying the output format. Default is \code{"default"}.
 #'   \itemize{
 #'     \item \code{"default"}: Returns the object and lets R decide whether
@@ -69,6 +71,16 @@
 #'   }
 #' @param save_as Character. Specific path/filename for output.
 #' @param save_in_wdir Logical. Save in working directory. Default \code{FALSE}.
+#' @param ... For the formula method: additional arguments forwarded to
+#'   the row-filtering step. The arguments \code{subset} and
+#'   \code{na.action} are honored: when supplied, they are spliced
+#'   (still unevaluated) into a \code{\link[stats]{model.frame}} call
+#'   built once before the per-response loop, so the \code{subset}
+#'   expression is evaluated in the data's column scope (e.g.
+#'   \code{subset = cyl == 6} works). All responses in a
+#'   multi-response call (\code{y1 + y2 ~ group}) are then tested on
+#'   the identical row set. For the default (vector) method, \code{...}
+#'   is currently unused.
 #'
 #' @return An object of class \code{'f_t_test'}, a named list with one element per
 #'   response variable. Each element contains the t-test result, normality test
@@ -78,7 +90,7 @@
 #' @references
 #' Delacre, M., Lakens, D., & Leys, C. (2017). Why psychologists should by default
 #' use Welch's t-test instead of Student's t-test.
-#' \emph{International Review of Social Psychology}, 30(1), 92–101.
+#' \emph{International Review of Social Psychology}, 30(1), 92-101.
 #' \doi{10.5334/irsp.82}
 #'
 #' @examples
@@ -175,34 +187,16 @@ f_t_test.formula <- function(formula,
                              alpha = 0.05,
                              intro_text = TRUE,
                              close_generated_files = FALSE,
-                             open_generated_files = TRUE,
+                             open_generated_files = interactive(),
                              output_type = "default",
                              save_as = NULL,
                              save_in_wdir = FALSE,
                              ...) {
   # ---------------------------------------------------------------------------
-  # 1. Standard Setup & Exit Handlers
+  # 1. Reset initial settings on exit
   # ---------------------------------------------------------------------------
-  old_par <- par(no.readonly = TRUE)
-  old_par$new <- NULL
-  original_options <- options()
-  original_panderOptions <- if (requireNamespace("pander", quietly = TRUE) &&
-                                is.function(pander::panderOptions)) {
-    pander::panderOptions()
-  } else {
-    NULL
-  }
-
-  on.exit({
-    suppressWarnings(par(old_par))
-    options(original_options)
-    if (!is.null(original_panderOptions)) {
-      for (opt in names(original_panderOptions)) {
-        try(pander::panderOptions(opt, original_panderOptions[[opt]]),
-            silent = TRUE)
-      }
-    }
-  }, add = TRUE)
+  .session_state <- save_session_state()  # Helper function: helper_session_state
+  on.exit(restore_session_state(.session_state), add = TRUE) # Helper function: helper_session_state
 
   # ---------------------------------------------------------------------------
   # 2. Data & Formula Parsing
@@ -331,7 +325,12 @@ f_t_test.formula <- function(formula,
   # ---------------------------------------------------------------------------
   # 5. Parse LHS and RHS of Formula
   # ---------------------------------------------------------------------------
+  # Warn if LHS has expressions like log(y) before silently stripping them
+  check_lhs_is_names(formula) #use helper_check_lhs.R
+
   lhs <- all.vars(formula[[2]])
+
+
   if (length(lhs) < 1)
     stop("Formula must specify at least one response variable on the LHS.")
 
@@ -366,6 +365,55 @@ f_t_test.formula <- function(formula,
     if (nlevels(data[[predictor_name]]) != 2)
       stop("Grouping variable must have exactly 2 levels for a t-test.")
   }
+
+  ########## Build master analysis frame (one row set, all responses) #######
+  # Hoists row filtering out of the per-response loop so every response
+  # in `mpg + hp ~ am` is tested on the identical row set, and bakes in
+  # any subset / na.action passed via `...`.
+  #
+  # Strategy: pre-evaluate subset eagerly against data first, falling
+  # back to the user's calling environment. Then apply the filter
+  # manually and pass plain values to stats::model.frame via do.call.
+  # This avoids the fragile match.call/substitute dance where spliced
+  # expressions inside a constructed call can end up containing `..N`
+  # dots-index symbols that crash model.frame with "the ... list
+  # contains fewer than 3 elements".
+  master_vars <- if (is_one_sample) lhs else c(lhs, predictor_name)
+  master_formula <- as.formula(
+    paste("~", paste(master_vars, collapse = " + "))
+  )
+
+  mc          <- match.call(expand.dots = FALSE)
+  dots_exprs  <- as.list(mc[["..."]])
+  caller_env  <- parent.frame()
+
+  # Resolve subset expression against data columns + caller env
+  subset_vec <- NULL
+  if (!is.null(dots_exprs$subset)) {
+    subset_vec <- eval(dots_exprs$subset, envir = data, enclos = caller_env)
+    if (is.logical(subset_vec)) subset_vec[is.na(subset_vec)] <- FALSE
+  }
+  n_before_master <- nrow(data)            # before any filtering
+  if (!is.null(subset_vec)) {
+    data <- data[subset_vec, , drop = FALSE]
+  }
+
+  # Resolve na.action (a function, defaults to na.omit)
+  na_action_fn <- stats::na.omit
+  if (!is.null(dots_exprs$na.action)) {
+    na_action_fn <- eval(dots_exprs$na.action, envir = caller_env)
+  }
+
+  mf_args <- list(
+    formula            = master_formula,
+    data               = data,
+    drop.unused.levels = TRUE,
+    na.action          = na_action_fn
+  )
+
+  data <- do.call(stats::model.frame, mf_args)
+  n_after_master  <- nrow(data)            # after subset + NA drop
+  ###########################################################################
 
   # ---------------------------------------------------------------------------
   # 6. Helper Functions
@@ -470,10 +518,10 @@ f_t_test.formula <- function(formula,
   + *One/Two-sample:* The data within each group (or residuals) should be normal.
   + *Paired:* The **differences** between pairs (not raw values) should be normal.
 - Normality is assessed *visually* (Q-Q plots, Histograms) and *formally* (Shapiro-Wilk test).
-  + **Decision to transform is based on Shapiro-Wilk only** — the most powerful omnibus normality test.
+  + **Decision to transform is based on Shapiro-Wilk only** -- the most powerful omnibus normality test.
   + Anderson-Darling is shown as additional diagnostic information only.
 
-##  4. Homogeneity of Variance (Homoscedasticity) — Two-sample t-tests only.
+##  4. Homogeneity of Variance (Homoscedasticity) -- Two-sample t-tests only.
 - **Welch's t-test is the default** (`var.equal = FALSE`). Current best practice ([Delacre, Lakens & Leys, 2017](https://doi.org/10.5334/irsp.82)) shows Welch's performs as well as Student's when variances are equal, and substantially better when they are not.
 - **Pre-testing is avoided.** Using Bartlett's or Levene's test to decide between t-tests inflates Type I error, and variance tests have low power with small samples.
 - **Diagnostic only:** Bartlett's and Levene's (Brown-Forsythe) tests are reported to help you understand your data, but do not affect the choice of t-test.
@@ -507,7 +555,7 @@ f_t_test.formula <- function(formula,
       bonf_alpha <- round(alpha / k, 4)
       cat(paste0(
         "\n\n***\n\n",
-        "\u26a0 **NOTE \u2014 Multiple Testing Across ", k, " Response Variables**  \n\n",
+        "**[!] NOTE: Multiple Testing Across ", k, " Response Variables**  \n\n",
         "This report runs ", k, " independent t-tests on the same dataset. ",
         "Each individual test is valid on its own, but running multiple tests ",
         "simultaneously inflates the risk of obtaining at least one spurious ",
@@ -520,17 +568,17 @@ f_t_test.formula <- function(formula,
         "**Possible remedies:**  \n",
         "\n-  **Bonferroni** (conservative): re-run with `alpha = ", bonf_alpha,
         "` (\u03b1 / ", k, ") to control the family-wise error rate.",
-        "-  **False Discovery Rate (FDR)**: collect the ", k, " p-values and apply ",
+        "\n-  **False Discovery Rate (FDR)**: collect the ", k, " p-values and apply ",
         "`p.adjust(p_values, method = \"fdr\")` after the fact.",
-        "-  **MANOVA**: if the response variables are correlated, consider `manova()` ",
+        "\n-  **MANOVA**: if the response variables are correlated, consider `manova()` ",
         "as a single omnibus test before interpreting individual t-tests.",
-        "-  **Pre-registration**: if each response was a pre-specified primary outcome, ",
+        "\n-  **Pre-registration**: if each response was a pre-specified primary outcome, ",
         "correction may not be required; document this decision explicitly.",
         "\n\n***\n\n"
       ))
     }
 
-    # Pre-compute once — avoids floating point printing (e.g. 94.9999...)
+    # Pre-compute once -- avoids floating point printing (e.g. 94.9999...)
     conf_pct <- round(conf.level * 100, 1)
 
     # =========================================================================
@@ -557,10 +605,15 @@ f_t_test.formula <- function(formula,
         cols_needed     <- c(response_name, predictor_name)
       }
 
-      n_before      <- nrow(data)
-      complete_idx  <- complete.cases(data[cols_needed])
-      data_complete <- data[complete_idx, cols_needed, drop = FALSE]
-      n_after       <- sum(complete_idx)
+      # Row filtering already happened once at the master level (above
+      # the loop), with subset / na.action from `...` baked in. Every
+      # response in a multi-response call therefore sees the identical
+      # row set. We just take the relevant columns here. data_complete
+      # is a per-iteration copy because the transformation step below
+      # mutates its response column in place.
+      n_before      <- n_before_master
+      data_complete <- data[, cols_needed, drop = FALSE]
+      n_after       <- n_after_master
 
       cat("  \n\n# Analysis of: ", response_name, "  \n")
       cat("\n## Normality and Assumptions for: ", response_name, "  \n")
@@ -619,21 +672,23 @@ f_t_test.formula <- function(formula,
         cat(
           paste0(
             "\n  **Variance tests**",
-            "\n  - *These results are informational. Welch's t-test is used regardless.*",
-            "\n  +  Bartlett's test: p = ",
+            "\n- *These results are informational only as Welch's t-test is used regardless.*",
+            "\n- Bartlett's test: p = ",
             round(homog_p, 4),
             ifelse(
               homog_p > alpha,
               " (no evidence of unequal variance)",
               " (suggests unequal variance)"
             ),
-            "\n  + Levene's / Brown-Forsythe: p = ",
+            "\n- Levene's / Brown-Forsythe: p = ",
             round(levene_p, 4),
             ifelse(
               levene_p > alpha,
               " (no evidence of unequal variance)",
               " (suggests unequal variance)"
             ),
+            "\n&nbsp;  \n  ",
+            "\n  - These two tests can disagree near the alpha threshold.",
             "\n&nbsp;  \n  "
           )
         )
@@ -680,7 +735,10 @@ f_t_test.formula <- function(formula,
       output_list[[response_name]][["t_test"]] <- test_res
       output_list[[response_name]][["t_call"]] <- call_str
 
-      shapiro_res <- shapiro.test(normality_values)
+      # Use safe_shapiro() so edge cases (n < 3, n > 5000) return a
+      # shaped htest with NA p-value instead of erroring. Downstream
+      # code must handle NA in $p.value and $statistic.
+      shapiro_res <- safe_shapiro(normality_values)
       adt_res     <- nortest::ad.test(normality_values)
       data_label  <- if (paired)
         "Differences"
@@ -689,30 +747,49 @@ f_t_test.formula <- function(formula,
       else
         "Residuals"
 
-      cat(
-        paste0(
-          "\n- **Shapiro-Wilk** (W = ",
-          round(shapiro_res$statistic, 4),
-          ", p = ",
-          round(shapiro_res$p.value, 4),
-          "): ",
-          data_label,
-          ifelse(
-            shapiro_res$p.value > alpha,
-            paste0(" **are Normal** (p > ", alpha, ")"),
-            paste0(" are **NOT Normal** (p \u2264 ", alpha, ")")
-          ),
-          " \u2014 *drives transformation decision*",
-          "\n- Anderson-Darling (A = ",
-          round(adt_res$statistic, 4),
-          ", p = ",
-          round(adt_res$p.value, 4),
-          "): ",
-          data_label,
-          ifelse(adt_res$p.value > alpha, " are Normal", " are NOT Normal"),
-          " \u2014 *diagnostic only* \n"
+      if (is.na(shapiro_res$p.value)) {
+        cat(
+          paste0(
+            "\n- **Shapiro-Wilk** skipped (", shapiro_res$method, "): ",
+            data_label, " normality cannot be tested at this sample ",
+            "size, the transformation decision falls back to the ",
+            "Anderson-Darling result below.",
+            "\n- Anderson-Darling (A = ",
+            round(adt_res$statistic, 4),
+            ", p = ",
+            round(adt_res$p.value, 4),
+            "): ",
+            data_label,
+            ifelse(adt_res$p.value > alpha, " are Normal", " are NOT Normal"),
+            ", *drives transformation decision (Shapiro skipped)* \n"
+          )
         )
-      )
+      } else {
+        cat(
+          paste0(
+            "\n- **Shapiro-Wilk** (W = ",
+            round(shapiro_res$statistic, 4),
+            ", p = ",
+            round(shapiro_res$p.value, 4),
+            "): ",
+            data_label,
+            ifelse(
+              shapiro_res$p.value > alpha,
+              paste0(" **are Normal** (p > ", alpha, ")"),
+              paste0(" are **NOT Normal** (p \u2264 ", alpha, ")")
+            ),
+            ", *drives transformation decision*",
+            "\n- Anderson-Darling (A = ",
+            round(adt_res$statistic, 4),
+            ", p = ",
+            round(adt_res$p.value, 4),
+            "): ",
+            data_label,
+            ifelse(adt_res$p.value > alpha, " are Normal", " are NOT Normal, "),
+            "*diagnostic only* \n"
+          )
+        )
+      }
 
       output_list[[response_name]][["shapiro_res"]] <- shapiro_res
       output_list[[response_name]][["adt_res"]]     <- adt_res
@@ -746,7 +823,7 @@ f_t_test.formula <- function(formula,
       } else {
         plot(
           normality_values,
-          main = paste0(data_label, " \u2014 Index Plot"),
+          main = paste0(data_label, ", Index Plot"),
           ylab = data_label
         )
       }
@@ -762,7 +839,21 @@ f_t_test.formula <- function(formula,
       if (output_type %in% c("pdf", "word"))
         cat("\n<div style=\"page-break-after: always;\"></div>\n\\newpage")
 
-      needs_trans <- shapiro_res$p.value < alpha ||
+      # Decide whether normality is violated. Prefer Shapiro-Wilk when
+      # available (most powerful for n <= 5000); fall back to
+      # Anderson-Darling when Shapiro was skipped (n outside 3..5000)
+      # so the decision is still made on test evidence rather than
+      # silently defaulting to FALSE. If both are unavailable, leave
+      # the trigger FALSE and let the user inspect the qq-plot.
+      normality_violated <- if (!is.na(shapiro_res$p.value)) {
+        shapiro_res$p.value < alpha
+      } else if (!is.na(adt_res$p.value)) {
+        adt_res$p.value < alpha
+      } else {
+        FALSE
+      }
+
+      needs_trans <- normality_violated ||
         response_name %in% force_transformation
 
       if (needs_trans) {
@@ -875,11 +966,12 @@ f_t_test.formula <- function(formula,
             cat(
               paste0(
                 "\n- Variance diagnostics on transformed data (diagnostic only):",
-                "\n  + Bartlett's: p = ",
+                "\n- Bartlett's: p = ",
                 round(bart_t$p.value, 4),
-                "\n  + Levene's / Brown-Forsythe: p = ",
+                "\n- Levene's / Brown-Forsythe: p = ",
                 round(lev_t$p, 4),
-                "  \n"
+                "  \n",
+                "\n- These two tests can disagree near the alpha threshold."
               )
             )
 
@@ -900,21 +992,33 @@ f_t_test.formula <- function(formula,
           if (!is.null(ci_bt))
             ci_backtransformed <- ci_bt
 
-          shapiro_res_t <- shapiro.test(res_t)
-          cat(
-            paste0(
-              "\n## Assumptions of **TRANSFORMED** Data\n\n",
-              "- Shapiro-Wilk (Transformed): p = ",
-              round(shapiro_res_t$p.value, 4),
-              " ",
-              ifelse(
-                shapiro_res_t$p.value > alpha,
-                "(OK \u2014 normality achieved)",
-                "(**Violation \u2014 consider a non-parametric test**)"
-              ),
-              "  \n"
+          shapiro_res_t <- safe_shapiro(res_t)
+          if (is.na(shapiro_res_t$p.value)) {
+            cat(
+              paste0(
+                "\n## Assumptions of **TRANSFORMED** Data\n\n",
+                "- Shapiro-Wilk (Transformed): skipped (",
+                shapiro_res_t$method,
+                "). Inspect the plots below to assess normality of ",
+                "the transformed data.  \n"
+              )
             )
-          )
+          } else {
+            cat(
+              paste0(
+                "\n## Assumptions of **TRANSFORMED** Data\n\n",
+                "- Shapiro-Wilk (Transformed): p = ",
+                round(shapiro_res_t$p.value, 4),
+                " ",
+                ifelse(
+                  shapiro_res_t$p.value > alpha,
+                  "(OK, normality achieved)",
+                  "(**Violation, consider a non-parametric test**)"
+                ),
+                "  \n"
+              )
+            )
+          }
 
           temp_file_t <- tempfile(fileext = ".png")
           png(
@@ -936,7 +1040,7 @@ f_t_test.formula <- function(formula,
               col = "lightgrey"
             )
           } else {
-            plot(res_t, main = "Transformed \u2014 Index Plot", ylab = "Transformed")
+            plot(res_t, main = "Transformed, Index Plot", ylab = "Transformed")
           }
           dev.off()
 
@@ -1136,7 +1240,7 @@ f_t_test.formula <- function(formula,
               paste0("\n  ", conf_pct, "% CI (back-transformed):  [ ",
                      round(ci_backtransformed[1], 3), ", ",
                      round(ci_backtransformed[2], 3), " ]",
-                     careful_note)
+                     careful_note, "\n")
             else
               paste0("\n-  **", conf_pct, "% CI** (back-transformed):  [ ",
                      round(ci_backtransformed[1], 3), ", ",
@@ -1156,16 +1260,16 @@ f_t_test.formula <- function(formula,
         if (console) {
           paste0(
             "\nNote on transformation:",
-            "\n  The t-test was conducted on the ", trans_name, "-transformed scale.",
-            "\n  The back-transformed mean and the sample median of the raw data will",
-            "\n  differ when the transformation is not perfectly normalizing.",
-            "\n  For non-normal data consider f_wilcox_test() which tests the median",
-            "\n  directly without transformation assumptions."
+            "\nThe t-test was conducted on the ", trans_name, "-transformed scale. ",
+            "The back-transformed mean and the sample median of the raw data will ",
+            "differ when the transformation is not perfectly normalizing. ",
+            "For non-normal data consider f_wilcox_test() which tests the median ",
+            "directly without transformation assumptions."
           )
         } else {
           paste0(
-            "\n\n> **Note on transformation:** The t-test was conducted on the ",
-            "*", trans_name, "*-transformed scale. ",
+            "\n**Note on transformation:**",
+            "\n The t-test was conducted on the *", trans_name, "*-transformed scale. ",
             "The back-transformed mean and the sample median of the raw data will ",
             "differ when the transformation is not perfectly normalizing. ",
             "For non-normal data consider `f_wilcox_test()` which tests the median ",
@@ -1236,10 +1340,10 @@ f_t_test.formula <- function(formula,
 
       cat(paste0("&nbsp;\n  \n**ESTIMATE:**\n"))
       cat(ci_txt)
-
+      cat("&nbsp;\n  \n&nbsp;  \n  \n")
       if (!is.null(trans_note)) cat(trans_note)
 
-      cat("&nbsp;\n  \n&nbsp;  \n  \n")
+
 
       if (n_before != n_after)
         cat(paste0("**WARNING** Removed ", n_before - n_after,
@@ -1312,9 +1416,19 @@ output:
 header-includes:
   - \\usepackage[T1]{fontenc}
   - \\usepackage[utf8]{inputenc}
+  - \\usepackage{textcomp}
+  - \\DeclareUnicodeCharacter{03BB}{\\ensuremath{\\lambda}}
+  - \\DeclareUnicodeCharacter{2264}{\\ensuremath{\\leq}}
+  - \\DeclareUnicodeCharacter{2265}{\\ensuremath{\\geq}}
+  - \\DeclareUnicodeCharacter{2192}{\\ensuremath{\\rightarrow}}
+  - \\DeclareUnicodeCharacter{00D7}{\\ensuremath{\\times}}
+  - \\DeclareUnicodeCharacter{2014}{\\textemdash}
+  - \\DeclareUnicodeCharacter{03B1}{\\ensuremath{\\alpha}}
+  - \\DeclareUnicodeCharacter{2019}{\\textquoteright}
+  - \\DeclareUnicodeCharacter{0160}{\\v{S}}
+  - \\DeclareUnicodeCharacter{00E1}{\\'{a}}
   - \\usepackage{titling}
-  - \\setlength{\\droptitle}{-2.5cm}
-  - \\DeclareUnicodeCharacter{26A0}{\\textbf{!}}
+  - \\setlength{\\droptitle}{-2.5cm} % Adjust vertical spacing
 ---
 "
       )
@@ -1411,7 +1525,7 @@ f_t_test.default <- function(x,
                              alpha = 0.05,
                              intro_text = TRUE,
                              close_generated_files = FALSE,
-                             open_generated_files = TRUE,
+                             open_generated_files = interactive(),
                              output_type = "default",
                              save_as = NULL,
                              save_in_wdir = FALSE,
@@ -1443,11 +1557,11 @@ f_t_test.default <- function(x,
   if (!is.null(force_transformation) && !is.null(y)) {
 
     if (force_transformation %in% c(x_name, y_name, "x", "y")) {
-      # Valid group name — silently redirect to the response column
+      # Valid group name -- silently redirect to the response column
       force_transformation <- response_col
 
     } else {
-      # Genuinely unrecognised name — warn and correct
+      # Genuinely unrecognised name -- warn and correct
       warning("'force_transformation = \"", force_transformation, "\"' was not ",
               "recognised. In the vector interface, valid values are '",
               x_name, "' or '", y_name, "'. ",

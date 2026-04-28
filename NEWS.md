@@ -1,17 +1,173 @@
-# rfriend 3.0.0 (2026-02-01)
+# rfriend 3.0.0 (2026-04-21)
 
-## Major Changes
+## Breaking Changes
 
-* **BREAKING CHANGE:** In order to take `formula` notation `f_summary` no longer accepts unquoted column names, either formula notation or quotes names must be used.
+* `f_model_comparison()` has been renamed to `f_model_compare()`. Please
+  update any scripts that used the previous name.
 
-## New Features
-New function to easily go from wide data to long format `f_long` and a function to scan the data distribution shape, spread, outliers and normality: `f_scan`. The new `f_stat_wizard` is still in BETA it analyzes your data structure based on a formula and recommends the appropriate statistical test.`f_wilcox_test` and `f_t_test` have been added to the package. Many functions now take formula notation, making iterative function use very simple e.g., summarize columns "disp" and "hp" from dataset "mtcars" grouped by "gear" and "cyl": `f_summary(disp + hp ~ gear + cyl, data = mtcars)`. `f_summary` now allows showing Excess Kurtosis `show_kurtosis = TRUE` (measure of "tailedness") and `show_skew = TRUE` Skewness (measure of asymmetry).
+* `f_summary()` no longer accepts unquoted column names. Columns must now be
+  supplied either via a formula (e.g.
+  `f_summary(disp + hp ~ gear + cyl, data = mtcars)`) or as quoted character
+  names passed to the `columns` argument (e.g. `columns = c("disp", "hp")`).
+  This change was required to support the new formula method.
+
+* The `output_type` argument of file-producing functions now defaults to
+  `"default"` instead of `"off"` (or `"console"`). The new `"default"` mode
+  returns an S3 object and lets R decide whether to print: the object is
+  auto-printed when the call is unassigned, and silent when the result is
+  assigned to a variable. Set `output_type = "console"` to force immediate
+  console printing regardless of assignment. Affects `f_aov()`,
+  `f_kruskal_test()`, `f_glm()`, `f_chisq_test()`, `f_bestNormalize()`,
+  `f_boxcox()`, and the new `f_lmer()`, `f_t_test()`, `f_wilcox_test()`,
+  `f_scan()` and `f_stat_wizard()`.
+
+* The default `transformation` in `f_aov()` is now `"boxcox"` (previously
+  `"bestnormalize"`). Box-Cox is faster, easier to back-transform and
+  sufficient for most ANOVA use cases.
+
+## New Functions
+
+* `f_lmer()` fits linear mixed-effects models using `lme4::lmer()` with
+  p-values supplied by `lmerTest`, and produces a fully formatted report
+  containing the fixed-effects ANOVA table, random-effects variance
+  components and ICC, marginal and conditional R-squared (Nakagawa and
+  Schielzeth), AIC, BIC, log-likelihood, residual and BLUP Q-Q diagnostics,
+  prominent surfacing of singular-fit and convergence messages, and
+  `emmeans` pairwise post hoc on factor fixed effects with compact letter
+  display. Supports `output_type` of `"console"`, `"pdf"`, `"word"`,
+  `"excel"` and `"rmd"`, mirroring `f_aov()` and `f_kruskal_test()`. The
+  intro section explains LMM assumptions and walks the user through the
+  `(1 | group)` random-effects syntax in study-design terms. Denominator
+  degrees of freedom are selectable via `ddf = "Satterthwaite"` (default),
+  `"Kenward-Roger"` or `"lme4"`.
+
+* `f_t_test()` wraps `stats::t.test()` with both a formula interface
+  (`y1 + y2 ~ group`, supporting multiple responses in sequence) and a
+  classic vector interface. Supports one-sample, two-sample and paired
+  tests, adds automated Shapiro-Wilk, Bartlett and Levene diagnostics,
+  optional Box-Cox or bestNormalize transformation of non-normal responses,
+  and formatted output to console, pdf, Word, Excel or R Markdown.
+
+* `f_wilcox_test()` wraps `stats::wilcox.test()` with the same formula and
+  vector interfaces as `f_t_test()`. The function explicitly labels and
+  reports the Hodges-Lehmann pseudo-median (one-sample and paired) or
+  location shift (two-sample), alongside descriptive sample medians, to
+  avoid the common "CI for the median" mislabelling found in textbooks and
+  software output.
+
+* `f_scan()` creates a 3-panel diagnostic dashboard (density, boxplot,
+  Q-Q) for one or more response columns, optionally split by up to three
+  grouping variables (colour, facet wrap, facet grid). It returns a
+  summary table and a Tukey-fence outlier table, and can optionally call
+  `f_stat_wizard()` to append a test recommendation for each response.
+
+* `f_long()` converts wide (Excel-style) data to long format in a single
+  call, selecting measurement columns, keeping ID columns and optionally
+  renaming categories. Returns an object of class `f_long` with dedicated
+  `plot()` and `summary()` methods. Extra arguments are forwarded to
+  `tidyr::pivot_longer()`.
+
+* `f_stat_wizard()` (BETA) analyses your data structure from a formula and
+  recommends an appropriate statistical test. It detects response type
+  (binary, count, multinomial, ratio normal or non-normal), checks
+  normality of residuals and homogeneity of variance, and evaluates
+  whether a Box-Cox transformation would resolve non-normality. The
+  recommendation is returned as ready-to-run code using the appropriate
+  `rfriend` function as primary code, with a base R fallback. Supports
+  `y ~ .`, interaction terms and paired or repeated-measures designs via
+  `id_col`. With `run = TRUE`, the recommended function is executed
+  automatically.
+
+* `f_outliers()` scans numeric columns for outliers using Tukey's fences
+  (IQR multiplier configurable via `coef`), optionally within groups.
+  Returns a data frame containing only the outlier rows, adds a `row_id`
+  column for traceability, and optionally exports to Excel. A formula
+  interface is supported, e.g. `col1 + col2 ~ group1 + group2`.
+
+* `f_remove_outliers()` removes rows from a data frame based on the output
+  of `f_outliers()` or a custom vector of IDs or row numbers, using safe
+  anti-join semantics so the original data structure is preserved.
+
+* `df_to_table()` converts a data frame to a base R contingency table.
+  The label column is auto-detected (first character or factor column, or
+  meaningful `rownames()`) but can be specified explicitly. Used
+  internally by `f_chisq_test()` and exported for manual use.
+
+## New Features in Existing Functions
+
+* Formula interfaces have been added to `f_summary()`, `f_boxplot()`,
+  `f_scan()`, `f_outliers()` and `f_stat_wizard()` via S3 dispatch
+  (`data.frame` and `formula` methods). This makes iterative use very
+  concise. For example, `f_summary(disp + hp ~ gear + cyl, data = mtcars)`
+  summarises `disp` and `hp` grouped by `gear` and `cyl`.
+
+* `f_summary()` gained `show_skew` (Skewness, measure of asymmetry) and
+  `show_kurtosis` (Excess Kurtosis, measure of tail heaviness).
+
+* `f_aov()` gained a `force_aov` argument to run ANOVA even when at least
+  one cell has n = 1 (saturated model). The default (`FALSE`) skips such
+  responses with a warning, because F-statistics and p-values are
+  undefined for saturated models.
+
+* `f_corplot()` has been rewritten. The upper triangle now displays
+  Pearson r, Spearman rho and Kendall tau simultaneously for every pair.
+  Ordinal variables are supported via the new `ordinal_vars` argument:
+  their diagonal labels are italicised and Pearson r is greyed and
+  bracketed for any pair that involves them. New arguments
+  `factor_select`, `factor_exclude`, `unique_num_treshold` and
+  `repeats_threshold` give finer control over automatic factor detection.
+
+* `f_aov()` and `f_glm()` post hoc summary tables now display
+  back-transformed data where a transformation has been applied. A data
+  summary table has also been added to both functions.
+
+* `f_boxplot()` now integrates with `f_outliers()` and can append an
+  outlier table to the report (new arguments `outliers`, `coef`,
+  `limit_columns`).
+
+* `f_chisq_test()` now uses the new `df_to_table()` helper when a data
+  frame instead of table is supplied, giving clearer messages about which column was used
+  as row labels.
+
+## New S3 Methods
+
+* New `plot()` methods for objects of class `f_kruskal_test`, `f_lmer`,
+  `f_long`, `f_scan`, `f_t_test` and `f_wilcox_test`.
+
+* New `print()` methods for `f_lmer`, `f_outliers`, `f_scan`,
+  `f_stat_wizard`, `f_t_test` and `f_wilcox_test`.
+
+* New `summary()` methods for `f_long` and `f_scan`.
+
+* New `predict()` method for `f_boxcox`, allowing forward transformation
+  of new values using a fitted `f_boxcox` object.
 
 ## Minor Changes
-intro text and summary text of `f_aov`, `f_kruskall_test`, and `f_glm` has been improved to be more user friendly. `f_aov` and `f_glm` now show backtransformed data in post hoc summary table. A data summary table has been added to these functions. `f_aov` now has `transformation = "boxcox"` as default instead of `"bestnormalize"`. `f_open_file` has been improved for linux users, formatting of `Word` output is now compatible with `LibreOffice Writer`, tested on version 24.2.7.2. `f_corplot` has been rewritten to allow for ordinal variables and now shows Pearson, Spearman and Kendall correlation coefficients. 
+
+* The intro text and summary text of `f_aov()`, `f_kruskal_test()` and
+  `f_glm()` have been reworked to be more user-friendly and consistent
+  across functions.
+
+* `f_open_file()` has been improved for Linux users.
+
+* Formatting of Word output has been updated and is now compatible with
+  LibreOffice Writer (tested on version 24.2.7.2).
+
+* New imports: `dplyr`, `gridExtra`, `lme4`, `lmerTest`, `magrittr`,
+  `png`, `rlang` and `tidyr`.
+
+* `MASS`, `nnet`, `pbkrtest`, `testthat` (>= 3.0.0) and `tibble` have been
+  added to Suggests. The package now ships a `testthat` (edition 3) test
+  suite (`Config/testthat/edition: 3`).
+
+* New internal helpers for formula handling, left-hand-side checking, safe
+  Shapiro-Wilk testing and session-state management.
 
 ## Bug Fixes
-Bug fixes for all functions after stress testing by using extreme combinations of input options.
+
+* General hardening of all functions following stress testing with
+  extreme combinations of input options, including malformed formulas,
+  edge cases of sample size, missing data, and factor-level counts.
 
 
 # rfriend 2.0.0 (2025-11-16)
@@ -27,7 +183,7 @@ Bug fixes for all functions after stress testing by using extreme combinations o
   * If a file extension (like `.pdf` or `.word`) is provided, `save_as` will override the `output_type` argument using this extension.
 
   * Changed the default argument from `output_type = "off"` to `output_type = "console"` for `f_aov()`, `f_kruskal_test()`, `f_glm()`, and `f_chisq_test()`. This ensures results are printed to the console by default, aligning with user expectations.
-  
+
   * The arguments `show_assumptions_text` from `f_glm()`, `kruskal_assumptions_text` from `f_kruskal_test()`, `aov_assumptions_text` from `f_aov()` and `boxplot_explanation` from `f_boxplot` were all replace by the argument `intro_text` to have a short and uniform argument.
 
 ## New Features

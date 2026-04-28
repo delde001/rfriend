@@ -133,7 +133,7 @@ f_conditional_round <- function(x,
     result <- x
     non_na <- !is.na(x)
 
-    # Exact zeros get "0" — the existing is_zero guard at the bottom handles this
+    # Exact zeros get "0" -- the existing is_zero guard at the bottom handles this
 
     if (any(non_na)) {
       use_scientific <- abs(x[non_na]) < threshold_small | abs(x[non_na]) >= threshold_large

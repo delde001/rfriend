@@ -1,4 +1,4 @@
-#' Correlation Plots with Factor Detection, Customization, and Multiple Correlation Coefficients
+#' Correlation Plots with Factor Detection and Multiple Correlation Coefficients
 #'
 #' Creates correlation plots for numeric variables in a data frame. The upper
 #' triangle displays Pearson \eqn{r}{r}, Spearman \eqn{\rho}{rho}, and Kendall
@@ -37,8 +37,10 @@
 #' @param res Numeric. Resolution in DPI. Default 600.
 #' @param pointsize Numeric. Base font size. Default 8.
 #' @param close_generated_files Logical. Closes open Excel or Word (NOT pdf) files before writing, depending on the output format. Works on Windows (taskkill), macOS (pkill) and Linux (pkill/soffice). Default \code{FALSE}. \strong{WARNING:} Always save your work before using this option!!
-#' @param open_generated_files Logical. If \code{TRUE}, opens generated output
-#'   files automatically. Default \code{TRUE}.
+#' @param open_generated_files Logical. Whether to open the generated output
+#'   files after creation. Defaults to \code{TRUE} in an interactive R session
+#'   and \code{FALSE} otherwise (e.g. in scripts or automated pipelines).
+#'   Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.
 #' @param output_type Character. One of \code{"pdf"}, \code{"word"},
 #'   \code{"png"}, or \code{"rmd"}. Default \code{"word"}.
 #' @param save_as Character or \code{NULL}. Output file path without extension.
@@ -66,20 +68,20 @@
 #'     (when present) and always includes an explanation of all three
 #'     correlation symbols whenever a legend is generated.
 #'   \item \strong{Constant columns:} Zero-variance columns produce \code{NA}
-#'     in all correlation panels rather than crashing.
+#'     in all correlation panels.
 #' }
 #'
 #' This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
 #'\itemize{
 #' \item \bold{Windows:} Install Pandoc and ensure the installation folder \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
-#' \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary’s location is in your PATH.
-#' \item \bold{Linux:} Install Pandoc through your distribution’s package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.
+#' \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.
+#' \item \bold{Linux:} Install Pandoc through your distribution's package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.
 #'
 #' \item If Pandoc is not found, this function may not work as intended.
 #' }
 #'
 #' @return No value is returned to the R environment. Output files are saved
-#'   and opened automatically when running on Windows.
+#'   and opened automatically.
 #'
 #' @author Sander H. van Delden \email{plantmind@proton.me}
 #'
@@ -89,8 +91,8 @@
 #' f_corplot(mtcars_sub,
 #'           color_factor = "gear",
 #'           shape_factor = "cyl",
-#'           output_type  = "png",
-#'           open_generated_files = FALSE)
+#'           output_type  = "png"
+#'           )
 #'
 #' # With ordinal variables
 #' data(iris)
@@ -106,7 +108,8 @@
 f_corplot <- function(data,
                       detect_factors        = TRUE,
                       factor_table          = FALSE,
-                      factor_exclude        = NULL,                                                         factor_select         = NULL,
+                      factor_exclude        = NULL,
+                      factor_select         = NULL,
                       unique_num_treshold   = 8,
                       repeats_threshold     = 2,
                       color_factor          = "auto",
@@ -119,7 +122,7 @@ f_corplot <- function(data,
                       res                   = 600,
                       pointsize             = 10,
                       close_generated_files = FALSE,
-                      open_generated_files  = TRUE,
+                      open_generated_files  = interactive(),
                       output_type           = "word",
                       save_as               = NULL,
                       save_in_wdir          = FALSE) {
@@ -127,24 +130,9 @@ f_corplot <- function(data,
   ##########################################################################
   # Save and restore settings on exit
   ##########################################################################
-  old_par      <- par(no.readonly = TRUE)
-  old_par$new  <- NULL
-  original_options <- options()
-  original_panderOptions <- if (requireNamespace("pander", quietly = TRUE) &&
-                                  is.function(pander::panderOptions)) {
-    pander::panderOptions()
-  } else {
-    NULL
-  }
-  on.exit({
-    par(old_par)
-    options(original_options)
-    if (!is.null(original_panderOptions)) {
-      for (opt in names(original_panderOptions))
-        try(pander::panderOptions(opt, original_panderOptions[[opt]]),
-            silent = TRUE)
-    }
-  }, add = TRUE)
+  .session_state <- save_session_state()  # Helper function: helper_session_state
+  on.exit(restore_session_state(.session_state), add = TRUE) # Helper function: helper_session_state
+
 
   ##########################################################################
   # Validate output_type
@@ -228,7 +216,7 @@ f_corplot <- function(data,
     if (output_type == "word")  close_app("WINWORD.EXE", "Microsoft Word",  "soffice")
   }
 
-  # guard dev.off() — only close if a non-null device is active.
+  # guard dev.off() -- only close if a non-null device is active.
    if (grDevices::dev.cur() > 1L) grDevices::dev.off()
 
   ##########################################################################
@@ -245,10 +233,9 @@ f_corplot <- function(data,
     data         <- f_rename_columns(data, fancy_names)
     color_factor <- f_rename_vector(color_factor, fancy_names)
     shape_factor <- f_rename_vector(shape_factor, fancy_names)
-    if (!is.null(ordinal_vars))
-      ordinal_vars <- ifelse(ordinal_vars %in% names(fancy_names),
-                             fancy_names[ordinal_vars],
-                             ordinal_vars)
+    if (!is.null(ordinal_vars) && ordinal_vars %in% names(fancy_names)) {
+      ordinal_vars <- f_rename_vector(ordinal_vars, fancy_names)
+    }
   }
 
   ##########################################################################
@@ -257,7 +244,7 @@ f_corplot <- function(data,
   if (!is.null(ordinal_vars)) {
     for (ov in ordinal_vars) {
       if (!ov %in% names(data)) {
-        warning("ordinal_vars: '", ov, "' not found in data — ignored.")
+        warning("ordinal_vars: '", ov, "' not found in data \u2014 ignored.")
         ordinal_vars <- setdiff(ordinal_vars, ov)
         next
       }
@@ -290,7 +277,8 @@ f_corplot <- function(data,
       )
     }
 
-    # Exclude ordered factors — those are ordinal data, not grouping aesthetics
+
+    # Exclude ordered factors -- those are ordinal data, not grouping aesthetics
     factor_vars  <- vapply(data,
                            function(x) is.factor(x) && !is.ordered(x),
                            logical(1))
@@ -590,7 +578,7 @@ f_corplot <- function(data,
         xpd        = TRUE,
         text.width = max(strwidth(legend_)) + 0.02
       )
-      # Measure actual rendered height before drawing — no more fixed guesses
+      # Measure actual rendered height before drawing -- no more fixed guesses
       leg_dims <- do.call(legend, c(leg_params, list(plot = FALSE)))
       # Draw the real legend
       do.call(legend, leg_params)
@@ -664,10 +652,8 @@ f_corplot <- function(data,
                          "at a constant rate). Use instead of Pearson when data are ordinal, ",
                          "skewed, or contain outliers. Works on ranks, not raw values.")),
       list(sym  = expression(italic(tau)),
-           desc = paste0("= Kendall: also rank-based like Spearman, but counts the proportion ",
-                         "of CONCORDANT pairs (both variables increase together) minus DISCORDANT ",
-                         "pairs (one increases, the other decreases). More robust than Spearman ",
-                         "for small samples or many tied ranks. Preferred for strictly ordinal data."))
+           desc = paste0("= Kendall: also rank-based like Spearman, but counts the proportion of CONCORDANT pairs (both variables increase together) minus DISCORDANT pairs (one increases, the other decreases). More robust than Spearman for small samples or many tied ranks (identical values that get the same rank). Preferred for strictly ordinal data.")
+           )
     )
 
     for (entry in cor_entries)

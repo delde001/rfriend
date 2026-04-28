@@ -18,7 +18,7 @@
 #'   for multiple comparisons. Available methods include:
 #'   \describe{
 #'     \item{"tukey"}{Tukey's Honest Significant Difference method}
-#'     \item{"sidak"}{Šidák correction}
+#'     \item{"sidak"}{Sidak correction}
 #'     \item{"bonferroni"}{Bonferroni correction}
 #'     \item{"none"}{No adjustment}
 #'     \item{"fdr"}{False Discovery Rate adjustment}
@@ -28,7 +28,10 @@
 #'   \code{"response"} (back-transformed to original units, e.g. probabilities, counts)
 #'   or \code{"link"} (on the linear predictor scale, e.g. log-odds). Default is \code{"response"}.
 #' @param close_generated_files Logical. Closes open Excel or Word (NOT pdf) files before writing, depending on the output format. Works on Windows (taskkill), macOS (pkill) and Linux (pkill/soffice). Default \code{FALSE}. \strong{WARNING:} Always save your work before using this option!!
-#' @param open_generated_files Logical. If \code{TRUE}, Opens the generated output files ('pdf', 'Word' or 'Excel') files depending on the output format. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.
+#' @param open_generated_files Logical. Whether to open the generated output
+#'   files after creation. Defaults to \code{TRUE} in an interactive R session
+#'   and \code{FALSE} otherwise (e.g. in scripts or automated pipelines).
+#'   Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.
 #' @param output_type Character string specifying the output format. Default is \code{"default"}.
 #'   \itemize{
 #'     \item \code{"default"}: Returns the object and lets R decide whether
@@ -74,8 +77,8 @@
 #' This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
 #'\itemize{
 #' \item \bold{Windows:} Install Pandoc and ensure the installation folder \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
-#' \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary’s location is in your PATH.
-#' \item \bold{Linux:} Install Pandoc through your distribution’s package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.
+#' \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.
+#' \item \bold{Linux:} Install Pandoc through your distribution's package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.
 #'
 #' \item If Pandoc is not found, this function may not work as intended.
 #' }
@@ -111,8 +114,8 @@
 #' glm_bin_word <- f_glm(vs ~ cyl,
 #'                  family = binomial,
 #'                  data = mtcars_mod,
-#'                  output_type = "word",
-#'                  open_generated_files = FALSE)
+#'                  output_type = "word"
+#'                  )
 #'
 #' # GLM Poisson example with output to rmd text
 #' data(warpbreaks)
@@ -143,39 +146,13 @@ f_glm <- function(
     save_as = NULL,                # name of the output dir and file (name and type)
     save_in_wdir = FALSE,          # Save in working directory
     close_generated_files = FALSE, # Close open files
-    open_generated_files = TRUE,   # Open files after creation
+    open_generated_files = interactive(),   # Open files after creation
     influence_threshold = 2,       # Leverage threshold
     ...) {
 
-  ########## Reset initial settings on exit ##################################
-  # Save initial settings at the start
-  old_par <- par(no.readonly = TRUE)  # Save graphical parameters
-  old_par$new <- NULL                 # Remove this parameter to prevent warning
-  original_options <- options()       # Save global options
-
-  # Conditionally save panderOptions if the package is loaded
-  original_panderOptions <- if (requireNamespace("pander", quietly = TRUE) && is.function(pander::panderOptions)) {
-    pander::panderOptions()
-  } else {
-    NULL
-  }
-
-  # Single exit handler to restore settings
-  on.exit({
-
-    # Restore saved parameters for par
-    par(old_par)
-
-    # Restore global options
-    options(original_options)
-
-    # Restore panderOptions if they were saved
-    if (!is.null(original_panderOptions)) {
-      for (opt in names(original_panderOptions)) {
-        try(pander::panderOptions(opt, original_panderOptions[[opt]]), silent = TRUE)
-      }
-    }
-  }, add = TRUE)
+  ########## Reset initial settings on exit #################################
+  .session_state <- save_session_state()  # Helper function: helper_session_state
+  on.exit(restore_session_state(.session_state), add = TRUE) # Helper function: helper_session_state
 
 
   ##### Save dataframe name and Handle input from vectors (dataframe column) #####
@@ -355,6 +332,10 @@ f_glm <- function(
     stop("'family' not recognized")
   }
 
+
+  # Warn if LHS has expressions like log(y) before silently stripping them
+  check_lhs_is_names(formula) #use helper_check_lhs.R
+
   # Extract response variables from the left-hand side of the formula
   lhs <- all.vars(formula[[2]])  # Get LHS variables (response)
   response_names <- lhs
@@ -383,7 +364,7 @@ f_glm <- function(
     if (!(predictor %in% names(data))) {
       stop(paste("Predictor variable", predictor, "not found in the data."))
     }
-    # Warn if a numeric predictor looks categorical — emmeans will evaluate at
+    # Warn if a numeric predictor looks categorical -- emmeans will evaluate at
     # its mean rather than at each level, producing a single-row table.
     n_unique <- length(unique(stats::na.omit(data[[predictor]])))
     if (is.numeric(data[[predictor]]) && n_unique <= 10) {
@@ -391,7 +372,7 @@ f_glm <- function(
         "Predictor '", predictor, "' is numeric with only ", n_unique,
         " unique value(s). emmeans will evaluate at its marginal mean (",
         round(mean(data[[predictor]], na.rm = TRUE), 2),
-        "), NOT at each level — resulting in a single-row post hoc table ",
+        "), NOT at each level, resulting in a single-row post hoc table ",
         "instead of one row per group. ",
         "Convert to factor first if this is a categorical variable: ",
         "data$", predictor, " <- as.factor(data$", predictor, ")"
@@ -448,7 +429,7 @@ f_glm <- function(
     ))
   }
 
-  # LRT-based pairwise comparisons — robust to complete separation.
+  # LRT-based pairwise comparisons -- robust to complete separation.
   # For each pair of factor levels, fits a reduced model with those levels merged,
   # then takes the LRT vs the full model. Letters assigned via multcompLetters().
   # Returns a named character vector of letters (names = factor levels), or NULL.
@@ -537,7 +518,7 @@ f_glm <- function(
     # All formula predictors
     all_specs  <- all.vars(formula[[3]])
 
-    # Categorical predictors only — continuous ones are held at their mean
+    # Categorical predictors only -- continuous ones are held at their mean
     # and must not appear as emmeans specs (CLD on a slope is meaningless)
     cat_specs  <- all_specs[vapply(all_specs, function(v) {
       is.factor(data[[v]]) || is.character(data[[v]])
@@ -556,9 +537,9 @@ f_glm <- function(
 
     # Always use ALL categorical predictors as specs.
     # - emm_is_cells = TRUE  (significant interaction): returns cell means for
-    #   every combination — CLD compares all cells simultaneously.
+    #   every combination -- CLD compares all cells simultaneously.
     # - emm_is_cells = FALSE (no significant interaction): returns marginal means
-    #   — emmeans averages over non-significant factors appropriately.
+    #   -- emmeans averages over non-significant factors appropriately.
     # Fall back to all predictors only if no categoricals exist (edge case).
     emm_specs <- if (length(cat_specs) > 0) cat_specs else all_specs
 
@@ -579,7 +560,7 @@ f_glm <- function(
     names(summary_table)[names(summary_table) == ".group"] <- "Letter"
 
     if (!sig_effects) {
-      # Overall effect not significant — all groups in one class
+      # Overall effect not significant -- all groups in one class
       summary_table$Letter <- "ns"
     } else if (sep_flag) {
       # Separation detected: Wald-based pairwise tests are unreliable.
@@ -598,10 +579,20 @@ f_glm <- function(
 
     # Data summary table groups by the same categorical specs as emmeans.
     # This keeps the raw-data table and the model-based table in sync:
-    # - emm_is_cells = TRUE  → cat_specs includes all factors → cell-level counts
-    # - emm_is_cells = FALSE → cat_specs includes all factors → counts per marginal group
+    # - emm_is_cells = TRUE  -> cat_specs includes all factors -> cell-level counts
+    # - emm_is_cells = FALSE -> cat_specs includes all factors -> counts per marginal group
     # Continuous predictors are excluded in both cases.
-    data_summary_table <- f_summary(data,
+    #
+    # Use model$model (the model.frame glm() actually fit on) instead
+    # of raw `data` so that any subset / na.action / weights / NA
+    # handling applied by glm() is reflected here too. Falls back to
+    # `data` only if the user passed `model = FALSE` via `...`, which
+    # suppresses model$model. Note: `model` is the first argument of
+    # perform_posthoc() (the fitted glm); we do NOT reference
+    # `glm_fit` here because that symbol only exists in the outer
+    # generate_report() scope.
+    summary_data <- if (!is.null(model$model)) model$model else data
+    data_summary_table <- f_summary(summary_data,
                                     response_name,
                                     emm_specs,
                                     show_name = FALSE,
@@ -647,7 +638,7 @@ f_glm <- function(
       if (sep_flag) {
         # Explain that LRT-based pairwise tests were used instead of Wald
         cld_text <- paste0(
-          "\n**\u26a0 Separation detected \u2014 LRT pairwise comparisons used:**  \n",
+          "\n**[!] Separation detected, LRT pairwise comparisons used:**  \n",
           "Complete separation was detected (at least one group perfectly predicts the outcome), ",
           "making Wald-based pairwise tests unreliable. ",
           "Letters were assigned using **likelihood ratio tests** (LRT): for each pair of groups, ",
@@ -674,14 +665,27 @@ f_glm <- function(
         )
       } else {
 
-        cld_text <- paste(attr(mult_cld, "mesg"), collapse = "  \n")
 
-        # Substitute 'alpha' with '$\alpha$'
-        # We use "\\alpha" because in R strings, you need \\ to produce a single \
-        cld_text <- gsub("alpha", "$\\\\alpha$", cld_text)
 
-        # Substitute 'Note' with '**NOTE**'
-        cld_text <- gsub("NOTE:", "**NOTE:**", cld_text)
+
+        # Extract the mult_cld text to adjust it
+        msgs <- attr(mult_cld, "mesg")
+
+        # Substitute 'alpha' with '\u03B1'
+        msgs <- gsub("alpha", "\u03B1",  msgs)
+
+        note_idx <- grep("^NOTE:", msgs, ignore.case = TRUE)
+        if (length(note_idx)) {
+          msgs[note_idx] <- paste0(
+            "*Note: Groups in the \"Letters\" column sharing the same letter are ",
+            "**not** significantly different (\u03B1 = ", alpha, "). Groups with ",
+            "different letters are significantly different. Sharing a letter ",
+            "indicates insufficient evidence to claim a difference; it does not ",
+            "prove the groups are identical.*"
+          )
+        }
+
+        cld_text <- paste(msgs, collapse = "  \n")
 
 
         # Extract min and max once to keep code clean and efficient
@@ -744,8 +748,6 @@ header-includes:
   - \\DeclareUnicodeCharacter{2192}{\\ensuremath{\\rightarrow}}
   - \\DeclareUnicodeCharacter{221A}{\\ensuremath{\\surd}}
   - \\DeclareUnicodeCharacter{2212}{\\ensuremath{-}}
-  - \\DeclareUnicodeCharacter{2013}{\\textendash}
-  - \\DeclareUnicodeCharacter{26A0}{\\textbf{!}}
   - \\usepackage{titling}
   - \\setlength{\\droptitle}{-2.5cm} % Adjust vertical spacing
 ---
@@ -814,7 +816,7 @@ This test checks for **overdispersion** (too much variance) or **underdispersion
 
 * **Where it matters:** This is most critical for **Poisson** (counts) and **Binomial** (proportions) families.
 * **The Problem:** Real-world data is often \"clumped\" (e.g., disease cases within families), which creates more noise (variance) than the model expects, i.e. was assumed.
-* **The Consequence:** If you ignore overdispersion, the model becomes \"overconfident.\" This leads to **false significance** (spurious significance)—the model claims a result is statistically significant when it is actually just random noise.
+* **The Consequence:** If you ignore overdispersion, the model becomes \"overconfident.\" This leads to **false significance** (spurious significance); the model claims a result is statistically significant when it is actually just random noise.
 * **The Fix:** If the dispersion test is significant (p < \u03b1), you should switch to a family that handles extra variance:
     * For Counts: **Negative Binomial** (e.g., package `MASS` or `glmmTMB`).
     * For Proportions: **Beta-Binomial** (e.g., package `glmmTMB`).
@@ -827,14 +829,16 @@ This test checks if your data has more extreme values (outliers) than the model 
 This plot shows your residuals (errors) on the Y-axis against the model's predictions on the X-axis.
 
 * **What to look for:** In a good model, the dots should be **randomly scattered** around the middle line (0.5), with no clear patterns.
-* **Red Stars:** These are outliers—observations that are more extreme than anything the model simulated.\n
+* **Red Stars:** These are outliers--observations that are more extreme than anything the model simulated.\n
 &nbsp;\n  \n
 **Common Problems to Spot:**
 
 * *Funnel shape:* The variance is changing (heteroscedasticity).
 * *U-shape or Hump:* You are missing a predictor or the relationship is not linear.
 * *Patterns:* Any clear pattern suggests the model is failing to capture some structure in the data.
-\n"
+\n
+<div style=\"page-break-after: always;\"></div>
+\\newpage"
     )
   }
 
@@ -853,14 +857,14 @@ This plot shows your residuals (errors) on the Y-axis against the model's predic
       bonf_alpha <- round(alpha / k, 4)
       cat(paste0(
         "\n\n***\n\n",
-        "\u26a0**NOTE \u2014 Multiple Testing Across ", k, " Response Variables**  \n\n",
+        "**[!] NOTE: Multiple Testing Across ", k, " Response Variables**  \n\n",
         "This report runs ", k, " independent GLMs on the same dataset. ",
         "The **", adjust,"** correction keeps each individual test honest, it guards against ",
         "false positives among the pairwise group comparisons, but it offers no protection ",
         " against the accumulation of error across all ",k," tests combined. ",
         "\nAt \u03b1 = ", alpha, " per test, the probability of obtaining at least one ",
         "spurious significant result across all ", k, " responses is approximately ",
-        "**", fwer_pct, "%** (1\u2212(1\u2212", alpha, ")^", k, ", assuming independence). ",
+        "**", fwer_pct, "%** ($1 - (1 - ", alpha, ")^{", k, ",}$ assuming independence). ",
         "This risk is highest in exploratory studies; it is less of a concern when ",
         "each response has a clear a priori hypothesis.  \n\n",
         "**Possible remedies:**  \n",
@@ -904,7 +908,7 @@ This plot shows your residuals (errors) on the Y-axis against the model's predic
         influence  = check_influence(glm_fit)
       )
 
-      # Compute drop1 (Type II) and LRT FIRST — needed for sig_effects below
+      # Compute drop1 (Type II) and LRT FIRST -- needed for sig_effects below
       is_quasi_store <- family$family %in% c("quasipoisson", "quasibinomial", "quasi")
       lrt_test_store <- if (is_quasi_store) "F" else "Chisq"
 
@@ -925,7 +929,7 @@ This plot shows your residuals (errors) on the Y-axis against the model's predic
       )
 
       # sig_effects: based on LRT p-value from drop1 (not Wald z-tests).
-      # Wald p-values are unreliable under complete separation — LRT is robust.
+      # Wald p-values are unreliable under complete separation -- LRT is robust.
       # If drop1 failed, fall back to Wald as a last resort.
       sig_effects <- {
         drop1_res_sig <- output_list[[response_name]][["drop1"]]
@@ -959,7 +963,7 @@ This plot shows your residuals (errors) on the Y-axis against the model's predic
       # ---- Interaction-aware emmeans mode (mirrors f_aov logic) ----
       # Parse drop1 term names to classify interactions vs main effects.
       # Determines whether emmeans returns cell means or marginal means,
-      # and what note to show the user — matching f_aov's emm_is_cells approach.
+      # and what note to show the user -- matching f_aov's emm_is_cells approach.
       drop1_for_int  <- output_list[[response_name]][["drop1"]]
       cat_preds      <- predictor_names[vapply(predictor_names, function(v)
         is.factor(data[[v]]) || is.character(data[[v]]),
@@ -1034,12 +1038,14 @@ This plot shows your residuals (errors) on the Y-axis against the model's predic
         } else {
           cat("\n**Note:** DHARMa diagnostic plots were skipped.\n")
           cat("Simulation-based residuals are not currently supported for quasi-families (e.g., Quasipoisson, Quasibinomial) because they lack a defined probability distribution for simulation.\n \n")
-        }
-
-        # Pagebreak
-        cat("
+          # Pagebreak
+          if(output_type != "rmd"){
+            # Pagebreak
+            cat("
 <div style=\"page-break-after: always;\"></div>
-\\newpage")
+\\newpage
+        ")}
+        }
       }
 
       # ---- Fix 5: Dispersion test text output (gated by dispersion_test param) ----
@@ -1051,12 +1057,12 @@ This plot shows your residuals (errors) on the Y-axis against the model's predic
           all(data[[response_name]] %in% c(0, 1, NA))
 
         if (is_bernoulli) {
-          # Bernoulli (0/1) data cannot be overdispersed by definition —
+          # Bernoulli (0/1) data cannot be overdispersed by definition --
           # variance is strictly p(1-p). Reporting a dispersion test would mislead students.
           cat(paste0(
             "*Dispersion test skipped: the response variable `", response_name,
             "` contains only 0s and 1s (Bernoulli data). ",
-            "Overdispersion is mathematically impossible for binary outcomes — ",
+            "Overdispersion is mathematically impossible for binary outcomes;",
             "the variance is fixed at p(1\u2212p) and cannot exceed this. ",
             "Overdispersion in binomial models only arises with **grouped data** ",
             "(e.g., successes out of N trials per row, where N > 1).*  \n\n"
@@ -1107,7 +1113,7 @@ This plot shows your residuals (errors) on the Y-axis against the model's predic
             }
 
             cat(paste0(
-              "**DHARMa Dispersion Test** \u2014 ",
+              "**DHARMa Dispersion Test:**  ",
               "Ratio of simulated vs. observed variance: **", disp_stat, "**  \n",
               disp_interp, "  \n\n"
             ))
@@ -1203,7 +1209,7 @@ main findings in the *Results* section, you **must** use the Emmeans table below
       sep_flag <- output_list[[response_name]][["sep_flag"]]
       coef_mat <- glm_sum$coefficients
 
-      # Coefficients as a pander table — framed as effect estimates, not a significance test
+      # Coefficients as a pander table -- framed as effect estimates, not a significance test
       cat("**Coefficient Estimates** (direction and magnitude):  \n\n")
       coef_df <- as.data.frame(coef_mat)
       coef_df <- cbind(Term = rownames(coef_df), coef_df)
@@ -1223,9 +1229,9 @@ main findings in the *Results* section, you **must** use the Emmeans table below
       # Note below coefficients table
       if (sep_flag) {
         cat(paste0(
-          "\n**\u26a0 Separation detected:** At least one predictor perfectly predicts the outcome ",
+          "\n**[!] Separation detected:** At least one predictor perfectly predicts the outcome ",
           "in a subset of the data (indicated by a very large Std. Error). ",
-          "Wald p-values are unreliable in this situation — they will appear non-significant ",
+          "Wald p-values are unreliable in this situation; they will appear non-significant ",
           "even for strongly predictive terms. ",
           "**Use the Type II Analysis of Deviance table below for all significance decisions.**  \n\n"
         ))
@@ -1247,12 +1253,12 @@ main findings in the *Results* section, you **must** use the Emmeans table below
       cat(paste0(
         "The table below tests the marginal significance of **each predictor term** ",
         "via `stats::drop1()` (Type II tests). Each term is dropped from the full model ",
-        "in turn and tested against the model retaining all other terms — equivalent to ",
+        "in turn and tested against the model retaining all other terms; equivalent to ",
         "`car::Anova(type = 2)` but using only base R. ",
         "This is the GLM equivalent of the ANOVA F-table: it answers *\"does this predictor ",
         "improve the model?\"* after accounting for all other terms. ",
-        "For single-predictor models this matches the coefficient z-test above; ",
-        "for multi-predictor models these per-term tests are the ones to report.  \n\n"
+        "For single-predictor models this matches the coefficient", stat_col,
+        "above; for multi-predictor models these per-term tests are the ones to report.  \n\n"
       ))
 
       if (!is.null(drop1_res)) {
@@ -1268,6 +1274,9 @@ main findings in the *Results* section, you **must** use the Emmeans table below
           drop1_df[[p_col_name]] <- ifelse(drop1_df[[p_col_name]] < 0.001, "< 0.001",
                                            as.character(round(as.numeric(drop1_df[[p_col_name]]), 4)))
         }
+        #drop1_df <- drop1_df[drop1_df$Term != "<none>", ]
+        drop1_df <- drop1_df[!is.na(drop1_df[[p_col_name]]), ]
+        rownames(drop1_df) <- NULL
         f_pander(drop1_df)
       } else {
         cat("*Type II deviance table could not be computed.*  \n\n")
@@ -1297,9 +1306,9 @@ main findings in the *Results* section, you **must** use the Emmeans table below
           "  \n\n",
           "*McFadden's Pseudo-R\u00b2 = 1 \u2212 (Residual deviance / Null deviance). ",
           "It measures how much the model improves over a null (intercept-only) model, ",
-          "on a 0\u20131 scale. Unlike R\u00b2 in linear regression, it is **not** a proportion of ",
-          "variance explained; values are typically lower \u2014 ",
-          "0.2\u20130.4 is already considered an excellent fit for GLMs.*  \n\n",
+          "on a 0 to 1 scale. Unlike R\u00b2 in linear regression, it is **not** a proportion of ",
+          "variance explained; values are typically lower: ",
+          "0.2 to 0.4 is already considered an excellent fit for GLMs.*  \n\n",
           "&nbsp;  \n\n"
         ))
 
@@ -1329,12 +1338,14 @@ main findings in the *Results* section, you **must** use the Emmeans table below
           lrt_df2[[p_col2]] <- ifelse(lrt_df2[[p_col2]] < 0.001, "< 0.001",
                                       as.character(round(as.numeric(lrt_df2[[p_col2]]), 4)))
         }
+
+        lrt_df2[] <- lapply(lrt_df2, function(x) ifelse(is.na(x), "", as.character(x)))
         f_pander(lrt_df2)
 
         # Warn about Type I (sequential) nature for multi-predictor models
         if (length(predictor_names) > 1) {
           cat(paste0(
-            "\n*\u26a0 This table uses **sequential (Type I) tests** \u2014 ",
+            "\n*[!] This table uses **sequential (Type I) tests**, ",
             "per-term p-values depend on the order predictors enter the model. ",
             "For per-term significance, use the **Type II Analysis of Deviance** ",
             "(`drop1`) table above, which tests each term after accounting for all others.*  \n\n"
@@ -1345,9 +1356,12 @@ main findings in the *Results* section, you **must** use the Emmeans table below
       }
 
       # Pagebreak
-      cat("
+      if(output_type != "rmd"){
+        # Pagebreak
+        cat("
 <div style=\"page-break-after: always;\"></div>
-\\newpage")
+\\newpage
+        ")}
       cat("\n
 \n## Model post hoc Analysis (Estimated Marginal Means) of: ", response_name, "\n   \n")
 
@@ -1358,13 +1372,13 @@ main findings in the *Results* section, you **must** use the Emmeans table below
       ns_main_out       <- output_list[[response_name]][["ns_main_effects"]]
       cat_preds_out     <- output_list[[response_name]][["cat_preds"]]
 
-      # Interaction / marginal-means note — mirrors f_aov's emm_is_cells logic
+      # Interaction / marginal-means note -- mirrors f_aov's emm_is_cells logic
       if (isTRUE(emm_is_cells_out) && length(sig_ints_out) > 0) {
         sig_int_preds <- unique(unlist(strsplit(sig_ints_out, ":")))
         cat(paste0(
           "\n**NOTE: Significant interaction(s) detected: ",
           paste(sig_ints_out, collapse = ", "), "**  \n",
-          "The post hoc table below shows **cell means** — the estimated value for ",
+          "The post hoc table below shows **cell means**, the estimated value for ",
           "every combination of ", paste(sig_int_preds, collapse = " \u00d7 "), ".  \n",
           "Letters compare all cells simultaneously. ",
           "Interpretation should focus on the full interaction pattern, ",
@@ -1374,7 +1388,7 @@ main findings in the *Results* section, you **must** use the Emmeans table below
         cat(paste0(
           "\n**NOTE:** The following term(s) were **not significant** (p \u2265 ", alpha, "): ",
           paste(ns_main_out, collapse = ", "), ".  \n",
-          "The table below shows **marginal means** — the model averages over ",
+          "The table below shows **marginal means**, the model averages over ",
           "non-significant factor(s), correcting for unbalanced designs. ",
           "Letter groups for non-significant terms are not meaningful but are ",
           "shown for completeness.  \n\n"
@@ -1439,8 +1453,8 @@ main findings in the *Results* section, you **must** use the Emmeans table below
       # 5. Print the Combined Dynamic Text
       cat(
         "The table below shows the ", est_label, " (`emmeans` package). These are ", scale_desc, " for ", response_name, ". Unlike raw averages, these values correct
-      for unbalanced designs and reflect the statistical model. Groups in the *\"Letters\"* column sharing the same letter are **not** statistically different (p > ", alpha, ").
-      Groups with *different* letters are significantly different.\n   \n  ")
+      for unbalanced designs and reflect the statistical model."
+      )
 
       cat(
         "\n#### Publication & Reporting Tips\n")
@@ -1609,7 +1623,7 @@ print.f_glm <- function(x, ...) {
 
     # Convergence warning
     if (!isTRUE(sublist$model$converged)) {
-      warning("Model did not converge — estimates unreliable.", call. = FALSE, immediate. = TRUE)
+      warning("Model did not converge, estimates unreliable.", call. = FALSE, immediate. = TRUE)
     }
 
     # Coefficients table
@@ -1631,9 +1645,10 @@ print.f_glm <- function(x, ...) {
     cat("McFadden's Pseudo-R\u00b2:", sublist$lrt_pct_explained, "\n")
 
     cat("\n--- Post hoc Comparisons of:", category, "---\n")
-    cat("_________________________________________\n")
     print(sublist$posthoc$post_hoc_summary_table)
-    cat("\n")
+    cat("___________________________\n")
+    cat(sublist$posthoc$cld_text)
+    cat("\n   \n")
   }
 
 }

@@ -4,10 +4,13 @@
 \alias{print.f_stat_wizard}
 \title{Print method for f_stat_wizard}
 \usage{
-\method{print}{f_stat_wizard}(x, ...)
+\method{print}{f_stat_wizard}(x, plots = TRUE, ...)
 }
 \arguments{
 \item{x}{An object of class \code{f_stat_wizard}.}
+
+\item{plots}{Logical. If \code{TRUE}, display diagnostic plots (histogram and
+QQ-plot) if they were generated with \code{plots=TRUE}. Default \code{TRUE}.}
 
 \item{...}{Additional arguments (ignored).}
 }

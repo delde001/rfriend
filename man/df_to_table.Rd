@@ -7,10 +7,15 @@
 df_to_table(df, label_col = NULL)
 }
 \arguments{
-\item{df}{A data frame where one column contains row labels and the rest are numeric.}
+\item{df}{A data frame. Either (a) one column contains row labels and the rest are
+numeric, (b) a fully numeric data frame with meaningful \code{rownames()} set, or
+(c) a fully numeric data frame with no row labels at all (in which case the data
+frame is coerced directly to a table without row labels).}
 
 \item{label_col}{Index or name of the column containing row labels. If NULL (default),
-the function auto-detects the first character/factor column.}
+the function auto-detects the first character/factor column. If no such column is
+found, the function falls back to using \code{rownames(df)} when these are
+meaningful, otherwise it coerces the data frame to a table as-is.}
 }
 \value{
 A contingency table.

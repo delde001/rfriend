@@ -14,7 +14,7 @@
 #'   one cell has \eqn{n = 1} (saturated model). By default (\code{FALSE}),
 #'   such responses are skipped with a warning because F-statistics and
 #'   p-values are undefined for saturated models. Set to \code{TRUE} only for
-#'   diagnostic purposes — results should \strong{not} be reported or
+#'   diagnostic purposes -- results should \strong{not} be reported or
 #'   interpreted as valid. Default is \code{FALSE}.
 #' @param alpha Numeric. Significance level for ANOVA, post hoc tests, and Shapiro-Wilk test. Default is \code{0.05}.
 #' @param adjust Character string specifying the method used to adjust p-values
@@ -22,7 +22,7 @@
 #'   \describe{
 #'     \item{"tukey"}{Tukey's Honest Significant Difference method, appropriate for
 #'                   all pairwise comparisons. Controls family-wise error rate.}
-#'     \item{"sidak"}{Šidák correction that controls the family-wise error rate.
+#'     \item{"sidak"}{Sidak correction that controls the family-wise error rate.
 #'                   Less conservative than Bonferroni.}
 #'     \item{"bonferroni"}{Conservative adjustment that multiplies p-values by
 #'                        the number of comparisons.}
@@ -32,7 +32,10 @@
 #'   } Default is \code{"sidak"}.
 #' @param intro_text Logical. If \code{TRUE}, includes a short explanation about ANOVA assumptions in the output file. Default is \code{TRUE}.
 #' @param close_generated_files Logical. Closes open Excel or Word (NOT pdf) files before writing, depending on the output format. Works on Windows (taskkill), macOS (pkill) and Linux (pkill/soffice). Default \code{FALSE}. \strong{WARNING:} Always save your work before using this option!!
-#' @param open_generated_files Logical. If \code{TRUE}, Opens the generated output files ('pdf', 'Word' or 'Excel') files depending on the output format. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.
+#' @param open_generated_files Logical. Whether to open the generated output
+#'   files after creation. Defaults to \code{TRUE} in an interactive R session
+#'   and \code{FALSE} otherwise (e.g. in scripts or automated pipelines).
+#'   Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.
 #' @param output_type Character string specifying the output format. Default is \code{"default"}.
 #'   \itemize{
 #'     \item \code{"default"}: Returns the object and lets R decide whether
@@ -56,6 +59,15 @@
 #'   the file is named "dataname_aov_output" in that directory. If an extension is provided the output format specified with option "output_type" will be overruled.
 #'   Defaults to \code{file.path(tempdir(), "dataname_summary.pdf")}.
 #' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.
+#' @param ... Additional arguments forwarded to \code{\link[stats]{aov}}.
+#'   The arguments \code{subset}, \code{na.action}, and \code{weights} are
+#'   handled specially: when supplied, they are applied via
+#'   \code{\link[stats]{model.frame}} so that the n=1 cell check,
+#'   Shapiro-Wilk test, Levene test, optional transformations, residual
+#'   diagnostics, and \code{emmeans} post hoc tests all see the exact
+#'   same row set as \code{aov()} itself. Any other \code{aov()}
+#'   arguments (e.g. \code{contrasts}, \code{projections},
+#'   \code{qr}, \code{contrasts.arg}) are passed through unchanged.
 
 #' @return An object of class 'f_aov' containing results from \code{aov()}, normality tests, transformations, and post hoc tests. Using the option "output_type", it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and plot methods for 'f_aov' objects.
 
@@ -74,12 +86,14 @@
 #'
 #' Outputs can be generated in multiple formats ("pdf", "word", "excel" and "rmd") as specified by \code{output_type}. The function also closes any open 'Word' files to avoid conflicts when generating 'Word' documents. If \code{output_type = "rmd"} is used it is adviced to use it in a chunk with \{r, echo=FALSE, results='asis'\}
 #'
+#' *Non-significant ANOVA results*: When the overall F-test is not significant, f_aov still reports the estimated marginal means table, but with all pairwise comparison letters replaced by *"ns"*. The numeric estimates (and their confidence intervals) are provided because they are often needed for manuscript tables, especially when the response was back-transformed from a Box-Cox or bestNormalize scale - the raw descriptive means and the emmeans values can differ, and it is the emmeans values that correspond to the actual model. The *"ns"* labels signal that pairwise differences should not be interpreted.
+#'
 #' This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
 #'\itemize{
 #' \item \bold{Windows:} Install Pandoc and ensure the installation folder.
 #' \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
-#' \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary’s location is in your PATH.
-#' \item \bold{Linux:} Install Pandoc through your distribution’s package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.
+#' \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.
+#' \item \bold{Linux:} Install Pandoc through your distribution's package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.
 #'
 #' \item If Pandoc is not found, this function may not work as intended.
 #' }
@@ -135,9 +149,7 @@
 #'                    # Save output in MS Word file (Default is console)
 #'                    output_type = "word",
 #'                    # Do bestNormalize transformation for non-normal residual (Default is boxcox)
-#'                    transformation = "bestnormalize",
-#'                    # Do not automatically open the file.
-#'                    open_generated_files = FALSE
+#'                    transformation = "bestnormalize"
 #'                    )
 #'
 #' # Print output to the console.
@@ -167,7 +179,7 @@ f_aov <- function(formula,
                   # force transformation for response var regardless of normality.
                   force_aov = FALSE,
                   # If TRUE, runs ANOVA even when min cell size = 1 (saturated model).
-                  # Results are unreliable — use only for diagnostics, not for reporting.
+                  # Results are unreliable -- use only for diagnostics, not for reporting.
                   alpha = 0.05,
                   # Significance level for both aov, posthoc and Shapiro-Wilk Test
                   adjust = "sidak",
@@ -176,47 +188,51 @@ f_aov <- function(formula,
                   # Print short explanation about aov assumptions in output file
                   close_generated_files = FALSE,
                   # Closes either open excel or word files depending on the output format.
-                  open_generated_files = TRUE,
+                  open_generated_files = interactive(),
                   # Open files after creation
                   output_type = "default",
                   # Output type can be excel, word, pdf, rmd, console, default
                   save_as = NULL,
                   # Specify the name of the output dir and file (name and type).
-                  save_in_wdir = FALSE          # Save file output in the working directory.
-
+                  save_in_wdir = FALSE,         # Save file output in the working directory.
+                  ...
+                  # Additional arguments forwarded to aov(). Currently
+                  # honored: subset, na.action, weights. If supplied, they
+                  # are applied via stats::model.frame() so that ALL
+                  # downstream steps (n=1 cell check, Shapiro, Levene,
+                  # transformations, residual plots, emmeans post hoc)
+                  # see the exact same row set as aov() itself.
 )
 {
 
+
+
   ########## Reset initial settings on exit #################################
-  # Save initial settings at the start
-  old_par <- par(no.readonly = TRUE)  # Save graphical parameters
-  old_par$new <- NULL                 # Remove this parameter to prevent warning
-  original_options <- options()       # Save global options
+  .session_state <- save_session_state()  # Helper function: helper_session_state
+  on.exit(restore_session_state(.session_state), add = TRUE) # Helper function: helper_session_state
 
-  # Conditionally save panderOptions if the package is loaded
-  original_panderOptions <- if (requireNamespace("pander", quietly = TRUE) && is.function(pander::panderOptions)) {
-    pander::panderOptions()
-  } else {
-    NULL
-  }
 
-  # Single exit handler to restore settings
-  on.exit({
+  ########## Capture ... UNEVALUATED at f_aov's own frame ##################
+  # Must be done HERE (in f_aov's body), not inside generate_report(),
+  # because match.call() captures the call to whatever function it is
+  # called from. Inside generate_report() it would capture
+  # generate_report()'s (empty) call and dots_exprs would always be
+  # NULL -- silently dropping subset / weights / na.action. The closure
+  # makes dots_exprs visible inside generate_report().
+  .mc         <- match.call(expand.dots = FALSE)
+  # Coerce the `...` pairlist returned by match.call(expand.dots = FALSE)
+  # to a real named list. Without as.list(), dots_exprs$subset partial-
+  # matches into the raw pairlist and returns a `..1` dots-index symbol
+  # instead of the actual expression, which then crashes model.frame()
+  # with "the ... list contains fewer than 3 elements" the moment a
+  # user actually passes subset / weights / na.action through dots.
+  dots_exprs  <- as.list(.mc[["..."]])
 
-    # Restore saved parameters for par
-    par(old_par)
-
-    # Restore global options
-    options(original_options)
-
-    # Restore panderOptions if they were saved
-    if (!is.null(original_panderOptions)) {
-      for (opt in names(original_panderOptions)) {
-        try(pander::panderOptions(opt, original_panderOptions[[opt]]), silent = TRUE)
-      }
-    }
-  }, add = TRUE)
-
+  # Capture the user's calling environment so that subset / weights /
+  # na.action expressions passed via `...` can be resolved against it
+  # (after `data` columns) from inside the generate_report() closure,
+  # where parent.frame() would otherwise point at f_aov itself.
+  caller_env  <- parent.frame()
 
 
   ####### Save dataframe name and Handle input from vectors (dataframe column) #####
@@ -367,7 +383,7 @@ f_aov <- function(formula,
 
 
 
-  # Convert the input to a character string and force lowercase for case‐insensitive matching
+  # Convert the input to a character string and force lowercase for case-insensitive matching
   if(is.character(transformation)){
     trans_input <- tolower(as.character(transformation))
 
@@ -392,6 +408,8 @@ f_aov <- function(formula,
     }
   }
 
+  # Warn if LHS has expressions like log(y) before silently stripping them
+  check_lhs_is_names(formula) #use helper_check_lhs.R
 
   # Extract response variables from the left-hand side of the formula
   lhs <- all.vars(formula[[2]])  # Get LHS variables (response)
@@ -484,7 +502,7 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
       bonf_alpha <- round(alpha / k, 4)
       cat(paste0(
         "\n\n***\n\n",
-        "\u26a0**NOTE \u2014 Multiple Testing Across ", k, " Response Variables**  \n\n",
+        "**[!] NOTE: Multiple Testing Across ", k, " Response Variables**  \n\n",
         "This report runs ", k, " independent ANOVAs on the same dataset. ",
         "The **", adjust,"** correction keeps each individual test honest, it guards against ",
         "false positives among the pairwise group comparisons, but it offers no protection ",
@@ -507,6 +525,73 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
       ))
     }
 
+    # Build the analysis data set ONCE, before the response loop.
+    # Use ALL responses + ALL predictors so every response is analysed
+    # on the identical row set. Rows with NA in ANY response or
+    # predictor are dropped (subject to na.action). Any subset /
+    # na.action / weights passed via `...` is applied here.
+    #
+    # Strategy: pre-evaluate subset/weights eagerly against data first,
+    # falling back to the user's calling environment. Then apply the
+    # filter manually and pass plain values to stats::model.frame via
+    # do.call. This avoids the fragile match.call/substitute dance
+    # where spliced expressions inside a constructed call can end up
+    # containing `..N` dots-index symbols that crash model.frame with
+    # "the ... list contains fewer than 3 elements".
+    combined_formula <- as.formula(
+      paste("~", paste(c(lhs, predictor_names), collapse = " + "))
+    )
+
+    # Resolve subset expression against data columns + caller env
+    subset_vec <- NULL
+    if (!is.null(dots_exprs$subset)) {
+      subset_vec <- eval(dots_exprs$subset, envir = data, enclos = caller_env)
+      if (is.logical(subset_vec)) subset_vec[is.na(subset_vec)] <- FALSE
+    }
+
+    # Resolve weights against FULL data before subsetting
+    weights_vec <- NULL
+    if (!is.null(dots_exprs$weights)) {
+      weights_vec <- eval(dots_exprs$weights, envir = data, enclos = caller_env)
+    }
+
+    # Apply the manual subset filter to data (and weights, if its
+    # length matches the pre-subset row count)
+    if (!is.null(subset_vec)) {
+      if (!is.null(weights_vec) && length(weights_vec) == nrow(data)) {
+        weights_vec <- weights_vec[subset_vec]
+      }
+      data <- data[subset_vec, , drop = FALSE]
+    }
+
+    # Resolve na.action (a function, defaults to na.omit)
+    na_action_fn <- stats::na.omit
+    if (!is.null(dots_exprs$na.action)) {
+      na_action_fn <- eval(dots_exprs$na.action, envir = caller_env)
+    }
+
+    # Build the model.frame call with plain values
+    mf_args <- list(
+      formula            = combined_formula,
+      data               = data,
+      drop.unused.levels = TRUE,
+      na.action          = na_action_fn
+    )
+    if (!is.null(weights_vec)) mf_args$weights <- weights_vec
+
+    data_master     <- do.call(stats::model.frame, mf_args)
+    n_before_master <- nrow(data)
+    n_after_master  <- nrow(data_master)
+
+    # Remaining ... args (e.g. contrasts, projections, qr) are
+    # eager-evaluated in the caller's environment because they do not
+    # reference data columns.
+    extra_names <- setdiff(names(dots_exprs),
+                           c("subset", "weights", "na.action"))
+    aov_extra   <- lapply(dots_exprs[extra_names], eval,
+                          envir = caller_env)
+    # ---------------------------------------------------------------
+
     # Loop for several response parameters
     for (response_name in lhs) {
 
@@ -521,33 +606,59 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
       # Create a new formula for each response, preserving interactions
       current_formula <- as.formula(paste0(response_name, "~", rhs))
 
-      # Document the data loss
-      n_before <- NULL
-      n_after  <- NULL
+      # Document the data loss (same for every response now -- both come
+      # from the master filter applied before the loop).
+      n_before <- n_before_master
+      n_after  <- n_after_master
 
-      n_before <- nrow(data)
-      complete_idx  <- complete.cases(data[c(response_name, predictor_names)])
-      data_complete <- data[complete_idx, ]
-      n_after <- sum(complete_idx)
+      # Fresh per-iteration copy of the master filtered frame. Required
+      # because the transformation step (Box-Cox / bestNormalize) mutates
+      # data_complete[[response_name]] in place; without a copy, that
+      # mutation would persist into subsequent responses.
+      data_complete <- data_master
+
+      # Extract weights vector (NULL if none supplied) for the aov() calls.
+      # model.frame stores them in a "(weights)" column; model.weights() pulls
+      # them out as a plain numeric vector aligned with data_complete rows.
+      mf_weights <- stats::model.weights(data_complete)
+
+      n_after <- nrow(data_complete)
 
       # Snapshot the original (untransformed) response before data_complete is
       # modified in-place by the transformation step. Used for raw-data overlay
       # in plot.f_aov so points are always on the original scale.
       original_response <- data_complete[[response_name]]
 
-      # ── n=1 cell check: must happen BEFORE aov() ──────────────────────
-      # In a factorial design, a cell with n=1 saturates the model —
+      # n=1 cell check: must happen BEFORE aov()
+      # In a factorial design, a cell with n=1 saturates the model,
       # residual df = 0, F-statistics are undefined, p-values meaningless.
       # Skip this response entirely and continue with the others.
-      cell_counts <- table(interaction(data_complete[predictor_names], drop = TRUE))
-      min_cell_n  <- min(cell_counts)
+      #
+      # Only categorical predictors (factor / character / logical)
+      # define cells. In ANCOVA mode, numeric covariates have as many
+      # "levels" as observations, which would falsely trigger the n=1
+      # skip. Continuous predictors are therefore excluded from the
+      # cell-size count.
+      cat_predictors <- predictor_names[vapply(
+        data_complete[predictor_names],
+        function(v) is.factor(v) || is.character(v) || is.logical(v),
+        logical(1)
+      )]
+      if (length(cat_predictors) == 0L) {
+        # Pure regression (no categorical predictors): no factorial
+        # design, no cell-size issue possible.
+        min_cell_n <- nrow(data_complete)
+      } else {
+        cell_counts <- table(interaction(data_complete[cat_predictors], drop = TRUE))
+        min_cell_n  <- min(cell_counts)
+      }
 
       if (min_cell_n == 1) {
         if (!isTRUE(force_aov)) {
           # Default: skip this response entirely, continue with others
           cat(paste0(
             "   \n  \n# Analysis of: ", response_name, "  \n\n",
-            "**WARNING \u2014 `", response_name, "` skipped.**  \n\n",
+            "**WARNING: `", response_name, "` skipped.**  \n\n",
             "At least one cell in the factorial design has $n = 1$. ",
             "This saturates the ANOVA model (residual degrees of freedom = 0), ",
             "making F-statistics and p-values undefined and uninterpretable.  \n\n",
@@ -561,10 +672,13 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
             "re-run with `force_aov = TRUE`. ",
             "Results will be unreliable and should **not** be reported.  \n   \n"
           ))
+
+          skipped_reason <- paste0("ANOVA undefined, n=1 in at least one cell; model ",
+                                  "saturated.\n  Only re-run with ",
+                                  "`force_aov = TRUE` for diagnostic purposes."
+                                  )
           output_list[[response_name]][["skipped"]]        <- TRUE
-          output_list[[response_name]][["skipped_reason"]] <-
-            "n=1 in at least one cell \u2014 model saturated, ANOVA undefined.
-          \n  Only re-run with `force_aov = TRUE` for diagnostic purposes."
+          output_list[[response_name]][["skipped_reason"]] <- skipped_reason
           output_list[[response_name]][["min_cell_n"]]     <- min_cell_n
           i <- i + 1
           next
@@ -573,7 +687,7 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
           # force_aov = TRUE: warn loudly and proceed
           cat(paste0(
             "   \n  \n# Analysis of: ", response_name, "  \n\n",
-            "**[!] WARNING \u2014 Saturated model: results are for diagnostic use only.**  \n\n",
+            "**[!] WARNING  Saturated model: results are for diagnostic use only.**  \n\n",
             "At least one cell has $n = 1$ (`force_aov = TRUE` overrides the skip). ",
             "The ANOVA model has zero residual degrees of freedom. ",
             "F-statistics and p-values below are **undefined and must not be reported**.  \n\n",
@@ -583,14 +697,22 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
           output_list[[response_name]][["min_cell_n"]]     <- min_cell_n
         }
       }
-      # ──────────────────────────────────────────────────────────────────
+      # ------------------------------------------------------------------
 
       cat("   \n  \n# Analysis of: ", response_name, "  \n")
       cat("  \n## Normality and homoscedasticity of residuals of: ", response_name, "  \n")
 
 
-      # Perform ANOVA
-      aov_test <- aov(current_formula, data = data_complete)
+      # Perform ANOVA. Forward any extra args from `...` to aov().
+      # subset / na.action / weights have already been baked into
+      # data_complete via model.frame(); aov_extra was assembled once at
+      # the master level above and contains only safe pass-through args
+      # such as `contrasts`. weights is re-supplied from mf_weights.
+      aov_test <- do.call(
+        stats::aov,
+        c(list(formula = current_formula, data = data_complete,
+               weights = mf_weights), aov_extra)
+      )
       output_list[[response_name]][["aov_test"]] <- aov_test
       res_aov <- residuals(aov_test)
       aov_summary <- summary(aov_test)
@@ -620,7 +742,7 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
                "(result is uninformative).  \n  \n&nbsp;  \n")
       } else if (min_cell_n == 1 && !is.na(levene_res$p)) {
         paste0("**Note:** At least one group cell contains only $n = 1$ observation. ",
-               "Levene's Test produced a result, but interpret it with caution — ",
+               "Levene's Test produced a result, but interpret it with caution; ",
                "variance estimates from single observations are unreliable.  \n  \n&nbsp;  \n")
       } else if (min_cell_n <= 3) {
         paste0("**Note:** The smallest group cell contains only $n = ", min_cell_n,
@@ -646,7 +768,7 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
         levene_res_intp_text <- paste0(
           "According to 'Levene's Test' (",
           round(levene_res$p, digits = 4),
-          "≤",
+          "\u2264",
           alpha,
           ") residuals do **NOT** have equal variance (Heteroskedasticity).  \n"
         )
@@ -661,19 +783,17 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
       if (!is.null(levene_size_warning)) cat(levene_size_warning)
 
       # Shapiro-Wilk Test for normality of the aov residuals
-      # shapiro.test() errors above n = 5000; fall back to AD-only when that occurs
-      if (length(res_aov) > 5000) {
-        warning(paste0(
-          "n = ", length(res_aov), " exceeds the Shapiro-Wilk limit (5000). ",
-          "Normality decision is based on the Anderson-Darling test only."
-        ))
-        shapiro_res <- list(statistic = NA_real_, p.value = 1, method = "Shapiro-Wilk (skipped: n > 5000)")
-        class(shapiro_res) <- "htest"
-      } else {
-        shapiro_res <- shapiro.test(res_aov)
-      }
+      # shapiro.test() errors above n = 5000; fall back to AD-only when that occurs.
+      # safe_shapiro helper
+      shapiro_res <- safe_shapiro(res_aov)
 
-      if (shapiro_res$p.value > alpha) {
+
+      if (is.na(shapiro_res$p.value)) {
+        shapiro_res_intp_text <- paste0(
+          "Shapiro-Wilk was skipped (", shapiro_res$method,
+          "). Normality decision is based on the Anderson-Darling test below.  \n  \n&nbsp;  \n"
+        )
+      } else if (shapiro_res$p.value > alpha) {
         shapiro_res_intp_text <- paste0(
           "According to 'Shapiro-Wilk Test' (",
           round(shapiro_res$p.value, digits = 4),
@@ -681,12 +801,11 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
           alpha,
           ") residuals **ARE normally distributed**.  \n  \n&nbsp;  \n"
         )
-      }
-      if (shapiro_res$p.value <= alpha) {
+      } else if (shapiro_res$p.value <= alpha) {
         shapiro_res_intp_text <- paste0(
           "According to 'Shapiro-Wilk Test' (",
           round(shapiro_res$p.value, digits = 4),
-          "≤",
+          "\u2264",
           alpha,
           ") residuals are **NOT** normally distributed.  \n  \n&nbsp;  \n"
         )
@@ -784,16 +903,34 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
         ")
       }
 
-      # Decide why transformation is triggered (for clearer messaging below)
-      trigger_normality <- shapiro_res$p.value < alpha
+      # Decide whether residuals fail the normality check.
+      # Shapiro-Wilk is the primary test because it is the most powerful for
+      # n <= 5000. For n > 5000 it is skipped (safe_shapiro returns NA), and
+      # we fall back to Anderson-Darling, which has no upper sample-size
+      # limit and is also reasonably powerful. If both are unavailable
+      # (extreme edge case: n < 3 and n < 8), we leave trigger_normality
+      # FALSE and defer the decision to the user inspecting the qq-plot.
+      if (!is.na(shapiro_res$p.value)) {
+        trigger_normality <- shapiro_res$p.value < alpha
+      } else if (!is.na(adt_res$p.value)) {
+        trigger_normality <- adt_res$p.value < alpha
+      } else {
+        trigger_normality <- FALSE
+      }
       trigger_levene    <- is_levene_sig
       trigger_forced    <- response_name %in% force_transformation
 
       # If not normal or force_transformation directs to: apply transformation
       if (trigger_normality || trigger_levene || trigger_forced) {
         if (transformation == FALSE) {
-          if (trigger_normality){
-            cat("   \n  \n**WARNING !!!**   \nBased on the Shapiro-Wilk Test on the aov residuals the response variable is **NOT** normal.   \n  \nPlease enable the transformation function (transformation == TRUE) in the f_aov function.   \n  \n")
+          if (trigger_normality) {
+            test_label <- if (!is.na(shapiro_res$p.value)) "Shapiro-Wilk" else "Anderson-Darling"
+            cat(paste0(
+              "   \n  \n**WARNING !!!**   \nBased on the ", test_label,
+              " test the residuals are **NOT** normally distributed.   \n  \n",
+              "Please enable the transformation function (transformation = TRUE) ",
+              "in the f_aov function.   \n  \n"
+            ))
           }
           if (trigger_levene){
             cat("   \n  \n**WARNING !!!**   \nBased on the Levene's Test the residuals do **NOT** have equal variance (Heteroskedasticity).   \n  \nPlease enable the transformation function function (transformation  == TRUE) in the f_aov function.   \n  \n")
@@ -805,7 +942,7 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
         # because Box-Cox targets non-normality; a variance-stabilising transformation
         # (e.g. log/sqrt) may be more appropriate for pure heteroscedasticity.
         if (!trigger_normality && !trigger_forced && trigger_levene && transformation != FALSE) {
-          cat("   \n  \n**NOTE**   \nHeteroscedasticity was detected (Levene's Test), but residuals are normally distributed (Shapiro-Wilk).   \nBox-Cox is applied since it can also stabilise variance — check the transformed Levene result below.   \nIf heteroscedasticity persists after transformation, resort to other statistical tests.   \n  \n")
+          cat("   \n  \n**NOTE**   \nHeteroscedasticity was detected (Levene's Test), but residuals are normally distributed (Shapiro-Wilk). Welch's ANOVA (`oneway.test(..., var.equal = FALSE)`) is recommended. \nNevertheless, Box-Cox is applied since it can also stabilise variance; check the transformed Levene result below.   \nIf heteroscedasticity persists after transformation, resort to other statistical tests.   \n  \n")
         }
 
         if (transformation == "boxcox" || (transformation == TRUE)) {
@@ -816,6 +953,7 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
                                                      alpha = alpha
           )
           )
+          cat("Note: the Shapiro-Wilk test below is performed on the response data, not the residuals.")
           cat(transformed_var$rmd)
 
           output_list[[response_name]][["boxcox"]] <-  transformed_var$transformed_data
@@ -839,18 +977,23 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
           data_complete[[response_name]] <- transformed_var$transformed_data  # Update the response variable in the data
 
           # Print the ouput of f_bestNormalize
+          cat("Note: the Shapiro-Wilk test below is performed on the response data, not the residuals.")
           cat(transformed_var$rmd)
           cat("    \n    \n")
         }
 
         if (transformation != FALSE) {
           # Perform ANOVA on transformed data
-          aov_test_transformed <- aov(current_formula, data = data_complete)
+          aov_test_transformed <- do.call(
+            stats::aov,
+            c(list(formula = current_formula, data = data_complete,
+                   weights = mf_weights), aov_extra)
+          )
           transformed_aov_res  <- residuals(aov_test_transformed)
           aov_summary_transformed <- summary(aov_test_transformed)
 
           # Perform Shapiro-Wilk test on transformed aov residuals
-          shapiro_res_transformed <- shapiro.test(transformed_aov_res)
+          shapiro_res_transformed <- safe_shapiro(transformed_aov_res)
 
           # Perform Anderson-Darling normality test on transformed aov residuals
           # ad.test() requires n >= 8; skip gracefully for very small samples
@@ -884,14 +1027,14 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
                                           round(levene_res_transformed$p, digits = 4),
                                           " > ",
                                           alpha,
-                                          ") transformed residuals **have equal variance** (homoscedasticity).  \n"
+                                          ") transformed residuals **have equal variance** (homoscedasticity)."
             )
           } else if (is_levene_trans_sig) {
             levene_res_intp_text <- paste("According to 'Levene's Test' (",
                                           round(levene_res_transformed$p, digits = 4),
-                                          "≤",
+                                          "\u2264",
                                           alpha,
-                                          ") transformed residuals do **NOT** have equal variance (Heteroskedasticity).  \n"
+                                          ") transformed residuals do **NOT** have equal variance (Heteroskedasticity)."
             )
           }
           # levene_output_transformed
@@ -906,7 +1049,12 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
 
 
           # Generate text for interpretation of shapiro output shapiro_res_intp_text
-          if (shapiro_res_transformed$p.value > alpha) {
+          if (is.na(shapiro_res_transformed$p.value)) {
+            shapiro_res_intp_text <- paste0(
+              "Shapiro-Wilk was skipped (", shapiro_res_transformed$method,
+              "). Normality decision is based on the Anderson-Darling test below.  \n  \n&nbsp;  \n"
+            )
+          } else if (shapiro_res_transformed$p.value > alpha) {
             shapiro_res_intp_text <- paste(
               "According to the 'Shapiro-Wilk' test (",
               round(shapiro_res_transformed$p.value, digits = 4),
@@ -914,17 +1062,17 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
               alpha,
               ") transformed residuals **ARE normally distributed**.  \n  \n&nbsp;  \n"
             )
-          }
-
-          if (shapiro_res_transformed$p.value <= alpha) {
+          } else if (shapiro_res_transformed$p.value <= alpha) {
             shapiro_res_intp_text <- paste(
               "According to the 'Shapiro-Wilk' test (",
               round(shapiro_res_transformed$p.value, digits = 4),
-              "≤",
+              "\u2264",
               alpha,
               ") transformed residuals are **NOT** normally distributed.  \n  \n&nbsp;  \n"
             )
           }
+
+
           # shapiro_output_transformed
           cat(
             "**Shapiro-Wilk Test** for Normality of transformed residuals: W =",
@@ -1093,48 +1241,66 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
       # from the model formula). This guarantees the reference grid
       # matches the fitted model regardless of significance.
       #
-      # emm_is_cells  : TRUE  → significant interaction present;
+      # emm_is_cells  : TRUE  -> significant interaction present;
       #                         emmeans returns cell means (all combinations).
-      #                 FALSE → no significant interaction;
+      #                 FALSE -> no significant interaction;
       #                         emmeans returns marginal means.
       # emm_type_label: used only in headings and description text.
       # ----------------------------------------------------------------
+      # Initialize a deferred-display note for the post-hoc table.
+      # Both branches below set this; it is cat()-ed later, directly
+      # above the post-hoc header, so the NOTE sits next to the table
+      # it describes rather than being visually attached to the
+      # Observed Descriptives Table that comes earlier in the report.
+      post_hoc_intro_note <- ""
+
       if (length(sig_interactions) > 0) {
         emm_is_cells   <- TRUE
         emm_type_label <- "Cell Means"
 
         sig_int_preds  <- unique(unlist(strsplit(sig_interactions, ":")))
 
-        cat(paste0(
+        post_hoc_intro_note <- paste0(
           "\n   \n**NOTE: Significant interaction(s) detected: ",
           paste(sig_interactions, collapse = ", "), "**  \n",
-          "The post hoc table below shows **cell means** — the estimated mean for ",
+          "The post hoc table below shows **cell means**, i.e. the estimated mean for ",
           "every combination of ", paste(sig_int_preds, collapse = " \u00d7 "), ".  \n",
           "Letters compare all cells simultaneously. ",
           "Interpretation should focus on the full interaction pattern, ",
           "not on individual factor effects in isolation.  \n\n"
-        ))
+        )
 
       } else {
         emm_is_cells   <- FALSE
         emm_type_label <- "Marginal Means"
 
-        # Report non-significant main effects so the reader knows they were tested.
-        # They are still included in the emmeans call (correct: the model controls
-        # for them), but the reader is informed they were not significant.
+        # Report non-significant main effects so the reader knows they
+        # were tested. They are still included in the emmeans call
+        # (correct: the model controls for them), but the reader is
+        # informed they were not significant.
+        #
+        # The NOTE is *stored* here rather than printed immediately,
+        # because it describes letter groups in the emmeans post-hoc
+        # table -- which appears much later in the report, after the
+        # Observed Descriptives Table. Printing it here would place
+        # the warning directly above the descriptive table and create
+        # the false impression that the letters being warned about
+        # are in the descriptive table. See the cat(post_hoc_intro_note)
+        # call below, just before the post-hoc header.
         if (length(ns_main_effects) > 0) {
-          cat(paste0(
+          post_hoc_intro_note <- paste0(
             "\n   \n**NOTE:** The following term(s) were **not significant** ",
             "(p \u2265 ", alpha, "): ",
             paste(ns_main_effects, collapse = ", "), ".  \n",
-            "Their marginal means are shown in the table below for completeness ",
-            "(the model controls for them), but their letter groups are not ",
-            "meaningful given the non-significant ANOVA result.  \n\n"
-          ))
+            "Their marginal means are shown in the emmeans table below for ",
+            "completeness (the model controls for them), but their letter ",
+            "groups are not meaningful given the non-significant ANOVA ",
+            "result.  \n\n"
+          )
         }
       }
 
-      # Estimated Marginal Means — always uses all predictor_names so that
+      # Estimated Marginal Means -- always uses all predictor_names so that
       # the specs exactly match the model's reference grid.
       emm <- emmeans::emmeans(aov_test_out,
                               specs = predictor_names,
@@ -1252,6 +1418,8 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
         names(post_hoc_summary_table)[names(post_hoc_summary_table) == "emmean"] <- "emmean.."
       }
 
+
+
       # Store output in output_list (after rename and SE removal so print.f_aov
       # receives the same clean table as the document output)
       output_list[[response_name]][["post_hoc_summary_table"]] <- post_hoc_summary_table
@@ -1270,14 +1438,21 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
         }
 
         # Add your new note
-        raw_msg <- c(raw_msg, "\n**Note:** Groups sharing the same letter are not significantly different. This indicates insufficient evidence to claim a difference, but it does not prove the groups are identical.")
+        raw_msg <- c(raw_msg, paste0(
+          "\n**Note:** Groups in the \"Letters\" column sharing the same letter are ",
+          "**not** significantly different (\u03B1 = ", alpha, "). Groups with ",
+          "different letters are significantly different. Sharing a letter ",
+          "indicates insufficient evidence to claim a difference; it does not ",
+          "prove the groups are identical.
+        \n")
+        )
 
         # Collapse
         cld_text <- paste(raw_msg, collapse = "  \n")
 
         # Substitute 'alpha' with '$\alpha$'
         # We use "\\alpha" because in R strings, you need \\ to produce a single \
-        cld_text <- gsub("alpha", "$\\\\alpha$", cld_text)
+        cld_text <- gsub("alpha", "\u03B1", cld_text)
 
         # Extract min and max once to keep code clean and efficient
         min_df <- min(summary_table$df, na.rm = TRUE)
@@ -1308,10 +1483,26 @@ main findings in the *Results* section, you **must** use the Emmeans table below
       # Show WARNING when assumptions of aov() are violated
       if (Response_Transformed == TRUE) {
 
-        # Build diagnosis of what is still wrong after transformation
+        # Build diagnosis of what is still wrong after transformation.
+        # For the normality check, prefer Shapiro-Wilk where available and
+        # fall back to Anderson-Darling when Shapiro was skipped (n > 5000),
+        # so the diagnosis does not silently pass for very large samples.
+        normality_still_bad <- if (!is.na(shapiro_res_transformed$p.value)) {
+          shapiro_res_transformed$p.value <= alpha
+        } else if (!is.na(adt_res_transformed$p.value)) {
+          adt_res_transformed$p.value <= alpha
+        } else {
+          FALSE
+        }
+
         still_wrong <- c(
-          if (is_levene_trans_sig)                      "heteroscedasticity (Levene's p < \u03b1)" else NULL,
-          if (shapiro_res_transformed$p.value <= alpha) "non-normality (Shapiro-Wilk p \u2264 \u03b1)" else NULL
+          if (is_levene_trans_sig) "heteroscedasticity (Levene's p < \u03b1)" else NULL,
+          if (isTRUE(normality_still_bad)) {
+            if (!is.na(shapiro_res_transformed$p.value))
+              "non-normality (Shapiro-Wilk p \u2264 \u03b1)"
+            else
+              "non-normality (Anderson-Darling p \u2264 \u03b1)"
+          } else NULL
         )
 
         if (length(still_wrong) > 0) {
@@ -1319,7 +1510,7 @@ main findings in the *Results* section, you **must** use the Emmeans table below
 
           cat(paste0(
             "\n\n***\n\n",
-            "**WARNING: Transformation did not resolve ", still_wrong_str, "**  \n\n",
+            "**WARNING: \nTransformation did not resolve ", still_wrong_str, "**  \n\n",
             "A ", if(transformation == TRUE) "boxcox", " transformation was applied but **",
             still_wrong_str, "** persists in the transformed residuals for `",
             response_name, "`.  \n",
@@ -1327,14 +1518,14 @@ main findings in the *Results* section, you **must** use the Emmeans table below
             "Type I error rate, meaning significant results may be false positives and ",
             "F-statistics are biased. Consider one of these **alternative tests** before ",
             "drawing conclusions:  \n",
-            "\n-  **Kruskal-Wallis test** — non-parametric, no normality or equal-variance ",
+            "\n-  **Kruskal-Wallis test:** non-parametric, no normality or equal-variance ",
             "assumption. Tests stochastic dominance between groups. Follow up with Dunn's test ",
             "(`rfriend::f_kruskal_test()`).",
-            "\n-  **Generalised Linear Model (GLM)** — if the data follow a specific non-normal ",
+            "\n-  **Generalised Linear Model (GLM):** if the data follow a specific non-normal ",
             "distribution (e.g. counts \u2192 Poisson, positive skewed \u2192 Gamma) modelling ",
             "the correct error distribution via `rfriend::f_glm()` is more principled than ",
             "transforming.",
-            "\n-  **Aligned Rank Transform (ART) ANOVA** — extends rank-based testing to ",
+            "\n-  **Aligned Rank Transform (ART) ANOVA:** extends rank-based testing to ",
             "factorial designs including interactions. Available via `ARTool::art()`. ",
             "Recommended for multi-factor designs. \n",
             "\n***\n\n"
@@ -1343,6 +1534,7 @@ main findings in the *Results* section, you **must** use the Emmeans table below
           # Store flag for print.f_aov
           output_list[[response_name]][["last_resort_triggered"]] <- TRUE
           output_list[[response_name]][["last_resort_reason"]]    <- still_wrong_str
+          output_list[[response_name]][["cld_text"]]              <- cld_text
         }
 
       } else {
@@ -1356,7 +1548,7 @@ main findings in the *Results* section, you **must** use the Emmeans table below
             "(`transformation = TRUE`) or resort to other statistical tests.*"
           ))
         }
-        if (shapiro_res$p.value <= alpha) {
+        if (isTRUE(shapiro_res$p.value <= alpha)) {
           cat(paste0(
             "\n   \n**WARNING**  \n",
             "*Shapiro-Wilk Test (", round(shapiro_res$p.value, digits = 4),
@@ -1399,7 +1591,7 @@ main findings in the *Results* section, you **must** use the Emmeans table below
       if (isTRUE(output_list[[response_name]][["force_aov_used"]])) {
         cat(paste0(
           "\n\n***\n\n",
-          "**[!] Diagnostic output only \u2014 do not report these results.**  \n",
+          "**[!] Diagnostic output only, do not report these results.**  \n",
           "The model above is saturated (at least one cell has $n = 1$). ",
           "F-statistics and p-values are undefined.  \n",
           "\n\n***\n\n"
@@ -1408,6 +1600,13 @@ main findings in the *Results* section, you **must** use the Emmeans table below
 
 
       if (!is.null(post_hoc_summary_table)) {
+        # Emit the deferred post-hoc intro note right here, so it
+        # sits directly above the post-hoc table it describes rather
+        # than being visually attached to the Observed Descriptives
+        # Table that comes earlier in the report. An empty string is
+        # a no-op for cat(), so we do not need a length check.
+        cat(post_hoc_intro_note)
+
         cat(paste0("  \n## Post Hoc Test on Estimated ", emm_type_label, " of ",
                    response_name, "  \n"))
 
@@ -1466,7 +1665,7 @@ main findings in the *Results* section, you **must** use the Emmeans table below
 \n**Note on back-transformation:** The column **'median (BT)'** contains back-transformed
 estimated marginal means. Back-transforming a mean from a transformed scale returns the
 **median** of the original-scale distribution, not the arithmetic mean. This follows from
-the property that medians — unlike means — are equivariant under monotone transformations
+the property that medians, unlike means, are equivariant under monotone transformations
 ($g(\\text{median}(X)) = \\text{median}(g(X))$, but $g(\\bar{X}) \\neq \\overline{g(X)}$ in general).
 For reporting purposes, describe these values as **back-transformed medians** (or geometric
 means in the specific case of a log transformation), not as means.
@@ -1480,7 +1679,7 @@ quantify uncertainty.
         }
       }
 
-      # ── Estimated means / interaction plot in document output ──────────
+      # -- Estimated means / interaction plot in document output ----------
       if (isTRUE(interaction_plots)) {
         bt_fn   <- output_list[[response_name]][["back_transform_fn"]]
         if (is.null(bt_fn)) bt_fn <- identity
@@ -1561,7 +1760,7 @@ quantify uncertainty.
                  pch = 19, title = trace_var, bty = "n", cex = 0.85)
 
           int_note_doc <- if (isTRUE(emm_is_cells))
-            paste0("Significant interaction \u2014 the lines representing ",
+            paste0("Significant interaction, the lines representing ",
                    trace_var, " factor levels are not parallel.")
           else
             paste0("No significant interaction. The lines representing ",
@@ -1640,7 +1839,7 @@ quantify uncertainty.
           }
         }
       }
-      # ────────────────────────────────────────────────────────────────────
+      # --------------------------------------------------------------------
 
       i <- i + 1
 
@@ -1699,6 +1898,9 @@ header-includes:
   - \\DeclareUnicodeCharacter{00D7}{\\ensuremath{\\times}}
   - \\DeclareUnicodeCharacter{2014}{\\textemdash}
   - \\DeclareUnicodeCharacter{03B1}{\\ensuremath{\\alpha}}
+  - \\DeclareUnicodeCharacter{2019}{\\textquoteright}
+  - \\DeclareUnicodeCharacter{0160}{\\v{S}}
+  - \\DeclareUnicodeCharacter{00E1}{\\'{a}}
   - \\usepackage{titling}
   - \\setlength{\\droptitle}{-2.5cm} % Adjust vertical spacing
 ---
@@ -1738,7 +1940,7 @@ header-includes:
                                   basename(temp_output_file)))
         if (file.exists(log_file)) {
           log_lines <- readLines(log_file, warn = FALSE)
-          # Extract only the error lines — look for lines starting with "!"
+          # Extract only the error lines -- look for lines starting with "!"
           error_lines <- grep("^!", log_lines, value = TRUE)
           context_idx <- grep("^!", log_lines)
           # Also grab the 2 lines after each "!" for context
@@ -1767,13 +1969,12 @@ header-includes:
     message(paste0("Saving output in: ", output_path))
 
     # Extract all post_hoc_summary_table tables and keep their names
-    post_hoc_tables <- lapply(output_list, function(obj)
-      obj$post_hoc_summary_table)
-
-    # Assign names to the list for Excel sheet names based on response names
+    post_hoc_tables <- lapply(output_list, function(obj) {
+      tab <- obj$post_hoc_summary_table
+      if (is.data.frame(tab)) tab else data.frame(note = "No post-hoc test performed")
+    })
     names(post_hoc_tables) <- response_names
 
-    # Write to an Excel file with each table in its own sheet
     writexl::write_xlsx(post_hoc_tables, path = output_path)
 
     # Open files after creation
@@ -1842,7 +2043,7 @@ print.f_aov <- function(x, ...) {
     if (isTRUE(sublist$force_aov_used)) {
       message(paste0(
         "\n", strrep("!", 60), "\n",
-        "  DIAGNOSTIC ONLY: ", category, " — saturated model (n=1 cell).\n",
+        "  DIAGNOSTIC ONLY: ", category, " \u2014 saturated model (n=1 cell).\n",
         "  F-statistics and p-values are undefined. Do not report.\n",
         strrep("!", 60)
       ))
@@ -1860,7 +2061,7 @@ print.f_aov <- function(x, ...) {
 
       if(sublist$transformation_option == "boxcox"||
          sublist$transformation_option == TRUE){
-        cat("\n   \n==========================================================\n")
+        cat("\n   \n===========================================================\n")
         cat("   ANOVA of Box-Cox TRANSFORMED response variable:", category, "\n")
         cat("===========================================================\n")
       }
@@ -1871,8 +2072,11 @@ print.f_aov <- function(x, ...) {
       print(sublist$aov_summary)
 
 
-      cat("\nTRANSFORMED post hoc Analysis:\n")
+      cat("\n--- BACK TRANSFORMED Post hoc Comparisons of:", category, "---\n")
       print(sublist$post_hoc_summary_table, row.names = FALSE, quote=FALSE)
+      cat("___________________________\n")
+      cat(sublist$cld_text)
+      cat("\n")
       message("Note: 'median (BT)' = back-transformed estimated marginal mean. ",
               "Back-transforming a mean from a transformed scale returns the MEDIAN ",
               "on the original scale, not the arithmetic mean. Report these as ",
@@ -1883,12 +2087,12 @@ print.f_aov <- function(x, ...) {
                 ". Levene's Test has very low power with such small groups; ",
                 "interpret its result with caution.  \n")
       }
-      if (sublist$transformed_levene_test$p <= sublist$alpha) {
+      if (isTRUE(sublist$transformed_levene_test$p <= sublist$alpha)) {
         warning(call. = FALSE, immediate. = TRUE, "   \nBased on the 'Levene's Test' (",
                 round(sublist$transformed_levene_test$p, digits = 4), " \u2264 ", sublist$alpha, ") the transformed\n residuals do NOT have equal variance (heteroskedasticity). \nANOVA results can be misleading, resort to other statistical tests.  \n")
       }
 
-      if (sublist$transformed_shapiro_test$p.value <= sublist$alpha) {
+      if (isTRUE(sublist$transformed_shapiro_test$p.value <= sublist$alpha)) {
         warning(call. = FALSE, immediate. = TRUE, "   \nBased on the Shapiro-Wilk Test (",
                 round(sublist$transformed_shapiro_test$p.value, digits = 4), " \u2264 ", sublist$alpha,") the transformed\n residuals are **NOT** normally distributed. \nANOVA results can be misleading, resort to other statistical tests.  \n"
         )
@@ -1911,7 +2115,7 @@ print.f_aov <- function(x, ...) {
 
     } else {
 
-      cat("\n   \n==========================================================\n")
+      cat("\n   \n===========================================================\n")
       cat("   ANOVA of response variable: ", category, "\n")
       cat("===========================================================\n")
 
@@ -1921,7 +2125,8 @@ print.f_aov <- function(x, ...) {
       print(sublist$aov_summary)
 
 
-      cat("\npost hoc Analysis:\n")
+      cat("\n--- Post hoc Comparisons of:", category, "---\n")
+      cat("_________________________________________\n")
       print(sublist$post_hoc_summary_table, row.names = FALSE, quote=FALSE)
 
       if (!is.null(sublist$min_cell_n) && sublist$min_cell_n <= 3) {
@@ -1929,15 +2134,15 @@ print.f_aov <- function(x, ...) {
                 ". Levene's Test has very low power with such small groups; ",
                 "interpret its result with caution.  \n")
       }
-      if (sublist$Levene_test_on_res$p <= sublist$alpha) {
+      if (isTRUE(sublist$Levene_test_on_res$p <= sublist$alpha)) {
         warning(call. = FALSE, immediate. = TRUE, "   \nBased on the 'Levene's Test' (",
                 round(sublist$Levene_test_on_res$p, digits = 4), " \u2264 ", sublist$alpha, ")\nthe residuals do NOT have equal variance (heteroskedasticity).\nANOVA results can be misleading. \nENABLE the transformation option or resort to other statistical tests.  \n"
         )
       }
 
-      if (sublist$shapiro_test_residuals$p.value <= sublist$alpha) {
+      if (isTRUE(sublist$shapiro_test_residuals$p.value <= sublist$alpha)) {
         warning(call. = FALSE, immediate. = TRUE, "  \nBased on the Shapiro-Wilk Test (",
-                round(sublist$shapiro_test_residuals$p.value, digits = 4), " ≤ ", sublist$alpha,")\n the residuals are **NOT** normally distributed. \nANOVA results can be misleading. \nENABLE the transformation option or resort to other statistical tests.  \n"
+                round(sublist$shapiro_test_residuals$p.value, digits = 4), " \u2264 ", sublist$alpha,")\n the residuals are **NOT** normally distributed. \nANOVA results can be misleading. \nENABLE the transformation option or resort to other statistical tests.  \n"
         )
       }
     }
@@ -1951,13 +2156,10 @@ print.f_aov <- function(x, ...) {
 
 #' @export
 plot.f_aov <- function(x, ...) {
-  # Save and restore par options
-  old_par <- par(no.readonly = TRUE)
-  old_par$new <- NULL                 # Remove this parameter to prevent warning
-  on.exit({
-    par(old_par)
-    layout(1)  # Reset layout matrix
-  })
+
+  ########## Reset initial settings on exit #################################
+  .session_state <- save_session_state()  # Helper function: helper_session_state
+  on.exit(restore_session_state(.session_state), add = TRUE) # Helper function: helper_session_state
 
 
   # Loop over each category (a, b, etc.)
@@ -2209,7 +2411,7 @@ plot.f_aov <- function(x, ...) {
                  pch = 19, title = trace_var, bty = "n", cex = 0.85)
 
           int_note <- if (isTRUE(emm_is_cells))
-            paste0("\nSignificant interaction \u2014 the lines representing ",
+            paste0("\nSignificant interaction; the lines representing ",
                    trace_var, " factor levels are not parallel, indicating that the effect of ",
                    x_var, " depends on ", trace_var, ".")
           else

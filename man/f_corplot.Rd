@@ -2,7 +2,7 @@
 % Please edit documentation in R/fcorplot.R
 \name{f_corplot}
 \alias{f_corplot}
-\title{Correlation Plots with Factor Detection, Customization, and Multiple Correlation Coefficients}
+\title{Correlation Plots with Factor Detection and Multiple Correlation Coefficients}
 \usage{
 f_corplot(
   data,
@@ -22,7 +22,7 @@ f_corplot(
   res = 600,
   pointsize = 10,
   close_generated_files = FALSE,
-  open_generated_files = TRUE,
+  open_generated_files = interactive(),
   output_type = "word",
   save_as = NULL,
   save_in_wdir = FALSE
@@ -75,8 +75,10 @@ excluded from aesthetic factor detection. Default \code{NULL}.}
 
 \item{close_generated_files}{Logical. Closes open Excel or Word (NOT pdf) files before writing, depending on the output format. Works on Windows (taskkill), macOS (pkill) and Linux (pkill/soffice). Default \code{FALSE}. \strong{WARNING:} Always save your work before using this option!!}
 
-\item{open_generated_files}{Logical. If \code{TRUE}, opens generated output
-files automatically. Default \code{TRUE}.}
+\item{open_generated_files}{Logical. Whether to open the generated output
+files after creation. Defaults to \code{TRUE} in an interactive R session
+and \code{FALSE} otherwise (e.g. in scripts or automated pipelines).
+Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.}
 
 \item{output_type}{Character. One of \code{"pdf"}, \code{"word"},
 \code{"png"}, or \code{"rmd"}. Default \code{"word"}.}
@@ -91,7 +93,7 @@ Overridden by \code{save_as}. Default \code{FALSE}.}
 }
 \value{
 No value is returned to the R environment. Output files are saved
-  and opened automatically when running on Windows.
+  and opened automatically.
 }
 \description{
 Creates correlation plots for numeric variables in a data frame. The upper
@@ -120,14 +122,14 @@ the grouping factors and the meaning of all three correlation symbols.
     (when present) and always includes an explanation of all three
     correlation symbols whenever a legend is generated.
   \item \strong{Constant columns:} Zero-variance columns produce \code{NA}
-    in all correlation panels rather than crashing.
+    in all correlation panels.
 }
 
 This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
 \itemize{
 \item \bold{Windows:} Install Pandoc and ensure the installation folder \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
-\item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary’s location is in your PATH.
-\item \bold{Linux:} Install Pandoc through your distribution’s package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.
+\item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.
+\item \bold{Linux:} Install Pandoc through your distribution's package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.
 
 \item If Pandoc is not found, this function may not work as intended.
 }
@@ -138,8 +140,8 @@ mtcars_sub <- subset(mtcars, select = -c(am, qsec, vs))
 f_corplot(mtcars_sub,
           color_factor = "gear",
           shape_factor = "cyl",
-          output_type  = "png",
-          open_generated_files = FALSE)
+          output_type  = "png"
+          )
 
 # With ordinal variables
 data(iris)

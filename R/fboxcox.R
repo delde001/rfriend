@@ -37,7 +37,10 @@
 #' @param range A numeric vector of length 2 defining the search interval for lambda. Defaults to \code{c(-2, 2)}.
 #' @param plots Logical. If \code{TRUE}, plots log-likelihood of the Box-Cox transformation, Histograms and Q-Q plots of the original and transformed data. Default is \code{FALSE}.
 #' @param close_generated_files Logical. Closes open Excel or Word (NOT pdf) files before writing, depending on the output format. Works on Windows (taskkill), macOS (pkill) and Linux (pkill/soffice). Default \code{FALSE}. \strong{WARNING:} Always save your work before using this option!!
-#' @param open_generated_files Logical. If \code{TRUE}, opens the generated output files ('pdf', 'Word' or 'Excel') files depending on the output format. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.
+#' @param open_generated_files Logical. Whether to open the generated output
+#'   files after creation. Defaults to \code{TRUE} in an interactive R session
+#'   and \code{FALSE} otherwise (e.g. in scripts or automated pipelines).
+#'   Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.
 #' @param output_type Character string specifying the output format. Default is \code{"default"}.
 #'   \itemize{
 #'     \item \code{"default"}: Returns the object and lets R decide whether
@@ -104,8 +107,8 @@
 #' This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
 #'\itemize{
 #' \item \bold{Windows:} Install Pandoc and ensure the installation folder \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
-#' \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary’s location is in your PATH.
-#' \item \bold{Linux:} Install Pandoc through your distribution’s package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.
+#' \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.
+#' \item \bold{Linux:} Install Pandoc through your distribution's package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.
 #'
 #' \item If Pandoc is not found, this function may not work as intended.
 #' }
@@ -167,7 +170,7 @@ f_boxcox <- function(
     xlab = expression(lambda),    # X-axis title of plot
     ylab = "log-Likelihood",      # Y-axis title of plot
     alpha = 0.05,                 # Significance level for shapiro test
-    open_generated_files = TRUE,  # Open files after creation
+    open_generated_files = interactive(),  # Open files after creation
     close_generated_files = FALSE,# Close open files to save a new one
     output_type = "default",          # Output type can be word, pdf, rmd, console
     save_as = NULL,               # Specify the name of the output dir and file (name and type).
@@ -176,35 +179,9 @@ f_boxcox <- function(
     ) {
 
 
-  ########## Reset initial settings on exit ##################################
-  # Save initial settings at the start
-  old_par <- par(no.readonly = TRUE)  # Save graphical parameters
-  old_par$new <- NULL                 # Remove this parameter to prevent warning
-  original_options <- options()       # Save global options
-
-  # Conditionally save panderOptions if the package is loaded
-  original_panderOptions <- if (requireNamespace("pander", quietly = TRUE) && is.function(pander::panderOptions)) {
-    pander::panderOptions()
-  } else {
-    NULL
-  }
-
-  # Single exit handler to restore settings
-  on.exit({
-
-    # Restore saved parameters for par
-    par(old_par)
-
-    # Restore global options
-    options(original_options)
-
-    # Restore panderOptions if they were saved
-    if (!is.null(original_panderOptions)) {
-      for (opt in names(original_panderOptions)) {
-        try(pander::panderOptions(opt, original_panderOptions[[opt]]), silent = TRUE)
-      }
-    }
-  }, add = TRUE)
+  ########## Reset initial settings on exit #################################
+  .session_state <- save_session_state()  # Helper function: helper_session_state
+  on.exit(restore_session_state(.session_state), add = TRUE) # Helper function: helper_session_state
 
 
   # Parameter validation
@@ -232,23 +209,28 @@ f_boxcox <- function(
   output_list[["plots"]] <- plots
 
 
-  # Capture the name of the submitted data object
+  # Capture the name of the submitted data object and coerce to a
+  # single-column data frame. The multi-column check MUST run before the
+  # reduction below, otherwise it becomes dead code and a multi-column
+  # data frame is silently truncated to its first column.
   if (is.data.frame(data)) {
-    # Get the name of the first column
+    if (ncol(data) > 1) {
+      stop("The data.frame has multiple columns please select one.")
+    }
     data_name <- colnames(data)[[1]]
     data <- data.frame(y = data[[1]])
-  }
-
-  # Convert potential vector to data frame
-  if (is.vector(data)) {
+  } else if (is.vector(data)) {
     data_name <- deparse(substitute(data))
     data <- data.frame(y = data)
+  } else {
+    stop("Input must be a numeric vector or data frame.")
   }
 
-  # Handle input: ensure data is numeric
-  if (ncol(data) > 1) stop("The data.frame has multiple columns please select one.")
-  if (!is.data.frame(data)) stop("Input must be a numeric vector or data frame.")
-  if (!is.numeric(data$y)) stop(paste0("The ", data_name," column in the data must be numeric."))
+  # At this point data is guaranteed to be a single-column data frame;
+  # the only remaining type check is that the column is numeric.
+  if (!is.numeric(data$y)) {
+    stop(paste0("The ", data_name, " column in the data must be numeric."))
+  }
 
 
   clean_data_name <- sub(".*\\$", "", data_name)  # Remove everything before the "$" symbol
@@ -266,7 +248,8 @@ f_boxcox <- function(
   output_type_map <- c(
     "pdf"  = ".pdf",
     "word" = ".docx",
-    "rmd"  = ".rmd"
+    "rmd"  = ".rmd",
+    "excel" = ".xlsx"
   )
 
   # If the user specifies a path, filename or save_in_wdir == TRUE an output file should be created
@@ -361,7 +344,7 @@ f_boxcox <- function(
   y_clean <- y[!is.na(y)]
 
 
-  if (any(y_clean <= 0)) stop("Response variable must higher than zero.")
+  if (any(y_clean <= 0)) stop("Response variable must be higher than zero.")
 
   # Scale y for numerical stability
   y_clean <- y_clean / exp(mean(log(y_clean)))  # Geometric mean scaling
@@ -379,8 +362,11 @@ f_boxcox <- function(
 
 
 
-  # Interp Logical. Controls if spline interpolation is used
-  interp = (plots && (length(lambda) < 100))
+  # Interp: whether to spline-interpolate for smoother plots. spline()
+  # needs at least 2 points, so we also guard against degenerate lambda
+  # vectors (e.g. range = c(-0.001, 0.001) with digits = 1 gives a
+  # single lambda value).
+  interp <- isTRUE(plots) && length(lambda) >= 2L && length(lambda) < 100L
 
   # Interpolation for smooth plotting
   if (interp) {
@@ -394,9 +380,13 @@ f_boxcox <- function(
   max_idx <- which.max(loglik)
   max_ll  <- loglik[max_idx]
   conf_limit <- max_ll - qchisq(0.95, 1) / 2
-  if(lambda[max_idx] != 0){
+  # Apply the selected Box-Cox transformation to the (original, unscaled)
+  # input data. Using `else` rather than `else if (lambda == 0)` guarantees
+  # transformed_data is always assigned on any finite lambda, which avoids
+  # a cryptic "object not found" error if lambda[max_idx] were ever NA.
+  if (lambda[max_idx] != 0) {
     transformed_data <- (data ^ lambda[max_idx] - 1) / lambda[max_idx]
-  } else if(lambda[max_idx] == 0){
+  } else {
     transformed_data <- log(data)
   }
 
@@ -410,26 +400,30 @@ f_boxcox <- function(
 
   n <- length(data$y)
 
-  if (n <= 5000) {
-    # Shapiro on initial data (run once)
-    st0 <- shapiro.test(data[[1]])
-    W0 <- signif(st0$statistic, digits = 4)
-    Shapiro.p.value0 <- signif(st0$p.value, digits = 4)
-    df0 <- data.frame(W0, Shapiro.p.value0)
+  # Run Shapiro-Wilk on original and transformed data via the package
+  # helper, which returns a shaped htest object for all n regimes:
+  #   - n < 3    -> NA p-value, method "skipped: n < 3"
+  #   - 3..5000  -> real Shapiro-Wilk result
+  #   - n > 5000 -> NA p-value, method "skipped: n > 5000"
+  # Downstream code therefore only needs to check is.na(p.value) once;
+  # no separate n-guard branching is required here. Note: these local
+  # data frames are named shapiro_original_df / shapiro_transformed_df
+  # rather than df0 / df, because a local object named `df` shadows
+  # stats::df (the F-distribution density) and produces cryptic
+  # "closure is not subsettable" errors on any code path that fails
+  # to assign to it.
+  st0 <- safe_shapiro(data[[1]])
+  W0               <- if (!is.na(st0$p.value)) signif(st0$statistic, digits = 4) else NA_real_
+  Shapiro.p.value0 <- if (!is.na(st0$p.value)) signif(st0$p.value,   digits = 4) else NA_real_
+  shapiro_original_df <- data.frame(W0, Shapiro.p.value0)
 
-    # Shapiro on transformed data (run once)
-    st1 <- shapiro.test(transformed_data[[1]])
-    W <- signif(st1$statistic, digits = 4)
-    Shapiro.p.value <- signif(st1$p.value, digits = 4)
-    df <- data.frame("lambda" = lambda_out, W, Shapiro.p.value)
+  st1 <- safe_shapiro(transformed_data[[1]])
+  W                <- if (!is.na(st1$p.value)) signif(st1$statistic, digits = 4) else NA_real_
+  Shapiro.p.value  <- if (!is.na(st1$p.value)) signif(st1$p.value,   digits = 4) else NA_real_
+  shapiro_transformed_df <- data.frame("lambda" = lambda_out, W, Shapiro.p.value)
 
-    output_list[["Shapiro_original_data"]]    <- df0
-    output_list[["Shapiro_transformed_data"]] <- df
-  } else {
-    message("Shapiro-Wilks cannot be used with sample sizes > 5000.")
-    output_list[["Shapiro_original_data"]]    <- NULL
-    output_list[["Shapiro_transformed_data"]] <- NULL
-  }
+  output_list[["Shapiro_original_data"]]    <- shapiro_original_df
+  output_list[["Shapiro_transformed_data"]] <- shapiro_transformed_df
 
 
     output_list[["transformed_data"]]         <- transformed_data[[1]]
@@ -452,7 +446,13 @@ f_boxcox <- function(
   if(output_type != "console" && output_type != "default"){
   generate_report <- function(){
   # Return results
-    if (n <= 5000) {
+    if (is.na(Shapiro.p.value0)) {
+      cat("Shapiro-Wilk test on untransformed **original data:** ",
+          "skipped (", st0$method, "). ",
+          "For very large samples Shapiro-Wilk is skipped because it is ",
+          "overly sensitive to trivial deviations from normality; please ",
+          "inspect the diagnostic plots instead.   \n")
+    } else {
       cat("Shapiro-Wilk test on untransformed **original data:**")
       cat(" W =", W0, " p value =", Shapiro.p.value0, "   \n")
       if (Shapiro.p.value0 >= alpha) {
@@ -463,8 +463,7 @@ f_boxcox <- function(
           alpha,
           ") original data is already normally distributed. \nTransformation will be applied regardless...  \n"
         )
-      }
-      if (Shapiro.p.value0 < alpha) {
+      } else {
         cat(
           "According to the Shapiro-Wilk test (",
           Shapiro.p.value0,
@@ -478,7 +477,7 @@ f_boxcox <- function(
     cat("$$y(\\lambda) = \\begin{cases} \\frac{y^\\lambda - 1}{\\lambda}, & \\lambda \\neq 0 \\\\    \\log(y), & \\lambda = 0 \\end{cases}
             $$   \n")
 
-    cat("   \n   \n**Box-Cox Transformation $\\lambda$ =", df$lambda, "**  \n")
+    cat("   \n   \n**Box-Cox Transformation $\\lambda$ =", lambda_out, "**  \n")
 
 
     # Plot results of transformation
@@ -492,10 +491,15 @@ f_boxcox <- function(
 
 
     cat("   \n   \n**Interpretation:**   \n")
-    if(Shapiro.p.value >= alpha){
+    if (is.na(Shapiro.p.value)) {
+      cat("Shapiro-Wilk on transformed data was skipped (", st1$method,
+          "). For very large samples Shapiro-Wilk is overly sensitive ",
+          "to trivial deviations from normality; please inspect the ",
+          "diagnostic plots below to assess normality of the ",
+          "transformed data.  \n  \n", sep = "")
+    } else if (Shapiro.p.value >= alpha) {
       cat("According to the Shapiro-Wilk test (", Shapiro.p.value, " > ",alpha,") data is normally distributed after transformation.  \n \n Inspect the plots to check normality and outliers:  \n  \n ")
-    }
-    if(Shapiro.p.value < alpha){
+    } else {
       cat("According to the Shapiro-Wilk test (", Shapiro.p.value, " < ",alpha,") data is still NOT normally distributed after transformation.  \n  \n Inspect the plots to check normality and outliers:  \n  \n ")
     }
 
@@ -593,6 +597,27 @@ header-includes:
     output_list[["rmd"]] <- clean_rmd_output
 
   }
+  else if (output_type == "excel") {
+
+    # show the location were the file is saved
+    message(paste0("Saving output in: ", output_path))
+
+
+    excel_out_list <- list(
+      "transformed_data" = setNames(data.frame(transformed_data[[1]]), paste0("transformed_", clean_data_name)),
+      "original_data"    = setNames(data.frame(data[[1]]), paste0("original_", clean_data_name ))
+    )
+
+    # Write to an Excel file with each table in its own sheet
+    writexl::write_xlsx(excel_out_list, path = output_path)
+
+    # Open files after creation
+    if(open_generated_files == TRUE){
+      f_open_file(output_path)
+    }
+
+    return(invisible(output_list))
+  }
   else if (output_type == "console"){
 
 
@@ -628,11 +653,17 @@ print.f_boxcox <- function(x, ...) {
 
   cat("Box-Cox\n")
   cat("--------\n")
-  if(x$Shapiro_original_data$Shapiro.p.value0 >= x$alpha){
-  cat("According to the Shapiro-Wilk test (", x$Shapiro_original_data$Shapiro.p.value0, " > ",x$alpha,") original data is:\n already normally distributed. Transformation will be applied regardless...  \n")
-  }
-  if(x$Shapiro_original_data$Shapiro.p.value0 < x$alpha){
-  cat("According to the Shapiro-Wilk test (", x$Shapiro_original_data$Shapiro.p.value0, " < ",x$alpha,") original data is:\n NOT normally distributed. Transformation will be applied...")
+  .sp0 <- x$Shapiro_original_data$Shapiro.p.value0
+  if (is.na(.sp0)) {
+    cat("Shapiro-Wilk on original data was skipped (sample size outside ",
+        "the 3..5000 range supported by shapiro.test). Transformation ",
+        "will be applied regardless; inspect plots for assessment.   \n", sep = "")
+  } else if (.sp0 >= x$alpha) {
+    cat("According to the Shapiro-Wilk test (", .sp0, " > ", x$alpha,
+        ") original data is:\n already normally distributed. Transformation will be applied regardless...  \n")
+  } else {
+    cat("According to the Shapiro-Wilk test (", .sp0, " < ", x$alpha,
+        ") original data is:\n NOT normally distributed. Transformation will be applied...")
   }
 
   cat("\u00A0  \n")
@@ -641,12 +672,20 @@ print.f_boxcox <- function(x, ...) {
   cat("{ log(x)\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0} if \u03BB == 0   \n")
   cat("\u00A0  \n")
   cat("Box-Cox Transformation \u03BB =", x$lambda, "  \n")
-  if(x$Shapiro_transformed_data$Shapiro.p.value >= x$alpha){
-  cat("According to the Shapiro-Wilk test (", x$Shapiro_transformed_data$Shapiro.p.value, " > ",x$alpha,") data is\n normally distributed after transformation.")
-  }
-  if(x$Shapiro_transformed_data$Shapiro.p.value < x$alpha){
-  cat("According to the Shapiro-Wilk test (", x$Shapiro_transformed_data$Shapiro.p.value, " < ",x$alpha,") data is\n still NOT normally distributed after transformation.")
-  cat("\nCheck the normality plots, by using the plot() function or 'plots = TRUE' option\n")
+  .sp1 <- x$Shapiro_transformed_data$Shapiro.p.value
+  if (is.na(.sp1)) {
+    cat("Shapiro-Wilk on transformed data was skipped (sample size ",
+        "outside the 3..5000 range). \nInspect the diagnostic plots to ",
+        "assess normality of the transformed data.\n",
+        "Check the normality plots, by using the plot() function or ",
+        "'plots = TRUE' option\n  \n", sep = "")
+  } else if (.sp1 >= x$alpha) {
+    cat("According to the Shapiro-Wilk test (", .sp1, " > ", x$alpha,
+        ") data is\n normally distributed after transformation.\n  \n")
+  } else {
+    cat("According to the Shapiro-Wilk test (", .sp1, " < ", x$alpha,
+        ") data is\n still NOT normally distributed after transformation.")
+    cat("\nCheck the normality plots, by using the plot() function or 'plots = TRUE' option\n  \n")
   }
 
   if(x$plots == TRUE){
@@ -670,13 +709,10 @@ print.f_boxcox <- function(x, ...) {
 #' and does not return a useful value. It invisibly returns \code{1}.
 #' @export
 plot.f_boxcox <- function(x, which = 1:3, ask = FALSE, ...) {
-# Save and restore par options
-old_par <- par(no.readonly = TRUE)
-old_par$new <- NULL                 # Remove this parameter to prevent warning
-on.exit({
-  par(old_par)
-  layout(1)  # Reset layout matrix
-})
+
+  ########## Reset initial settings on exit #################################
+  .session_state <- save_session_state()  # Helper function: helper_session_state
+  on.exit(restore_session_state(.session_state), add = TRUE) # Helper function: helper_session_state
 
 par(ask = ask)
 

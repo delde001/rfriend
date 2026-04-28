@@ -17,10 +17,11 @@ f_aov(
   adjust = "sidak",
   intro_text = TRUE,
   close_generated_files = FALSE,
-  open_generated_files = TRUE,
+  open_generated_files = interactive(),
   output_type = "default",
   save_as = NULL,
-  save_in_wdir = FALSE
+  save_in_wdir = FALSE,
+  ...
 )
 }
 \arguments{
@@ -42,7 +43,7 @@ f_aov(
 one cell has \eqn{n = 1} (saturated model). By default (\code{FALSE}),
 such responses are skipped with a warning because F-statistics and
 p-values are undefined for saturated models. Set to \code{TRUE} only for
-diagnostic purposes — results should \strong{not} be reported or
+diagnostic purposes -- results should \strong{not} be reported or
 interpreted as valid. Default is \code{FALSE}.}
 
 \item{alpha}{Numeric. Significance level for ANOVA, post hoc tests, and Shapiro-Wilk test. Default is \code{0.05}.}
@@ -52,7 +53,7 @@ for multiple comparisons. Available methods include:
 \describe{
   \item{"tukey"}{Tukey's Honest Significant Difference method, appropriate for
                 all pairwise comparisons. Controls family-wise error rate.}
-  \item{"sidak"}{Šidák correction that controls the family-wise error rate.
+  \item{"sidak"}{Sidak correction that controls the family-wise error rate.
                 Less conservative than Bonferroni.}
   \item{"bonferroni"}{Conservative adjustment that multiplies p-values by
                      the number of comparisons.}
@@ -65,7 +66,10 @@ for multiple comparisons. Available methods include:
 
 \item{close_generated_files}{Logical. Closes open Excel or Word (NOT pdf) files before writing, depending on the output format. Works on Windows (taskkill), macOS (pkill) and Linux (pkill/soffice). Default \code{FALSE}. \strong{WARNING:} Always save your work before using this option!!}
 
-\item{open_generated_files}{Logical. If \code{TRUE}, Opens the generated output files ('pdf', 'Word' or 'Excel') files depending on the output format. This to directly view the results after creation. Files are stored in tempdir(). Default is \code{TRUE}.}
+\item{open_generated_files}{Logical. Whether to open the generated output
+files after creation. Defaults to \code{TRUE} in an interactive R session
+and \code{FALSE} otherwise (e.g. in scripts or automated pipelines).
+Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.}
 
 \item{output_type}{Character string specifying the output format. Default is \code{"default"}.
 \itemize{
@@ -91,6 +95,16 @@ the file is named "dataname_aov_output" in that directory. If an extension is pr
 Defaults to \code{file.path(tempdir(), "dataname_summary.pdf")}.}
 
 \item{save_in_wdir}{Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.}
+
+\item{...}{Additional arguments forwarded to \code{\link[stats]{aov}}.
+The arguments \code{subset}, \code{na.action}, and \code{weights} are
+handled specially: when supplied, they are applied via
+\code{\link[stats]{model.frame}} so that the n=1 cell check,
+Shapiro-Wilk test, Levene test, optional transformations, residual
+diagnostics, and \code{emmeans} post hoc tests all see the exact
+same row set as \code{aov()} itself. Any other \code{aov()}
+arguments (e.g. \code{contrasts}, \code{projections},
+\code{qr}, \code{contrasts.arg}) are passed through unchanged.}
 }
 \value{
 An object of class 'f_aov' containing results from \code{aov()}, normality tests, transformations, and post hoc tests. Using the option "output_type", it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and plot methods for 'f_aov' objects.
@@ -114,12 +128,14 @@ More response variables can be added using \code{-} or \code{+} (e.g., \code{res
 
 Outputs can be generated in multiple formats ("pdf", "word", "excel" and "rmd") as specified by \code{output_type}. The function also closes any open 'Word' files to avoid conflicts when generating 'Word' documents. If \code{output_type = "rmd"} is used it is adviced to use it in a chunk with \{r, echo=FALSE, results='asis'\}
 
+*Non-significant ANOVA results*: When the overall F-test is not significant, f_aov still reports the estimated marginal means table, but with all pairwise comparison letters replaced by *"ns"*. The numeric estimates (and their confidence intervals) are provided because they are often needed for manuscript tables, especially when the response was back-transformed from a Box-Cox or bestNormalize scale - the raw descriptive means and the emmeans values can differ, and it is the emmeans values that correspond to the actual model. The *"ns"* labels signal that pairwise differences should not be interpreted.
+
 This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
 \itemize{
 \item \bold{Windows:} Install Pandoc and ensure the installation folder.
 \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
-\item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary’s location is in your PATH.
-\item \bold{Linux:} Install Pandoc through your distribution’s package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.
+\item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.
+\item \bold{Linux:} Install Pandoc through your distribution's package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.
 
 \item If Pandoc is not found, this function may not work as intended.
 }
@@ -174,9 +190,7 @@ f_aov_out <- f_aov(Sepal.Width + Sepal.Length ~ Species,
                    # Save output in MS Word file (Default is console)
                    output_type = "word",
                    # Do bestNormalize transformation for non-normal residual (Default is boxcox)
-                   transformation = "bestnormalize",
-                   # Do not automatically open the file.
-                   open_generated_files = FALSE
+                   transformation = "bestnormalize"
                    )
 
 # Print output to the console.
