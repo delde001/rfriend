@@ -15,7 +15,7 @@ f_bestNormalize(
   save_as = NULL,
   save_in_wdir = FALSE,
   close_generated_files = FALSE,
-  open_generated_files = TRUE,
+  open_generated_files = interactive(),
   ...
 )
 ```
@@ -86,9 +86,10 @@ f_bestNormalize(
 
 - open_generated_files:
 
-  Logical. If `TRUE`, Opens the generated output file, this to directly
-  view the results after creation. Files are stored in tempdir().
-  Default is `TRUE`.
+  Logical. Whether to open the generated output files after creation.
+  Defaults to `TRUE` in an interactive R session and `FALSE` otherwise
+  (e.g. in scripts or automated pipelines). Set to `TRUE` or `FALSE` to
+  override this behaviour explicitly.
 
 - ...:
 
@@ -139,9 +140,9 @@ or higher), a universal document converter.
 
 - **macOS:** If using Homebrew, Pandoc is typically installed in
   "/usr/local/bin". Alternatively, download the .pkg installer and
-  verify that the binary’s location is in your PATH.
+  verify that the binary's location is in your PATH.
 
-- **Linux:** Install Pandoc through your distribution’s package manager
+- **Linux:** Install Pandoc through your distribution's package manager
   (commonly installed in "/usr/bin" or "/usr/local/bin") or manually,
   and ensure the directory containing Pandoc is in your PATH.
 
@@ -261,12 +262,12 @@ f_bestNormalize(skewed_data, output_type = "console")
 # Generate a PDF report saved to a custom path.
 f_bestNormalize(skewed_data,
                 output_type          = "pdf",
-                save_as              = "my_report",
-                open_generated_files = FALSE)
-#> Saving output in: /tmp/RtmpyM0xyc/my_report.pdf
+                save_as              = "my_report"
+                )
+#> Saving output in: /tmp/RtmpG5HCTF/my_report.pdf
 #> Warning: error in running command
 #> ! sh: 1: pdflatex: not found
-#> Error: LaTeX failed to compile /tmp/RtmpyM0xyc/my_report.tex. See https://yihui.org/tinytex/r/#debugging for debugging tips. See my_report.log for more info.
+#> Error: LaTeX failed to compile /tmp/RtmpG5HCTF/my_report.tex. See https://yihui.org/tinytex/r/#debugging for debugging tips. See my_report.log for more info.
 
 # Generate R Markdown output for use inside a .Rmd chunk
 # (set chunk option results = 'asis').

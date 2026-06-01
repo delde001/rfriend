@@ -22,7 +22,7 @@ f_glm(
   save_as = NULL,
   save_in_wdir = FALSE,
   close_generated_files = FALSE,
-  open_generated_files = TRUE,
+  open_generated_files = interactive(),
   influence_threshold = 2,
   ...
 )
@@ -68,7 +68,7 @@ f_glm(
 
   "sidak"
 
-  :   Šidák correction
+  :   Sidak correction
 
   "bonferroni"
 
@@ -150,10 +150,10 @@ f_glm(
 
 - open_generated_files:
 
-  Logical. If `TRUE`, Opens the generated output files ('pdf', 'Word' or
-  'Excel') files depending on the output format. This to directly view
-  the results after creation. Files are stored in tempdir(). Default is
-  `TRUE`.
+  Logical. Whether to open the generated output files after creation.
+  Defaults to `TRUE` in an interactive R session and `FALSE` otherwise
+  (e.g. in scripts or automated pipelines). Set to `TRUE` or `FALSE` to
+  override this behaviour explicitly.
 
 - influence_threshold:
 
@@ -244,9 +244,9 @@ or higher), a universal document converter.
 
 - **macOS:** If using Homebrew, Pandoc is typically installed in
   "/usr/local/bin". Alternatively, download the .pkg installer and
-  verify that the binary’s location is in your PATH.
+  verify that the binary's location is in your PATH.
 
-- **Linux:** Install Pandoc through your distribution’s package manager
+- **Linux:** Install Pandoc through your distribution's package manager
   (commonly installed in "/usr/bin" or "/usr/local/bin") or manually,
   and ensure the directory containing Pandoc is in your PATH.
 
@@ -298,20 +298,25 @@ print(glm_bin)
 #> McFadden's Pseudo-R²: 0.629 
 #> 
 #> --- Post hoc Comparisons of: vs ---
-#> _________________________________________
 #>   cyl         prob           SE    asymp.LCL asymp.UCL Letter  n
 #> 1   8 3.181005e-09 9.142626e-06 2.220446e-16 1.0000000      b 14
 #> 2   6 5.714286e-01 1.870439e-01 1.771200e-01 0.8920012      a  7
 #> 3   4 9.090909e-01 8.667842e-02 4.497464e-01 0.9918928      a 11
+#> ___________________________
 #> 
+#> **[!] Separation detected, LRT pairwise comparisons used:**  
+#> Complete separation was detected (at least one group perfectly predicts the outcome), making Wald-based pairwise tests unreliable. Letters were assigned using **likelihood ratio tests** (LRT): for each pair of groups, a reduced model with those groups merged was compared against the full model via LRT. This approach is robust to separation.  
+#> P-values were adjusted using the **Bonferroni method (conservative approximation; base R lacks native Šidák)**.  
+#> 
+#>    
 
 # GLM Binomial example with output to MS Word file
 glm_bin_word <- f_glm(vs ~ cyl,
                  family = binomial,
                  data = mtcars_mod,
-                 output_type = "word",
-                 open_generated_files = FALSE)
-#> Saving output in: /tmp/RtmpyM0xyc/mtcars_mod_glm_output.docx
+                 output_type = "word"
+                 )
+#> Saving output in: /tmp/RtmpG5HCTF/mtcars_mod_glm_output.docx
 
 # GLM Poisson example with output to rmd text
 data(warpbreaks)
@@ -330,14 +335,12 @@ cat(glm_pos$rmd)
 #> 
 #> ## Model Diagnostics of:  breaks 
 #>    
-#> ![](/tmp/RtmpyM0xyc/file1fa814a48b76.png)    
+#> ![](/tmp/RtmpG5HCTF/file1d946793f122.png)    
 #>   
 #> 
-#> <div style="page-break-after: always;"></div>
-#> \newpage
 #> ## Dispersion Diagnostics of: breaks 
 #> 
-#> **DHARMa Dispersion Test** — Ratio of simulated vs. observed variance: **4.449**  
+#> **DHARMa Dispersion Test:**  Ratio of simulated vs. observed variance: **4.449**  
 #> The dispersion test is **significant** (p = 0 ≤ α = 0.05), indicating **overdispersion** (more variance than the model assumes).   
 #> **Recommended action:** Switch to a family that accounts for extra variance:
 #>   - Counts (Poisson): use **Negative Binomial** (`MASS::glm.nb()` or `glmmTMB`).
@@ -406,14 +409,12 @@ cat(glm_pos$rmd)
 #> 
 #> ### Type II Analysis of Deviance of: breaks 
 #> 
-#> The table below tests the marginal significance of **each predictor term** via `stats::drop1()` (Type II tests). Each term is dropped from the full model in turn and tested against the model retaining all other terms — equivalent to `car::Anova(type = 2)` but using only base R. This is the GLM equivalent of the ANOVA F-table: it answers *"does this predictor improve the model?"* after accounting for all other terms. For single-predictor models this matches the coefficient z-test above; for multi-predictor models these per-term tests are the ones to report.  
+#> The table below tests the marginal significance of **each predictor term** via `stats::drop1()` (Type II tests). Each term is dropped from the full model in turn and tested against the model retaining all other terms; equivalent to `car::Anova(type = 2)` but using only base R. This is the GLM equivalent of the ANOVA F-table: it answers *"does this predictor improve the model?"* after accounting for all other terms. For single-predictor models this matches the coefficientz valueabove; for multi-predictor models these per-term tests are the ones to report.  
 #> 
 #> 
 #> ----------------------------------------------------
 #> Term      Df   Deviance   AIC     LRT     Pr(>Chi)  
 #> --------- ---- ---------- ------- ------- ----------
-#> <none>    NA   210.4      493.1   NA      NA        
-#> 
 #> wool      1    226.4      507.1   16.04   < 0.001   
 #> 
 #> tension   2    281.3      560.0   70.94   < 0.001   
@@ -427,39 +428,34 @@ cat(glm_pos$rmd)
 #> 
 #> **McFadden's Pseudo-R²:** 0.292  
 #> 
-#> *McFadden's Pseudo-R² = 1 − (Residual deviance / Null deviance). It measures how much the model improves over a null (intercept-only) model, on a 0–1 scale. Unlike R² in linear regression, it is **not** a proportion of variance explained; values are typically lower — 0.2–0.4 is already considered an excellent fit for GLMs.*  
+#> *McFadden's Pseudo-R² = 1 − (Residual deviance / Null deviance). It measures how much the model improves over a null (intercept-only) model, on a 0 to 1 scale. Unlike R² in linear regression, it is **not** a proportion of variance explained; values are typically lower: 0.2 to 0.4 is already considered an excellent fit for GLMs.*  
 #> 
 #> &nbsp;  
 #> 
 #> **χ² likelihood ratio test** vs. null model: p = **< 0.001**. The model fits **significantly better** than the null model (α = 0.05), meaning at least one predictor contributes to explaining the response.  
 #> 
 #> 
-#> --------------------------------------------------------
-#> Term      Df   Deviance   Resid     Resid     Pr(>Chi)  
-#>                           Df        Dev                 
-#> --------- ---- ---------- --------- --------- ----------
-#> NULL      NA   NA         53        297.4     NA        
+#> ---------------------------------------------------------
+#> Term      Df   Deviance   Resid     Resid      Pr(>Chi)  
+#>                           Df        Dev                  
+#> --------- ---- ---------- --------- ---------- ----------
+#> NULL                      53        297.3722             
 #> 
-#> wool      1    16.04      52        281.3     < 0.001   
+#> wool      1    16.0388    52        281.3335   < 0.001   
 #> 
-#> tension   2    70.94      50        210.4     < 0.001   
-#> --------------------------------------------------------
-#> 
-#> 
-#> *⚠ This table uses **sequential (Type I) tests** — per-term p-values depend on the order predictors enter the model. For per-term significance, use the **Type II Analysis of Deviance** (`drop1`) table above, which tests each term after accounting for all others.*  
+#> tension   2    70.9416    50        210.3919   < 0.001   
+#> ---------------------------------------------------------
 #> 
 #> 
-#> <div style="page-break-after: always;"></div>
-#> \newpage
+#> *[!] This table uses **sequential (Type I) tests**, per-term p-values depend on the order predictors enter the model. For per-term significance, use the **Type II Analysis of Deviance** (`drop1`) table above, which tests each term after accounting for all others.*  
+#> 
+#> 
 #> 
 #> 
 #> ## Model post hoc Analysis (Estimated Marginal Means) of:  breaks 
 #>    
 #> The table below shows the  Estimated Marginal Rates  (`emmeans` package). These are  back-transformed, model-based values on the response scale  for  breaks . Unlike raw averages, these values correct
-#>       for unbalanced designs and reflect the statistical model. Groups in the *"Letters"* column sharing the same letter are **not** statistically different (p >  0.05 ).
-#>       Groups with *different* letters are significantly different.
-#>    
-#>   
+#>       for unbalanced designs and reflect the statistical model.
 #> #### Publication & Reporting Tips
 #> * For main results showing significant differences, prioritize reporting these Estimated Marginal Rates  and their *Confidence Intervals (CIs)* rather than raw means.
 #>  * Figures should ideally overlay these  Estimated Marginal Rates  (and error bars) on top of the raw data points.
@@ -497,9 +493,7 @@ cat(glm_pos$rmd)
 #> Intervals are back-transformed from the log scale  
 #> P value adjustment: sidak method for 15 tests  
 #> Tests are performed on the log scale  
-#> significance level used: $\alpha$ = 0.05  
-#> **NOTE:** If two or more means share the same grouping symbol,
-#>       then we cannot show them to be different.
-#>       But we also did not show them to be the same.
+#> significance level used: α = 0.05  
+#> *Note: Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different. Sharing a letter indicates insufficient evidence to claim a difference; it does not prove the groups are identical.*
 # }
 ```

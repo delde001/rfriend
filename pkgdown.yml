@@ -1,8 +1,8 @@
-pandoc: 3.1.11
+pandoc: 3.8.3
 pkgdown: 2.2.0
 pkgdown_sha: ~
 articles: {}
-last_built: 2026-04-06T08:41Z
+last_built: 2026-06-01T07:05Z
 urls:
   reference: https://delde001.github.io/rfriend/reference
   article: https://delde001.github.io/rfriend/articles

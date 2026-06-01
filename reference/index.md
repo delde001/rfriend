@@ -30,8 +30,8 @@
   : Conditional Rounding for Numeric Values
 
 - [`f_corplot()`](https://delde001.github.io/rfriend/reference/f_corplot.md)
-  : Correlation Plots with Factor Detection, Customization, and Multiple
-  Correlation Coefficients
+  : Correlation Plots with Factor Detection and Multiple Correlation
+  Coefficients
 
 - [`f_factors()`](https://delde001.github.io/rfriend/reference/f_factors.md)
   : Convert multiple columns to Factors in a data frame
@@ -47,6 +47,12 @@
 - [`f_kruskal_test()`](https://delde001.github.io/rfriend/reference/f_kruskal_test.md)
   : Perform multiple Kruskal-Wallis tests with a user-friendly output
   file, do data inspection and Dunn's test (of 'rstatix') as post hoc.
+
+- [`f_lmer()`](https://delde001.github.io/rfriend/reference/f_lmer.md) :
+
+  Fit a linear mixed model with
+  [`lme4::lmer()`](https://rdrr.io/pkg/lme4/man/lmer.html) including
+  assumption checks, diagnostics, R-squared and post hoc tests.
 
 - [`f_load_packages()`](https://delde001.github.io/rfriend/reference/f_load_packages.md)
   : Install and Load Multiple R Packages
@@ -109,6 +115,9 @@
 
 - [`plot(`*`<f_kruskal_test>`*`)`](https://delde001.github.io/rfriend/reference/plot.f_kruskal_test.md)
   : Plot method for f_kruskal_test objects
+
+- [`plot(`*`<f_lmer>`*`)`](https://delde001.github.io/rfriend/reference/plot.f_lmer.md)
+  : Plot method for f_lmer objects
 
 - [`plot(`*`<f_long>`*`)`](https://delde001.github.io/rfriend/reference/plot.f_long.md)
   : Plot method for f_long objects

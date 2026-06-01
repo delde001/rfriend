@@ -69,9 +69,11 @@ data transformations, assumption checking, and post hoc testing.
 DESCRIPTION for details). You can install the latest released version
 from CRAN with:
 
+
     install.packages("rfriend")
 
 If you want the latest development version (if available on GitHub):
+
 
 
     # install.packages("devtools")
@@ -81,6 +83,7 @@ If you want the latest development version (if available on GitHub):
 ------------------------------------------------------------------------
 
 ## Basic Usage
+
 
     library(rfriend)
 
@@ -192,8 +195,8 @@ Feel free to reach out for support, feature requests, or collaborations.
   : Conditional Rounding for Numeric Values
 
 - [`f_corplot()`](https://delde001.github.io/rfriend/reference/f_corplot.md)
-  : Correlation Plots with Factor Detection, Customization, and Multiple
-  Correlation Coefficients
+  : Correlation Plots with Factor Detection and Multiple Correlation
+  Coefficients
 
 - [`f_factors()`](https://delde001.github.io/rfriend/reference/f_factors.md)
   : Convert multiple columns to Factors in a data frame
@@ -209,6 +212,12 @@ Feel free to reach out for support, feature requests, or collaborations.
 - [`f_kruskal_test()`](https://delde001.github.io/rfriend/reference/f_kruskal_test.md)
   : Perform multiple Kruskal-Wallis tests with a user-friendly output
   file, do data inspection and Dunn's test (of 'rstatix') as post hoc.
+
+- [`f_lmer()`](https://delde001.github.io/rfriend/reference/f_lmer.md) :
+
+  Fit a linear mixed model with
+  [`lme4::lmer()`](https://rdrr.io/pkg/lme4/man/lmer.html) including
+  assumption checks, diagnostics, R-squared and post hoc tests.
 
 - [`f_load_packages()`](https://delde001.github.io/rfriend/reference/f_load_packages.md)
   : Install and Load Multiple R Packages
@@ -271,6 +280,9 @@ Feel free to reach out for support, feature requests, or collaborations.
 
 - [`plot(`*`<f_kruskal_test>`*`)`](https://delde001.github.io/rfriend/reference/plot.f_kruskal_test.md)
   : Plot method for f_kruskal_test objects
+
+- [`plot(`*`<f_lmer>`*`)`](https://delde001.github.io/rfriend/reference/plot.f_lmer.md)
+  : Plot method for f_lmer objects
 
 - [`plot(`*`<f_long>`*`)`](https://delde001.github.io/rfriend/reference/plot.f_long.md)
   : Plot method for f_long objects

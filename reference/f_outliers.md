@@ -13,25 +13,25 @@ original data structure and adding a `row_id` column for traceability.
 f_outliers(x, ...)
 
 # S3 method for class 'numeric'
-f_outliers(data, ...)
+f_outliers(x, ...)
 
 # S3 method for class 'integer'
-f_outliers(data, ...)
+f_outliers(x, ...)
 
 # S3 method for class 'formula'
 f_outliers(formula, data, ...)
 
 # S3 method for class 'data.frame'
 f_outliers(
-  data,
-  columns,
+  x,
+  columns = NULL,
   group_vars = NULL,
   id_var = NULL,
   coef = 1.5,
   digits = NULL,
   export_to_excel = FALSE,
   close_generated_files = FALSE,
-  open_generated_files = TRUE,
+  open_generated_files = interactive(),
   save_as = NULL,
   save_in_wdir = FALSE,
   check_input = TRUE,
@@ -43,9 +43,13 @@ f_outliers(
 
 ## Arguments
 
-- data:
+- x:
 
-  A `vector`, `data.frame`, `data.table`, or `tibble`.
+  A data.frame or formula (dispatches to the right method).
+
+- ...:
+
+  Further arguments forwarded to `f_outliers.data.frame`.
 
 - formula:
 
@@ -54,11 +58,17 @@ f_outliers(
   using `-` or `+` (e.g., `col1 + col2 ~ group1 + group2`) to do a
   sequential analysis for each column parameter.
 
+- data:
+
+  A `vector`, `data.frame`, `data.table`, or `tibble`.
+
 - columns:
 
   The numerical columns to analyze if no formula is used. Can be entered
   as a single character string (e.g., `"weight"`) or as a character
-  vector `c("weight", "length"`).
+  vector `c("weight", "length"`). When omitted, defaults to all numeric
+  columns in `data` (excluding any columns named in `group_vars` or
+  `id_var`).
 
 - group_vars:
 
@@ -100,8 +110,10 @@ f_outliers(
 
 - open_generated_files:
 
-  Logical. If `TRUE`, opens the Excel file after creation. Default
-  `TRUE`.
+  Logical. Whether to open the generated output files after creation.
+  Defaults to `TRUE` in an interactive R session and `FALSE` otherwise
+  (e.g. in scripts or automated pipelines). Set to `TRUE` or `FALSE` to
+  override this behaviour explicitly.
 
 - save_as:
 
@@ -248,6 +260,7 @@ print(out)
 out <- f_outliers(Salary + Age ~ Team + Department, data = df)
 print(out)            # prints both result tables
 #> 
+#>  Variable: Salary
 #> ----------------------------------------------------
 #> row_id   Salary     Team   Depart   Age     Employ  
 #>                            ment             eeID    
@@ -260,6 +273,7 @@ print(out)            # prints both result tables
 #> ----------------------------------------------------
 #> 
 #> 
+#>  Variable: Age
 #> ----------------------------------------------------
 #> row_id   Age     Team   Depart   Salary     Employ  
 #>                         ment                eeID    
@@ -316,13 +330,13 @@ print(out)
 out_standard <- f_outliers(Salary ~ Team, data = df, coef = 1.5)
 out_extreme  <- f_outliers(Salary ~ Team, data = df, coef = 3.0)
 
-nrow(out_standard$output_df)  # 3 — catches mild + extreme outliers
+nrow(out_standard$output_df)  # 3 -- catches mild + extreme outliers
 #> [1] 3
-nrow(out_extreme$output_df)   # 2 — catches extreme outliers only
+nrow(out_extreme$output_df)   # 2 -- catches extreme outliers only
 #> [1] 2
 
 # --- Example 7: Vector input ---
-# Pass a column directly as a vector — no data.frame needed.
+# Pass a column directly as a vector -- no data.frame needed.
 # The column name is captured automatically from the call.
 
 out <- f_outliers(df$Salary)

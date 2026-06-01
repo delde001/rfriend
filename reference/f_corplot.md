@@ -1,4 +1,4 @@
-# Correlation Plots with Factor Detection, Customization, and Multiple Correlation Coefficients
+# Correlation Plots with Factor Detection and Multiple Correlation Coefficients
 
 Creates correlation plots for numeric variables in a data frame. The
 upper triangle displays Pearson \\r\\, Spearman \\\rho\\, and Kendall
@@ -30,7 +30,7 @@ f_corplot(
   res = 600,
   pointsize = 10,
   close_generated_files = FALSE,
-  open_generated_files = TRUE,
+  open_generated_files = interactive(),
   output_type = "word",
   save_as = NULL,
   save_in_wdir = FALSE
@@ -130,8 +130,10 @@ f_corplot(
 
 - open_generated_files:
 
-  Logical. If `TRUE`, opens generated output files automatically.
-  Default `TRUE`.
+  Logical. Whether to open the generated output files after creation.
+  Defaults to `TRUE` in an interactive R session and `FALSE` otherwise
+  (e.g. in scripts or automated pipelines). Set to `TRUE` or `FALSE` to
+  override this behaviour explicitly.
 
 - output_type:
 
@@ -153,7 +155,7 @@ f_corplot(
 ## Value
 
 No value is returned to the R environment. Output files are saved and
-opened automatically when running on Windows.
+opened automatically.
 
 ## Details
 
@@ -178,7 +180,7 @@ opened automatically when running on Windows.
   symbols whenever a legend is generated.
 
 - **Constant columns:** Zero-variance columns produce `NA` in all
-  correlation panels rather than crashing.
+  correlation panels.
 
 This function requires
 \[Pandoc\](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3
@@ -190,9 +192,9 @@ or higher), a universal document converter.
 
 - **macOS:** If using Homebrew, Pandoc is typically installed in
   "/usr/local/bin". Alternatively, download the .pkg installer and
-  verify that the binary’s location is in your PATH.
+  verify that the binary's location is in your PATH.
 
-- **Linux:** Install Pandoc through your distribution’s package manager
+- **Linux:** Install Pandoc through your distribution's package manager
   (commonly installed in "/usr/bin" or "/usr/local/bin") or manually,
   and ensure the directory containing Pandoc is in your PATH.
 
@@ -210,12 +212,12 @@ mtcars_sub <- subset(mtcars, select = -c(am, qsec, vs))
 f_corplot(mtcars_sub,
           color_factor = "gear",
           shape_factor = "cyl",
-          output_type  = "png",
-          open_generated_files = FALSE)
+          output_type  = "png"
+          )
 #> 
 #> Variable 'gear' was converted to a factor.
 #> Variable 'cyl' was converted to a factor.
-#> Saving output in: /tmp/RtmpyM0xyc/mtcars_sub_CorPlot.png and /tmp/RtmpyM0xyc/mtcars_sub_Legend.png
+#> Saving output in: /tmp/RtmpG5HCTF/mtcars_sub_CorPlot.png and /tmp/RtmpG5HCTF/mtcars_sub_Legend.png
 
 # With ordinal variables
 data(iris)
@@ -226,5 +228,5 @@ f_corplot(iris,
           ordinal_vars = "Petal.Width",
           output_type  = "png",
           open_generated_files = FALSE)
-#> Saving output in: /tmp/RtmpyM0xyc/iris_CorPlot.png and /tmp/RtmpyM0xyc/iris_Legend.png
+#> Saving output in: /tmp/RtmpG5HCTF/iris_CorPlot.png and /tmp/RtmpG5HCTF/iris_Legend.png
 ```

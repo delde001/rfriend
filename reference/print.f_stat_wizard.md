@@ -6,7 +6,7 @@ Print method for f_stat_wizard
 
 ``` r
 # S3 method for class 'f_stat_wizard'
-print(x, ...)
+print(x, plots = TRUE, ...)
 ```
 
 ## Arguments
@@ -14,6 +14,11 @@ print(x, ...)
 - x:
 
   An object of class `f_stat_wizard`.
+
+- plots:
+
+  Logical. If `TRUE`, display diagnostic plots (histogram and QQ-plot)
+  if they were generated with `plots=TRUE`. Default `TRUE`.
 
 - ...:
 

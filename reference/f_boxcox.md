@@ -19,7 +19,7 @@ f_boxcox(
   xlab = expression(lambda),
   ylab = "log-Likelihood",
   alpha = 0.05,
-  open_generated_files = TRUE,
+  open_generated_files = interactive(),
   close_generated_files = FALSE,
   output_type = "default",
   save_as = NULL,
@@ -78,10 +78,10 @@ f_boxcox(
 
 - open_generated_files:
 
-  Logical. If `TRUE`, opens the generated output files ('pdf', 'Word' or
-  'Excel') files depending on the output format. This to directly view
-  the results after creation. Files are stored in tempdir(). Default is
-  `TRUE`.
+  Logical. Whether to open the generated output files after creation.
+  Defaults to `TRUE` in an interactive R session and `FALSE` otherwise
+  (e.g. in scripts or automated pipelines). Set to `TRUE` or `FALSE` to
+  override this behaviour explicitly.
 
 - close_generated_files:
 
@@ -191,9 +191,9 @@ or higher), a universal document converter.
 
 - **macOS:** If using Homebrew, Pandoc is typically installed in
   "/usr/local/bin". Alternatively, download the .pkg installer and
-  verify that the binary’s location is in your PATH.
+  verify that the binary's location is in your PATH.
 
-- **Linux:** Install Pandoc through your distribution’s package manager
+- **Linux:** Install Pandoc through your distribution's package manager
   (commonly installed in "/usr/bin" or "/usr/local/bin") or manually,
   and ensure the directory containing Pandoc is in your PATH.
 
@@ -254,6 +254,7 @@ print(bc)
 #> Box-Cox Transformation λ = -0.218   
 #> According to the Shapiro-Wilk test ( 0.9482  >  0.05 ) data is
 #>  normally distributed after transformation.
+#>   
 
 # Plot the QQ plots, Histograms and Lambda Log-Likelihood estimation.
 plot(bc)

@@ -10,20 +10,27 @@ outliers.
 f_scan(x, ...)
 
 # S3 method for class 'formula'
-f_scan(formula, data, ...)
+f_scan(formula, data = NULL, ...)
+
+# S3 method for class 'numeric'
+f_scan(x, ...)
+
+# S3 method for class 'integer'
+f_scan(x, ...)
 
 # S3 method for class 'data.frame'
 f_scan(
-  data,
-  columns,
+  x,
+  columns = NULL,
   group_vars = NULL,
   summary = TRUE,
   outliers = TRUE,
   coef = 1.5,
   limit_columns = 7,
   fancy_names = NULL,
+  advice = FALSE,
   close_generated_files = FALSE,
-  open_generated_files = TRUE,
+  open_generated_files = interactive(),
   output_type = "default",
   save_as = NULL,
   save_in_wdir = FALSE,
@@ -33,6 +40,14 @@ f_scan(
 ```
 
 ## Arguments
+
+- x:
+
+  A data.frame or formula (dispatches to the right method).
+
+- ...:
+
+  Further arguments forwarded to `f_scan.data.frame`.
 
 - formula:
 
@@ -49,7 +64,9 @@ f_scan(
 
   The numerical column(s) to summarize if no formula is used. Can be
   entered as a single character string (e.g., `"weight"`) or as a
-  character vector `c("weight", "length"`).
+  character vector `c("weight", "length"`). When omitted, defaults to
+  all numeric columns in `data` (excluding any columns named in
+  `group_vars`).
 
 - group_vars:
 
@@ -80,6 +97,14 @@ f_scan(
   Named character vector or `NULL`. Optional mapping of column names to
   more readable names for display in plots and legends.
 
+- advice:
+
+  Logical. If `TRUE`, runs
+  [`f_stat_wizard()`](https://delde001.github.io/rfriend/reference/f_stat_wizard.md)
+  on each response column and appends the recommendation to the result.
+  The advice is accessible via `result[["column_name"]]$advice` and is
+  printed automatically. Default `FALSE`.
+
 - close_generated_files:
 
   Logical. Closes open Excel or Word (NOT pdf) files before writing,
@@ -89,10 +114,10 @@ f_scan(
 
 - open_generated_files:
 
-  Logical. If `TRUE`, Opens the generated output files ('pdf', 'Word' or
-  'Excel') files depending on the output format. This to directly view
-  the results after creation. Files are stored in tempdir(). Default is
-  `TRUE`.
+  Logical. Whether to open the generated output files after creation.
+  Defaults to `TRUE` in an interactive R session and `FALSE` otherwise
+  (e.g. in scripts or automated pipelines). Set to `TRUE` or `FALSE` to
+  override this behaviour explicitly.
 
 - output_type:
 
@@ -166,9 +191,9 @@ or higher), a universal document converter.
 
 - **macOS:** If using Homebrew, Pandoc is typically installed in
   "/usr/local/bin". Alternatively, download the .pkg installer and
-  verify that the binary’s location is in your PATH.
+  verify that the binary's location is in your PATH.
 
-- **Linux:** Install Pandoc through your distribution’s package manager
+- **Linux:** Install Pandoc through your distribution's package manager
   (commonly installed in "/usr/bin" or "/usr/local/bin") or manually,
   and ensure the directory containing Pandoc is in your PATH.
 
@@ -241,6 +266,7 @@ result <- f_scan(
 
 
 
+# \donttest{
 # 3. Non-formula | 2 groups | Multiple columns | Excel output
  result <- f_scan(
    mtcars,
@@ -251,7 +277,7 @@ result <- f_scan(
    output_type = "excel",
    save_as    = "mtcars_scan"
  )
-#> Saving output in: /tmp/RtmpyM0xyc/mtcars_scan.xlsx
+#> Saving output in: /tmp/RtmpG5HCTF/mtcars_scan.xlsx
 
 # 4. Formula | 1 group | Strict outlier detection | Word output
 result <- f_scan(
@@ -262,7 +288,7 @@ result <- f_scan(
   output_type = "word",
   save_as     = "iris_scan"
  )
-#> Saving output in: /tmp/RtmpyM0xyc/iris_scan.docx
+#> Saving output in: /tmp/RtmpG5HCTF/iris_scan.docx
 
 # 5. Formula | 2 groups | Multiple columns | Fancy names
 result <- f_scan(
@@ -271,11 +297,11 @@ result <- f_scan(
  fancy_names = c(mpg = "Fuel Efficiency", hp = "Horsepower",
                  wt  = "Weight",          vs = "Engine Type",
                  am  = "Transmission"),
- summary     = TRUE,
- outliers    = FALSE
+ summary     = TRUE
 )
 print(result)
 #> 
+#>  Variable: Fuel Efficiency
 #> --- Summary Statistics ---
 #> 
 #> -----------------------------------------------------------------------------------------
@@ -292,11 +318,16 @@ print(result)
 #> -----------------------------------------------------------------------------------------
 #> 
 #> 
+#> 
+#> --- Outlier Detection ---
+#> No outliers detected.
+#> 
 
 
 
 
 #> 
+#>  Variable: Horsepower
 #> --- Summary Statistics ---
 #> 
 #> ----------------------------------------------------------------------------------------
@@ -313,11 +344,26 @@ print(result)
 #> ----------------------------------------------------------------------------------------
 #> 
 #> 
+#> 
+#> --- Outlier Detection ---
+#> 
+#> Found 1 outliers:
+#> 
+#> ----------------------------------------------------------------
+#> row_id   Horsep   Engine   Transm   Fuel E   cyl   disp   drat  
+#>          ower     Type     ission   fficie                      
+#>                                     ncy                         
+#> -------- -------- -------- -------- -------- ----- ------ ------
+#> 8        62       1        0        24.4     4     147    3.69  
+#> ----------------------------------------------------------------
+#> 
+#> 
 
 
 
 
 #> 
+#>  Variable: Weight
 #> --- Summary Statistics ---
 #> 
 #> ------------------------------------------------------------------------------------------
@@ -334,6 +380,21 @@ print(result)
 #> ------------------------------------------------------------------------------------------
 #> 
 #> 
+#> 
+#> --- Outlier Detection ---
+#> 
+#> Found 1 outliers:
+#> 
+#> ------------------------------------------------------------------
+#> row_id   Weight   Engine   Transm   Fuel E   cyl   disp   Horsep  
+#>                   Type     ission   fficie                ower    
+#>                                     ncy                           
+#> -------- -------- -------- -------- -------- ----- ------ --------
+#> 21       2.46     1        0        21.5     4     120    97      
+#> ------------------------------------------------------------------
+#> 
+#> 
+
 
 
 
@@ -348,77 +409,197 @@ plant_data <- data.frame(
   batch     = factor(rep(c("1", "2", "3"), 40))
  )
 
-# 6. Formula | 3 groups | Facet Grid | Saved to working directory
+# 6. Formula | 3 groups | Facet Grid
 result <- f_scan(
   weight ~ species + treatment + batch,
   data         = plant_data,
   coef         = 2.0,
   digits       = 2,
-  save_in_wdir = TRUE,
-  output_type  = "pdf"
+  output_type  = "word"
 )
-#> Saving output in: /home/runner/work/rfriend/rfriend/docs/reference/plant_data_fscan_output.pdf
-#> Warning: error in running command
-#> ! sh: 1: pdflatex: not found
-#> Error: LaTeX failed to compile /home/runner/work/rfriend/rfriend/docs/reference/plant_data_fscan_output.tex. See https://yihui.org/tinytex/r/#debugging for debugging tips. See plant_data_fscan_output.log for more info.
+#> Saving output in: /tmp/RtmpG5HCTF/plant_data_fscan_output.docx
 print(result)
 #> 
 #> --- Summary Statistics ---
 #> 
-#> -----------------------------------------------------------------------------------------
-#> Engine Typ   Transmissi   n    mean   sd     se      min    Q1     median   Q3     max   
-#> e            on                                                                          
-#> ------------ ------------ ---- ------ ------ ------- ------ ------ -------- ------ ------
-#> 0            0            12   15.1   2.77   0.801   10.4   14.1   15.2     16.6   19.2  
+#> ------------------------------------------------------------------------------------------------
+#> species   treatment   batch   n    mean    sd     se      min     Q1      median   Q3     max   
+#> --------- ----------- ------- ---- ------- ------ ------- ------- ------- -------- ------ ------
+#> A         control     1       10   9.72    3.16   1.001   5.12    6.66    10.57    12.4   13.8  
 #> 
-#> 1            0            7    20.7   2.47   0.934   17.8   18.6   21.4     22.1   24.4  
+#> B         control     1       10   14.26   1.58   0.499   11.61   13.36   14.59    15.2   16.8  
 #> 
-#> 0            1            6    19.8   4.01   1.637   15.0   16.8   20.4     21.0   26.0  
+#> A         treated     1       10   9.85    1.10   0.348   8.43    8.87    10.13    10.7   11.5  
 #> 
-#> 1            1            7    28.4   4.76   1.798   21.4   25.1   30.4     31.4   33.9  
-#> -----------------------------------------------------------------------------------------
+#> B         treated     1       10   14.55   2.66   0.842   10.68   12.55   14.30    16.4   19.4  
 #> 
+#> A         control     2       10   10.33   1.37   0.434   8.87    9.43    9.73     10.9   12.6  
+#> 
+#> B         control     2       10   13.96   1.72   0.545   11.80   12.21   14.27    15.5   16.1  
+#> 
+#> A         treated     2       10   9.71    2.53   0.801   4.01    8.42    10.48    11.2   13.2  
+#> 
+#> B         treated     2       10   13.49   2.13   0.675   11.08   12.09   13.10    14.0   17.7  
+#> 
+#> A         control     3       10   10.36   2.85   0.901   4.69    9.41    9.76     12.0   14.6  
+#> 
+#> B         control     3       10   14.93   1.38   0.436   12.91   13.77   15.05    15.8   17.0  
+#> 
+#> A         treated     3       10   9.71    2.56   0.811   5.17    7.77    10.61    11.3   12.9  
+#> 
+#> B         treated     3       10   13.84   1.19   0.377   12.28   12.98   13.85    14.2   16.1  
+#> ------------------------------------------------------------------------------------------------
+#> 
+#> 
+#> 
+#> --- Outlier Detection ---
+#> No outliers detected.
 #> 
 
 
 
 
+
+# 7. With statistical advice
+result <- f_scan(
+  Sepal.Length ~ Species,
+  data    = iris,
+  advice  = TRUE
+)
+#' print(result)
+result[["Sepal.Length"]]$advice$y_type
+#> [1] "ratio_normal"
+
+
+# 8. Vector input | Single numeric vector (no formula, no data.frame)
+# When you only have loose vectors in your workspace, pass one
+# directly to f_scan(). The vector's name is used as the column label
+# in the dashboard and outlier table.
+disp1 <- mtcars$disp
+result <- f_scan(disp1)
+print(result)
 #> 
 #> --- Summary Statistics ---
 #> 
-#> ----------------------------------------------------------------------------------------
-#> Engine Typ   Transmissi   n    mean    sd     se      min   Q1      median   Q3    max  
-#> e            on                                                                         
-#> ------------ ------------ ---- ------- ------ ------- ----- ------- -------- ----- -----
-#> 0            0            12   194.2   33.4   9.63    150   175.0   180      219   245  
+#> ----------------------------------------------------------
+#> n    mean   sd    se     min    Q1    median   Q3    max  
+#> ---- ------ ----- ------ ------ ----- -------- ----- -----
+#> 32   231    124   21.9   71.1   121   196      326   472  
+#> ----------------------------------------------------------
 #> 
-#> 1            0            7    102.1   20.9   7.91    62    96.0    105      116   123  
 #> 
-#> 0            1            6    180.8   98.8   40.34   91    110.0   142      242   335  
 #> 
-#> 1            1            7    80.6    24.1   9.13    52    65.5    66       101   113  
-#> ----------------------------------------------------------------------------------------
+#> --- Outlier Detection ---
+#> No outliers detected.
+#> 
+
+
+
+
+
+# 9. Formula on vectors | Multiple responses | One grouping vector
+# f_scan() also accepts a formula built from bare vectors, i.e.
+# no `data =` argument is needed. Multiple
+# response variables are combined with `+` on the
+# left hand side of the formula, exactly as
+# in the data.frame form.
+disp1 <- mtcars$disp
+hp1   <- mtcars$hp
+cyl1  <- factor(mtcars$cyl)
+result <- f_scan(disp1 + hp1 ~ cyl1)
+print(result)
+#> 
+#>  Variable: disp1
+#> --- Summary Statistics ---
+#> 
+#> ---------------------------------------------------------------------
+#> cyl1   n    mean   sd     se     min     Q1      median   Q3    max  
+#> ------ ---- ------ ------ ------ ------- ------- -------- ----- -----
+#> 4      11   105    26.9   8.1    71.1    78.8    108      121   147  
+#> 
+#> 6      7    183    41.6   15.7   145.0   160.0   168      196   258  
+#> 
+#> 8      14   353    67.8   18.1   275.8   301.8   350      390   472  
+#> ---------------------------------------------------------------------
+#> 
+#> 
+#> 
+#> --- Outlier Detection ---
+#> 
+#> Found 1 outliers:
+#> 
+#> -----------------------------
+#> row_id   disp1   cyl1   hp1  
+#> -------- ------- ------ -----
+#> 4        258     6      110  
+#> -----------------------------
 #> 
 #> 
 
 
 
 
+#> 
+#>  Variable: hp1
+#> --- Summary Statistics ---
+#> 
+#> ---------------------------------------------------------------------
+#> cyl1   n    mean    sd     se      min   Q1      median   Q3    max  
+#> ------ ---- ------- ------ ------- ----- ------- -------- ----- -----
+#> 4      11   82.6    20.9   6.31    52    65.5    91       96    113  
+#> 
+#> 6      7    122.3   24.3   9.17    105   110.0   110      123   175  
+#> 
+#> 8      14   209.2   51.0   13.62   150   176.2   192      241   335  
+#> ---------------------------------------------------------------------
+#> 
+#> 
+#> 
+#> --- Outlier Detection ---
+#> 
+#> Found 1 outliers:
+#> 
+#> -----------------------------
+#> row_id   hp1   cyl1   disp1  
+#> -------- ----- ------ -------
+#> 30       175   6      145    
+#> -----------------------------
+#> 
+#> 
+
+
+
+
+
+# 10. Positional vector form: equivalent to f_scan(disp1 ~ cyl1).
+# The first vector is the response, the rest are grouping variables.
+disp1 <- mtcars$disp
+cyl1  <- factor(mtcars$cyl)
+f_scan(disp1, cyl1)
 #> 
 #> --- Summary Statistics ---
 #> 
-#> ------------------------------------------------------------------------------------------
-#> Engine Typ   Transmissi   n    mean   sd      se      min    Q1     median   Q3     max   
-#> e            on                                                                           
-#> ------------ ------------ ---- ------ ------- ------- ------ ------ -------- ------ ------
-#> 0            0            12   4.10   0.768   0.222   3.44   3.56   3.81     4.37   5.42  
+#> ---------------------------------------------------------------------
+#> cyl1   n    mean   sd     se     min     Q1      median   Q3    max  
+#> ------ ---- ------ ------ ------ ------- ------- -------- ----- -----
+#> 4      11   105    26.9   8.1    71.1    78.8    108      121   147  
 #> 
-#> 1            0            7    3.19   0.348   0.131   2.46   3.17   3.21     3.44   3.46  
+#> 6      7    183    41.6   15.7   145.0   160.0   168      196   258  
 #> 
-#> 0            1            6    2.86   0.487   0.199   2.14   2.66   2.82     3.10   3.57  
+#> 8      14   353    67.8   18.1   275.8   301.8   350      390   472  
+#> ---------------------------------------------------------------------
 #> 
-#> 1            1            7    2.03   0.440   0.166   1.51   1.73   1.94     2.26   2.78  
-#> ------------------------------------------------------------------------------------------
+#> 
+#> 
+#> --- Outlier Detection ---
+#> 
+#> Found 1 outliers:
+#> 
+#> -----------------------
+#> row_id   disp1   cyl1  
+#> -------- ------- ------
+#> 4        258     6     
+#> -----------------------
 #> 
 #> 
 
@@ -426,4 +607,5 @@ print(result)
 
 
 
+# }
 ```

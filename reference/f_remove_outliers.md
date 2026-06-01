@@ -118,7 +118,7 @@ clean_df <- f_remove_outliers(df, bad_rows)
 nrow(clean_df)
 #> [1] 37
 
-# --- Example 4: Selective removal — only act on a subset of outliers ---
+# --- Example 4: Selective removal -- only act on a subset of outliers ---
 # Find all flagged rows, but only remove the extreme high salaries.
 # Step 1: Identify all Salary outliers grouped by Team
 bad_rows    <- f_outliers(Salary ~ Team, data = df)
@@ -127,7 +127,7 @@ all_flagged <- bad_rows$output_df
 # Step 2: Filter to keep only the rows where Salary > 90000
 really_bad  <- all_flagged[all_flagged$Salary > 90000, ]
 
-# Step 3: Remove only those rows — low outlier (row 40) is preserved
+# Step 3: Remove only those rows -- low outlier (row 40) is preserved
 clean_df <- f_remove_outliers(df, really_bad)
 #> rfriend: Removed 1 outliers.
 #> rfriend: Rows: 40 -> 39

@@ -21,10 +21,11 @@ f_aov(
   adjust = "sidak",
   intro_text = TRUE,
   close_generated_files = FALSE,
-  open_generated_files = TRUE,
+  open_generated_files = interactive(),
   output_type = "default",
   save_as = NULL,
-  save_in_wdir = FALSE
+  save_in_wdir = FALSE,
+  ...
 )
 ```
 
@@ -79,7 +80,7 @@ f_aov(
   Logical. If `TRUE`, runs the ANOVA even when at least one cell has \\n
   = 1\\ (saturated model). By default (`FALSE`), such responses are
   skipped with a warning because F-statistics and p-values are undefined
-  for saturated models. Set to `TRUE` only for diagnostic purposes —
+  for saturated models. Set to `TRUE` only for diagnostic purposes –
   results should **not** be reported or interpreted as valid. Default is
   `FALSE`.
 
@@ -100,7 +101,7 @@ f_aov(
 
   "sidak"
 
-  :   Šidák correction that controls the family-wise error rate. Less
+  :   Sidak correction that controls the family-wise error rate. Less
       conservative than Bonferroni.
 
   "bonferroni"
@@ -133,10 +134,10 @@ f_aov(
 
 - open_generated_files:
 
-  Logical. If `TRUE`, Opens the generated output files ('pdf', 'Word' or
-  'Excel') files depending on the output format. This to directly view
-  the results after creation. Files are stored in tempdir(). Default is
-  `TRUE`.
+  Logical. Whether to open the generated output files after creation.
+  Defaults to `TRUE` in an interactive R session and `FALSE` otherwise
+  (e.g. in scripts or automated pipelines). Set to `TRUE` or `FALSE` to
+  override this behaviour explicitly.
 
 - output_type:
 
@@ -174,6 +175,21 @@ f_aov(
   is `FALSE`, this avoid unintended changes to the global environment.
   If `save_as` location is specified `save_in_wdir` is overwritten by
   `save_as`.
+
+- ...:
+
+  Additional arguments forwarded to
+  [`aov`](https://rdrr.io/r/stats/aov.html). The arguments `subset`,
+  `na.action`, and `weights` are handled specially: when supplied, they
+  are applied via
+  [`model.frame`](https://rdrr.io/r/stats/model.frame.html) so that the
+  n=1 cell check, Shapiro-Wilk test, Levene test, optional
+  transformations, residual diagnostics, and `emmeans` post hoc tests
+  all see the exact same row set as
+  [`aov()`](https://rdrr.io/r/stats/aov.html) itself. Any other
+  [`aov()`](https://rdrr.io/r/stats/aov.html) arguments (e.g.
+  `contrasts`, `projections`, `qr`, `contrasts.arg`) are passed through
+  unchanged.
 
 ## Value
 
@@ -215,6 +231,16 @@ Outputs can be generated in multiple formats ("pdf", "word", "excel" and
 `output_type = "rmd"` is used it is adviced to use it in a chunk with
 {r, echo=FALSE, results='asis'}
 
+\*Non-significant ANOVA results\*: When the overall F-test is not
+significant, f_aov still reports the estimated marginal means table, but
+with all pairwise comparison letters replaced by \*"ns"\*. The numeric
+estimates (and their confidence intervals) are provided because they are
+often needed for manuscript tables, especially when the response was
+back-transformed from a Box-Cox or bestNormalize scale - the raw
+descriptive means and the emmeans values can differ, and it is the
+emmeans values that correspond to the actual model. The \*"ns"\* labels
+signal that pairwise differences should not be interpreted.
+
 This function requires
 \[Pandoc\](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3
 or higher), a universal document converter.
@@ -225,9 +251,9 @@ or higher), a universal document converter.
 
 - **macOS:** If using Homebrew, Pandoc is typically installed in
   "/usr/local/bin". Alternatively, download the .pkg installer and
-  verify that the binary’s location is in your PATH.
+  verify that the binary's location is in your PATH.
 
-- **Linux:** Install Pandoc through your distribution’s package manager
+- **Linux:** Install Pandoc through your distribution's package manager
   (commonly installed in "/usr/bin" or "/usr/local/bin") or manually,
   and ensure the directory containing Pandoc is in your PATH.
 
@@ -289,17 +315,15 @@ f_aov_out <- f_aov(Sepal.Width + Sepal.Length ~ Species,
                    # Save output in MS Word file (Default is console)
                    output_type = "word",
                    # Do bestNormalize transformation for non-normal residual (Default is boxcox)
-                   transformation = "bestnormalize",
-                   # Do not automatically open the file.
-                   open_generated_files = FALSE
+                   transformation = "bestnormalize"
                    )
-#> Saving output in: /tmp/RtmpyM0xyc/iris_aov_output.docx
+#> Saving output in: /tmp/RtmpG5HCTF/iris_aov_output.docx
 
 # Print output to the console.
 print(f_aov_out)
 #> 
 #>    
-#> ==========================================================
+#> ===========================================================
 #>    ANOVA of response variable:  Sepal.Width 
 #> ===========================================================
 #> 
@@ -312,7 +336,8 @@ print(f_aov_out)
 #> ---
 #> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 #> 
-#> post hoc Analysis:
+#> --- Post hoc Comparisons of: Sepal.Width ---
+#> _________________________________________
 #>     Species emmean..        SE lower.CL upper.CL Letter  n
 #>  versicolor    2.770 0.0480391 2.653974 2.886026    a   50
 #>   virginica    2.974 0.0480391 2.857974 3.090026     b  50
@@ -332,11 +357,13 @@ print(f_aov_out)
 #> ---
 #> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 #> 
-#> TRANSFORMED post hoc Analysis:
+#> --- BACK TRANSFORMED Post hoc Comparisons of: Sepal.Length ---
 #>     Species median (BT) lower.CL upper.CL Letter  n
 #>      setosa    4.961446 4.861228 5.058657    a   50
 #>  versicolor    5.944039 5.721010 6.180035     b  50
 #>   virginica    6.593552 6.393878 6.750179      c 50
+#> ___________________________
+#> 
 #> Note: 'median (BT)' = back-transformed estimated marginal mean. Back-transforming a mean from a transformed scale returns the MEDIAN on the original scale, not the arithmetic mean. Report these as back-transformed medians. CIs are valid; SE is omitted (asymmetric on original scale).
 #> 
 #>    
@@ -395,7 +422,7 @@ cat(f_aov_rmd_out$rmd)
 #>  According to 'Anderson-Darling test' (0.2116 > 0.05) residuals **ARE normally distributed**.  
 #>   
 #> Check the plots in the figure below to assess normality.  
-#> ![](/tmp/RtmpyM0xyc/file1fa8435f5678.png)    
+#> ![](/tmp/RtmpG5HCTF/file1d9464ac0cca.png)    
 #>   
 #> 
 #> ## Observed Descriptives Table of:  Sepal.Width ~ Species   
@@ -476,11 +503,13 @@ cat(f_aov_rmd_out$rmd)
 #> Confidence level used: 0.95  
 #> Conf-level adjustment: sidak method for 3 estimates  
 #> P value adjustment: sidak method for 3 tests  
-#> significance level used: $\alpha$ = 0.05  
+#> significance level used: α = 0.05  
 #> 
-#> **Note:** Groups sharing the same letter are not significantly different. This indicates insufficient evidence to claim a difference, but it does not prove the groups are identical.
+#> **Note:** Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different. Sharing a letter indicates insufficient evidence to claim a difference; it does not prove the groups are identical.
+#>         
+#> 
 #> ## Estimated Means Plot of: Sepal.Width  
-#> ![](/tmp/RtmpyM0xyc/file1fa85ea7cb33.png)    
+#> ![](/tmp/RtmpG5HCTF/file1d946c337cbf.png)    
 #>   
 
 ```

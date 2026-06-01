@@ -69,9 +69,11 @@ data transformations, assumption checking, and post hoc testing.
 DESCRIPTION for details). You can install the latest released version
 from CRAN with:
 
+
     install.packages("rfriend")
 
 If you want the latest development version (if available on GitHub):
+
 
 
     # install.packages("devtools")
@@ -81,6 +83,7 @@ If you want the latest development version (if available on GitHub):
 ------------------------------------------------------------------------
 
 ## Basic Usage
+
 
     library(rfriend)
 

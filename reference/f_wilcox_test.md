@@ -58,6 +58,18 @@ f_wilcox_test(
   two-sample), or a formula of the form `response ~ group` or
   `response ~ 1`.
 
+- ...:
+
+  For the formula method: additional arguments forwarded to the
+  row-filtering step. The arguments `subset` and `na.action` are
+  honored: when supplied, they are spliced (still unevaluated) into a
+  [`model.frame`](https://rdrr.io/r/stats/model.frame.html) call built
+  once before the per-response loop, so the `subset` expression is
+  evaluated in the data's column scope (e.g. `subset = cyl == 6` works).
+  All responses in a multi-response call (`y1 + y2 ~ group`) are then
+  tested on the identical row set. For the default (vector) method,
+  `...` is currently unused.
+
 - formula:
 
   A formula specifying the model (alternative to using x/y).
@@ -87,6 +99,7 @@ f_wilcox_test(
   differences as `level1 - level2` based on factor level order, which
   defaults to alphabetical. To control the direction, set the reference
   level explicitly:
+
 
         # Set levels at creation
         group <- factor(group, levels = c("pre", "post"))
@@ -134,7 +147,10 @@ f_wilcox_test(
 
 - open_generated_files:
 
-  Logical. Opens the generated file after creation. Default `TRUE`.
+  Logical. Whether to open the generated output files after creation.
+  Defaults to `TRUE` in an interactive R session and `FALSE` otherwise
+  (e.g. in scripts or automated pipelines). Set to `TRUE` or `FALSE` to
+  override this behaviour explicitly.
 
 - output_type:
 

@@ -12,10 +12,16 @@ boxplots.
 f_boxplot(x, ...)
 
 # S3 method for class 'formula'
-f_boxplot(formula, data, ...)
+f_boxplot(formula, data = NULL, ...)
 
 # S3 method for class 'data.frame'
-f_boxplot(data, ...)
+f_boxplot(x, ...)
+
+# S3 method for class 'numeric'
+f_boxplot(x, ...)
+
+# S3 method for class 'integer'
+f_boxplot(x, ...)
 
 f_boxplot_worker(
   formula = NULL,
@@ -28,7 +34,7 @@ f_boxplot_worker(
   save_as = NULL,
   save_in_wdir = FALSE,
   close_generated_files = FALSE,
-  open_generated_files = TRUE,
+  open_generated_files = interactive(),
   boxplot_explanation = TRUE,
   detect_factors = TRUE,
   jitter = FALSE,
@@ -36,11 +42,30 @@ f_boxplot_worker(
   height = 7,
   units = "in",
   res = 300,
-  las = 2
+  las = 2,
+  color = "rainbow",
+  boxwidth = NULL,
+  ...
 )
 ```
 
 ## Arguments
+
+- x:
+
+  A data.frame, formula, or numeric/integer vector (dispatches to the
+  correct method). When a single numeric or integer vector is supplied,
+  it is treated as a single response variable, plotted on the y-axis
+  with the variable name as label, and grouped by a single dummy factor
+  (one box). When several unnamed numeric vectors are supplied (as in
+  base R's [`boxplot()`](https://rdrr.io/r/graphics/boxplot.html), e.g.
+  `f_boxplot(x1, x2)`), each becomes its own box side by side, labelled
+  with the original variable name on the x-axis.
+
+- ...:
+
+  Further arguments forwarded to `f_boxplot_worker`, such as
+  `fancy_names`, `title`, `fill`, etc.
 
 - formula:
 
@@ -109,10 +134,10 @@ f_boxplot_worker(
 
 - open_generated_files:
 
-  Logical. If `TRUE`, Opens the generated output files ('pdf', 'Word' or
-  'png') files depending on the output format. This to directly view the
-  results after creation. Files are stored in tempdir(). Default is
-  `TRUE`.
+  Logical. Whether to open the generated output files after creation.
+  Defaults to `TRUE` in an interactive R session and `FALSE` otherwise
+  (e.g. in scripts or automated pipelines). Set to `TRUE` or `FALSE` to
+  override this behaviour explicitly.
 
 - boxplot_explanation:
 
@@ -154,12 +179,42 @@ f_boxplot_worker(
   labels are perpendicular to the axis. (default setting). `las = 3`:
   Axis labels are always vertical.
 
+- color:
+
+  Colour scheme for the boxes. One of: `"rainbow"` (default; one hue per
+  group), `"bw"` (white fill with black lines, outliers and mean marker,
+  suitable for publication), a single R colour name or hex string
+  applied to all boxes (with a transparent fill and a darker outline
+  derived from it), or a vector of colours which is recycled to the
+  number of groups for a custom per-group palette.
+
+- boxwidth:
+
+  Numeric or `NULL`. Relative width of each box, passed as `boxwex` to
+  [`boxplot()`](https://rdrr.io/r/graphics/boxplot.html). When `NULL`
+  (default) the width is computed automatically as `num.bars/18`,
+  keeping boxes roughly comparable across plots with different numbers
+  of groups. Supply a numeric value (for example `0.5`) to override. The
+  numeric/integer vector method uses `0.4` by default to avoid an overly
+  thin single box.
+
 ## Value
 
-Generates a report file ('pdf' or 'Word') with boxplots and, optionally,
-opens it with the default program. Returns NULL (no R object) when
-generating 'pdf' or 'Word' files. Can also return R Markdown code or
-'PNG' files depending on the output format.
+The return value depends on `output_type`:
+
+- `"pdf"` and `"word"`: Writes a report file to `save_as` (or
+  [`tempdir()`](https://rdrr.io/r/base/tempfile.html) by default) and
+  returns `NULL` invisibly. The file can optionally be opened with
+  `open_generated_files = TRUE`.
+
+- `"png"`: Writes one PNG file per response x factor combination into
+  the directory given by `save_as` and returns `NULL` invisibly.
+
+- `"rmd"`: Returns the generated R Markdown content as a single
+  character string (invisibly). No file is written and nothing is
+  printed to the console. The caller can
+  [`cat()`](https://rdrr.io/r/base/cat.html) the string, assign it to a
+  variable, or embed it in a larger report (see Examples).
 
 ## Details
 
@@ -195,9 +250,9 @@ system PATH.
 
 **macOS:** If using Homebrew, Pandoc is typically installed in
 "/usr/local/bin". Alternatively, download the .pkg installer and verify
-that the binary’s location is in your PATH.
+that the binary's location is in your PATH.
 
-**Linux:** Install Pandoc through your distribution’s package manager
+**Linux:** Install Pandoc through your distribution's package manager
 (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and
 ensure the directory containing Pandoc is in your PATH.
 
@@ -225,10 +280,9 @@ new_names = c(
 # Use the whole data.frame to generate an MS Word report and don't open it.
 f_boxplot(iris,
            fancy_names = new_names,
-           output_type = "word",
-           open_generated_files = FALSE
+           output_type = "word"
            )
-#> Saving output in: /tmp/RtmpyM0xyc/data_BoxPlot.docx
+#> Saving output in: /tmp/RtmpG5HCTF/data_BoxPlot.docx
 
 # Use a formula to plot several response parameters (response 1 + response 2 etc)
 # and generate a rmd output without boxplot_explanation.
@@ -236,8 +290,78 @@ data(mtcars)
 f_boxplot(hp + disp ~ gear*cyl,
            data=mtcars,
            boxplot_explanation = FALSE,
-           output_type = "word",
-           open_generated_files = FALSE) # Do not automatically open the 'Word' file.
-#> Saving output in: /tmp/RtmpyM0xyc/data_BoxPlot.docx
+           output_type = "word"
+           )
+#> Saving output in: /tmp/RtmpG5HCTF/mtcars_BoxPlot.docx
+
+# Pass a bare numeric vector. Its name is used as the y-axis label
+# and as the data_name in the output filename.
+set.seed(1)
+my_vec <- rnorm(50, mean = 10)
+f_boxplot(my_vec, output_type = "png")
+#> PNG files saved in: /tmp/RtmpG5HCTF
+#>    
+
+# Formula with bare vectors (no data.frame): group hp by cyl.
+hp1  <- mtcars$hp
+cyl1 <- mtcars$cyl
+f_boxplot(hp1 ~ cyl1, output_type = "png")
+#> PNG files saved in: /tmp/RtmpG5HCTF
+#>    
+
+# Multiple unnamed numeric vectors, base R's boxplot() convention:
+# each vector becomes its own box, labelled on the x-axis with its
+# original variable name. Use the formula syntax above when you
+# instead want to group one response by a factor.
+f_boxplot(hp1, cyl1, output_type = "png")
+#> PNG files saved in: /tmp/RtmpG5HCTF
+#>    
+
+# Capture the R Markdown output as a string and render it inline.
+# Use output_type = "rmd" to get the markdown back as a character value
+# instead of writing a file. Useful for embedding in a larger knitr document.
+rmd <- f_boxplot(iris,
+                 output_type         = "rmd",
+                 boxplot_explanation = FALSE,
+                 outliers            = FALSE
+                 )
+
+# Display it in the console
+cat(rmd)
+#>   
+#>   
+#> #  Boxplots of:  Sepal.Length   
+#> ##  Boxplot of:  Sepal.Length  as function of  Species   
+#>    
+#> ![](/tmp/RtmpG5HCTF/file1d94655b6cb1.png)    
+#>   
+#>   
+#>   
+#> #  Boxplots of:  Sepal.Width   
+#> ##  Boxplot of:  Sepal.Width  as function of  Species   
+#>    
+#> ![](/tmp/RtmpG5HCTF/file1d9445cede05.png)    
+#>   
+#>   
+#>   
+#> #  Boxplots of:  Petal.Length   
+#> ##  Boxplot of:  Petal.Length  as function of  Species   
+#>    
+#> ![](/tmp/RtmpG5HCTF/file1d9445f0bbb0.png)    
+#>   
+#>   
+#>   
+#> #  Boxplots of:  Petal.Width   
+#> ##  Boxplot of:  Petal.Width  as function of  Species   
+#>    
+#> ![](/tmp/RtmpG5HCTF/file1d946a2069ab.png)    
+#>   
+
+# ...or splice it into a knitr child chunk with results = "asis":
+#   ```{r, echo=FALSE, results='asis'}
+#   cat(rmd)
+#   ```
+
+
 # }
 ```

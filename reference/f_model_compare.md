@@ -1,8 +1,8 @@
 # Compare Two Statistical Models
 
 Compares two statistical models by calculating key metrics such as AIC,
-BIC, log-likelihood, R-squared, and others. Supports comparison of
-nested models using ANOVA tests.
+BIC, log-likelihood, \\R^2\\, and others. Supports comparison of nested
+models using ANOVA tests.
 
 ## Usage
 
@@ -102,15 +102,17 @@ Calculate various metrics to assess model fit:
 
 - **Log-Likelihood:** Higher values (less negative) indicate better fit.
 
-- **R-squared:** Proportion of variance explained by the model.
+- **\\R^2\\:** Proportion of variance explained by the model.
 
-- **Adjusted R-squared:** R-squared penalized for the number of
-  parameters (for linear models).
+- **Adjusted \\R^2\\:** \\R^2\\ penalized for the number of parameters
+  (for linear models).
 
-- **Nagelkerke R^2:** A pseudo-R^2 for generalized linear models (GLMs).
+- **Nagelkerke \\R^2\\:** A pseudo-\\R^2\\ for generalized linear models
+  (GLMs).
 
-- **Marginal/Conditional R^2:** For mixed models, marginal R^2 reflects
-  fixed effects, while conditional R^2 includes random effects.
+- **Marginal/Conditional \\R^2\\:** For mixed models, marginal \\R^2\\
+  reflects fixed effects, while conditional \\R^2\\ includes random
+  effects.
 
 - **Sigma:** Residual standard error.
 
@@ -135,14 +137,14 @@ significantly improves fit.
 - The function supports a variety of model types but may issue warnings
   if unsupported or partially supported classes are used.
 
-- For GLMs, Nagelkerke's R^2 is used as a pseudo-R^2 approximation,
-  computed from the model's null deviance to avoid refitting a null
-  model.
+- For GLMs, Nagelkerke's \\R^2\\ is used as a pseudo-\\R^2\\
+  approximation, computed from the model's null deviance to avoid
+  refitting a null model.
 
 - For mixed models, the function relies on the 'r.squaredGLMM' function
-  from the 'MuMIn' package for R^2 calculation.
+  from the 'MuMIn' package for \\R^2\\ calculation.
 
-- For NLS models, R-squared is provided for convenience but should be
+- For NLS models, \\R^2\\ is provided for convenience but should be
   interpreted with caution as it does not have the same statistical
   properties as in linear models.
 
@@ -199,8 +201,8 @@ print(comparison)
 #>              AIC 166.029 156.652     -9.377
 #>              BIC 170.427 162.515     -7.911
 #>   Log-Likelihood -80.015 -74.326      5.689
-#>        R-squared   0.753   0.827      0.074
-#>   Adj. R-squared   0.745   0.815      0.070
+#>               R²   0.753   0.827      0.074
+#>          Adj. R²   0.745   0.815      0.070
 #>            Sigma   3.046   2.593     -0.452
 #>         Deviance 278.322 195.048    -83.274
 #>              SSE 278.322 195.048    -83.274
@@ -210,8 +212,8 @@ print(comparison)
 #> 
 #> Interpretation Guide:
 #> - Lower AIC/BIC values indicate better model fit.
-#> - Higher R-squared values indicate better model fit.
-#> - Adj. R-squared is R-squared with a penalty for
+#> - Higher R² values indicate better model fit.
+#> - Adj. R² is R² with a penalty for
 #>   the number of model parameters used.
 #> - A lower Sigma (residual standard error) generally
 #>   indicates a better fit to the data.
@@ -232,7 +234,7 @@ print(comparison)
 #>              AIC 23.176 16.059     -7.117
 #>              BIC 26.108 20.456     -5.651
 #>   Log-Likelihood -9.588 -5.030      4.558
-#>   Nagelkerke R^2  0.713  0.871      0.158
+#>    Nagelkerke R²  0.713  0.871      0.158
 #>            Sigma      1      1          0
 #>         Deviance 19.176 10.059     -9.117
 #>              SSE      -      -          -
@@ -242,9 +244,9 @@ print(comparison)
 #> 
 #> Interpretation Guide:
 #> - Lower AIC/BIC values indicate better model fit.
-#> - Higher R-squared values indicate better model fit.
-#> - Nagelkerke's R^2 adapts Cox & Snell's R^2 for GLMs,
-#>   scaling it to a 0-1 range to serve as a pseudo-R^2
+#> - Higher R² values indicate better model fit.
+#> - Nagelkerke's R² adapts Cox & Snell's R² for GLMs,
+#>   scaling it to a 0-1 range to serve as a pseudo-R²
 #>   approximating explained variance.
 #> - A lower Sigma (residual standard error) generally
 #>   indicates a better fit to the data.
@@ -252,7 +254,7 @@ print(comparison)
 #>   that the more complex model is significantly better.
 # }
 
-# Models can be passed in any order — the function auto-swaps if needed.
+# Models can be passed in any order - the function auto-swaps if needed.
 complex <- lm(mpg ~ wt + hp + qsec, data = mtcars)
 simple  <- lm(mpg ~ wt, data = mtcars)
 comparison <- f_model_compare(complex, simple)
@@ -276,7 +278,7 @@ print(comparison)
 #>              AIC 23.176 16.059     -7.117
 #>              BIC 26.108 20.456     -5.651
 #>   Log-Likelihood -9.588 -5.030      4.558
-#>   Nagelkerke R^2  0.713  0.871      0.158
+#>    Nagelkerke R²  0.713  0.871      0.158
 #>            Sigma      1      1          0
 #>         Deviance 19.176 10.059     -9.117
 #>              SSE      -      -          -
@@ -286,9 +288,9 @@ print(comparison)
 #> 
 #> Interpretation Guide:
 #> - Lower AIC/BIC values indicate better model fit.
-#> - Higher R-squared values indicate better model fit.
-#> - Nagelkerke's R^2 adapts Cox & Snell's R^2 for GLMs,
-#>   scaling it to a 0-1 range to serve as a pseudo-R^2
+#> - Higher R² values indicate better model fit.
+#> - Nagelkerke's R² adapts Cox & Snell's R² for GLMs,
+#>   scaling it to a 0-1 range to serve as a pseudo-R²
 #>   approximating explained variance.
 #> - A lower Sigma (residual standard error) generally
 #>   indicates a better fit to the data.

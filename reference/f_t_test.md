@@ -27,7 +27,7 @@ f_t_test(
   alpha = 0.05,
   intro_text = TRUE,
   close_generated_files = FALSE,
-  open_generated_files = TRUE,
+  open_generated_files = interactive(),
   output_type = "default",
   save_as = NULL,
   save_in_wdir = FALSE,
@@ -49,7 +49,7 @@ f_t_test(
   alpha = 0.05,
   intro_text = TRUE,
   close_generated_files = FALSE,
-  open_generated_files = TRUE,
+  open_generated_files = interactive(),
   output_type = "default",
   save_as = NULL,
   save_in_wdir = FALSE,
@@ -64,6 +64,18 @@ f_t_test(
   Numeric vector of data values (one-sample or first group for
   two-sample), or a formula of the form `response ~ group` or
   `response ~ 1`.
+
+- ...:
+
+  For the formula method: additional arguments forwarded to the
+  row-filtering step. The arguments `subset` and `na.action` are
+  honored: when supplied, they are spliced (still unevaluated) into a
+  [`model.frame`](https://rdrr.io/r/stats/model.frame.html) call built
+  once before the per-response loop, so the `subset` expression is
+  evaluated in the data's column scope (e.g. `subset = cyl == 6` works).
+  All responses in a multi-response call (`y1 + y2 ~ group`) are then
+  tested on the identical row set. For the default (vector) method,
+  `...` is currently unused.
 
 - formula:
 
@@ -151,7 +163,10 @@ f_t_test(
 
 - open_generated_files:
 
-  Logical. Opens the generated file after creation. Default `TRUE`.
+  Logical. Whether to open the generated output files after creation.
+  Defaults to `TRUE` in an interactive R session and `FALSE` otherwise
+  (e.g. in scripts or automated pipelines). Set to `TRUE` or `FALSE` to
+  override this behaviour explicitly.
 
 - output_type:
 
@@ -195,7 +210,7 @@ applied), and back-transformed confidence interval (if applicable).
 
 Delacre, M., Lakens, D., & Leys, C. (2017). Why psychologists should by
 default use Welch's t-test instead of Student's t-test. *International
-Review of Social Psychology*, 30(1), 92–101.
+Review of Social Psychology*, 30(1), 92-101.
 [doi:10.5334/irsp.82](https://doi.org/10.5334/irsp.82)
 
 ## Author
@@ -279,12 +294,9 @@ f_t_test(mpg + hp ~ am, data = mtcars, output_type = "console", norm_plots = FAL
 #> ESTIMATE:
 #>   95% CI (transformed scale): [ -0.072, 1.09 ]
 #>   95% CI (back-transformed):  [ 0.93, 2.821 ]  *interpret carefully*
+#> 
 #> Note on transformation:
-#>   The t-test was conducted on the Box-Cox-transformed scale.
-#>   The back-transformed mean and the sample median of the raw data will
-#>   differ when the transformation is not perfectly normalizing.
-#>   For non-normal data consider f_wilcox_test() which tests the median
-#>   directly without transformation assumptions.
+#> The t-test was conducted on the Box-Cox-transformed scale. The back-transformed mean and the sample median of the raw data will differ when the transformation is not perfectly normalizing. For non-normal data consider f_wilcox_test() which tests the median directly without transformation assumptions.
 #> 
 #> 
 
@@ -337,12 +349,9 @@ f_t_test(extra ~ group, data = sleep, paired = TRUE,
 #> ESTIMATE:
 #>   95% CI (transformed scale): [ -0.715, 0.715 ]
 #>   95% CI (back-transformed):  [ -2.188, -0.757 ]
+#> 
 #> Note on transformation:
-#>   The t-test was conducted on the arcsinh(x)-transformed scale.
-#>   The back-transformed mean and the sample median of the raw data will
-#>   differ when the transformation is not perfectly normalizing.
-#>   For non-normal data consider f_wilcox_test() which tests the median
-#>   directly without transformation assumptions.
+#> The t-test was conducted on the arcsinh(x)-transformed scale. The back-transformed mean and the sample median of the raw data will differ when the transformation is not perfectly normalizing. For non-normal data consider f_wilcox_test() which tests the median directly without transformation assumptions.
 #> 
 #> 
 
@@ -546,12 +555,9 @@ result <- f_t_test(hp ~ am, data = mtcars, transformation = TRUE,
 #> ESTIMATE:
 #>   95% CI (transformed scale): [ -0.072, 1.09 ]
 #>   95% CI (back-transformed):  [ 0.93, 2.821 ]  *interpret carefully*
+#> 
 #> Note on transformation:
-#>   The t-test was conducted on the Box-Cox-transformed scale.
-#>   The back-transformed mean and the sample median of the raw data will
-#>   differ when the transformation is not perfectly normalizing.
-#>   For non-normal data consider f_wilcox_test() which tests the median
-#>   directly without transformation assumptions.
+#> The t-test was conducted on the Box-Cox-transformed scale. The back-transformed mean and the sample median of the raw data will differ when the transformation is not perfectly normalizing. For non-normal data consider f_wilcox_test() which tests the median directly without transformation assumptions.
 #> 
 #> 
 result[["hp"]]$ci_backtransformed
@@ -585,12 +591,9 @@ f_t_test(hp ~ 1, data = mtcars, mu = 100, transformation = TRUE,
 #> ESTIMATE:
 #>   95% CI (transformed scale): [ 5.94, 6.482 ]
 #>   95% CI (back-transformed):  [ 112.145, 157.88 ]
+#> 
 #> Note on transformation:
-#>   The t-test was conducted on the Box-Cox-transformed scale.
-#>   The back-transformed mean and the sample median of the raw data will
-#>   differ when the transformation is not perfectly normalizing.
-#>   For non-normal data consider f_wilcox_test() which tests the median
-#>   directly without transformation assumptions.
+#> The t-test was conducted on the Box-Cox-transformed scale. The back-transformed mean and the sample median of the raw data will differ when the transformation is not perfectly normalizing. For non-normal data consider f_wilcox_test() which tests the median directly without transformation assumptions.
 #> 
 #> 
 
@@ -624,12 +627,9 @@ f_t_test(hp ~ am, data = mtcars, transformation = "bestnormalize",
 #> ESTIMATE:
 #>   95% CI (transformed scale): [ -0.186, 1.386 ]
 #>   95% CI (back-transformed):  [ 127.305, 244.812 ]  *interpret carefully*
+#> 
 #> Note on transformation:
-#>   The t-test was conducted on the sqrt(x + a)-transformed scale.
-#>   The back-transformed mean and the sample median of the raw data will
-#>   differ when the transformation is not perfectly normalizing.
-#>   For non-normal data consider f_wilcox_test() which tests the median
-#>   directly without transformation assumptions.
+#> The t-test was conducted on the sqrt(x + a)-transformed scale. The back-transformed mean and the sample median of the raw data will differ when the transformation is not perfectly normalizing. For non-normal data consider f_wilcox_test() which tests the median directly without transformation assumptions.
 #> 
 #> 
 
@@ -662,12 +662,9 @@ f_t_test(mpg + hp ~ am, data = mtcars, force_transformation = "mpg",
 #> ESTIMATE:
 #>   95% CI (transformed scale): [ -0.565, -0.169 ]
 #>   95% CI (back-transformed):  [ 0.567, 0.844 ]  *interpret carefully*
+#> 
 #> Note on transformation:
-#>   The t-test was conducted on the Box-Cox-transformed scale.
-#>   The back-transformed mean and the sample median of the raw data will
-#>   differ when the transformation is not perfectly normalizing.
-#>   For non-normal data consider f_wilcox_test() which tests the median
-#>   directly without transformation assumptions.
+#> The t-test was conducted on the Box-Cox-transformed scale. The back-transformed mean and the sample median of the raw data will differ when the transformation is not perfectly normalizing. For non-normal data consider f_wilcox_test() which tests the median directly without transformation assumptions.
 #> 
 #> ==========================================================
 #> Welch Two Sample t-test (Box-Cox transformed) of: hp
@@ -694,12 +691,9 @@ f_t_test(mpg + hp ~ am, data = mtcars, force_transformation = "mpg",
 #> ESTIMATE:
 #>   95% CI (transformed scale): [ -0.072, 1.09 ]
 #>   95% CI (back-transformed):  [ 0.93, 2.821 ]  *interpret carefully*
+#> 
 #> Note on transformation:
-#>   The t-test was conducted on the Box-Cox-transformed scale.
-#>   The back-transformed mean and the sample median of the raw data will
-#>   differ when the transformation is not perfectly normalizing.
-#>   For non-normal data consider f_wilcox_test() which tests the median
-#>   directly without transformation assumptions.
+#> The t-test was conducted on the Box-Cox-transformed scale. The back-transformed mean and the sample median of the raw data will differ when the transformation is not perfectly normalizing. For non-normal data consider f_wilcox_test() which tests the median directly without transformation assumptions.
 #> 
 #> 
 

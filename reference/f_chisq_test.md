@@ -87,6 +87,12 @@ An object of class f_chisq_test containing:
   values, standardized residuals, and adjusted p-values (for vector
   input).
 
+- `observed_vs_adj_p_value`: Interleaved table of observed values and
+  adjusted p-values (for table/matrix input).
+
+- `stdres_vs_adj_p_value`: Interleaved table of standardized residuals
+  and adjusted p-values (for table/matrix input).
+
 ## Details
 
 The function first performs a chi-squared test using
@@ -181,11 +187,11 @@ f_chisq_test(x = observed, p = expected_probs)
 #> 
 #> Observed data and corresponding bonferroni corrected p-values:
 #>    
-#>  Observed Expected Std.Residuals   p.value
-#>         2       10    -2.5298221     0.034
-#>         2       10    -2.5298221     0.034
+#>  Observed Expected Std.Residuals   p-value
+#>         2       10    -2.7712813     0.034
+#>         2       10    -2.7712813     0.034
 #>        10       10     0.0000000     1.000
-#>        20       10     3.1622777 3.192e-03
-#>        15       10     1.5811388     0.500
-#>        11       10     0.3162278     1.000
+#>        20       10     3.4641016 3.192e-03
+#>        15       10     1.7320508     0.500
+#>        11       10     0.3464102     1.000
 ```

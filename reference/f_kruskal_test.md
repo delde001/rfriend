@@ -21,7 +21,8 @@ f_kruskal_test(
   intro_text = TRUE,
   adjust = "bonferroni",
   close_generated_files = FALSE,
-  open_generated_files = TRUE
+  open_generated_files = interactive(),
+  ...
 )
 ```
 
@@ -110,10 +111,20 @@ f_kruskal_test(
 
 - open_generated_files:
 
-  Logical. If `TRUE`, Opens the generated output files ('pdf', 'Word' or
-  'Excel') files depending on the output format. This to directly view
-  the results after creation. Files are stored in tempdir(). Default is
-  `TRUE`.
+  Logical. Whether to open the generated output files after creation.
+  Defaults to `TRUE` in an interactive R session and `FALSE` otherwise
+  (e.g. in scripts or automated pipelines). Set to `TRUE` or `FALSE` to
+  override this behaviour explicitly.
+
+- ...:
+
+  Additional arguments forwarded to
+  [`kruskal.test`](https://rdrr.io/r/stats/kruskal.test.html). The
+  arguments `subset` and `na.action` are honored: when supplied, they
+  are applied via
+  [`model.frame`](https://rdrr.io/r/stats/model.frame.html) so that the
+  descriptive summary table, density plot, boxplot, Dunn's post hoc test
+  and the Kruskal-Wallis test itself all see the exact same row set.
 
 ## Value
 
@@ -185,9 +196,9 @@ or higher), a universal document converter.
 
 - **macOS:** If using Homebrew, Pandoc is typically installed in
   "/usr/local/bin". Alternatively, download the .pkg installer and
-  verify that the binary’s location is in your PATH.
+  verify that the binary's location is in your PATH.
 
-- **Linux:** Install Pandoc through your distribution’s package manager
+- **Linux:** Install Pandoc through your distribution's package manager
   (commonly installed in "/usr/bin" or "/usr/local/bin") or manually,
   and ensure the directory containing Pandoc is in your PATH.
 
@@ -205,8 +216,7 @@ response). It does **not** protect against the inflation of Type I error
 
 **Practical implication:** With \\k\\ independent response variables all
 tested at \\\alpha = 0.05\\, the probability of obtaining at least one
-false positive is \\1 - (1 - 0.05)^k\\, which reaches ~40% for \\k =
-10\\.
+false positive is \\1-(1-0.05)^k\\, which reaches ~40% for \\k = 10\\.
 
 ## Author
 
@@ -225,10 +235,9 @@ output <- f_kruskal_test(
                data = iris,
                plot = FALSE,
                output_type = "word",
-               adjust = "holm",
-               open_generated_files = FALSE
+               adjust = "holm"
                )
-#> Saving output in: /tmp/RtmpyM0xyc/iris_Kruskal_Wallis_output.docx
+#> Saving output in: /tmp/RtmpG5HCTF/iris_Kruskal_Wallis_output.docx
 
 # Save Kruskal-Wallis test and posthoc to Excel sheets: Sepal.Width and Sepal.Length.
 f_kruskal_out <- f_kruskal_test(
@@ -236,8 +245,7 @@ f_kruskal_out <- f_kruskal_test(
                      data = iris,
                      plot = FALSE,
                      output_type = "excel",
-                     adjust = "holm",
-                     open_generated_files = FALSE
+                     adjust = "holm"
                      )
-#> Saving output in: /tmp/RtmpyM0xyc/iris_Kruskal_Wallis_output.xlsx
+#> Saving output in: /tmp/RtmpG5HCTF/iris_Kruskal_Wallis_output.xlsx
 ```
