@@ -1,3 +1,42 @@
+# rfriend 3.1.0 (2026-05-30)
+
+## New Features
+
+`f_boxplot` now accepts numeric vectors in addition to data.frames and formulas. A single vector like `f_boxplot(my_vec)` produces one box labelled with the vector name on the y-axis; multiple unnamed vectors like `f_boxplot(hp, cyl)` produce side-by-side boxes, matching base R's `boxplot()` convention. A new `color` argument controls the palette: the default `"rainbow"` preserves existing behaviour, `"bw"` gives publication-style white boxes with black lines, outliers and mean marker, a single colour name like `"steelblue"` applies one hue to all boxes (with a light-tinted fill and darkened outline derived in HSV space), and a vector of colours is recycled for custom per-group palettes. A new `boxwidth` argument exposes the relative width of each box (passed as `boxwex` to `boxplot()`) for finer control over plot appearance.
+
+`f_scan` now accepts loose numeric vectors in the same spirit as `f_boxplot`. A single vector like `f_scan(disp1)` produces a one-group diagnostic dashboard with the vector name carried through as the column label. A formula built from bare vectors works identically to the data.frame form, so `f_scan(disp1 + hp1 ~ cyl1)` assembles the data.frame internally from the variable names in the formula. A positional shorthand is also supported: `f_scan(disp1, cyl1)` is equivalent to `f_scan(disp1 ~ cyl1)`, treating the first vector as the response and any additional vectors as grouping variables, with length checks against the response and clear errors on mismatch.
+
+* `f_summary()` gains a `show_ci` argument (default `FALSE`) that adds
+  `CI_lower` and `CI_upper` columns, the bounds of a confidence interval for
+  the mean. The interval is a parametric t-interval, computed as
+  `mean +/- qt(1 - (1 - conf_level)/2, df = n - 1) * se`, matching the interval
+  reported by `t.test()`. A companion `conf_level` argument (default `0.95`)
+  sets the confidence level. Groups with fewer than two non-missing
+  observations return `NA` bounds.
+  
+## Minor Changes
+
+* Removed an internal package startup/shutdown file `zzz.R` that printed a spurious "Package unloaded from:" message on unload. Package loading and unloading are now silent on the rfriend side.
+
+* Improved the boxplot explanation in the introduction section ("Understanding Boxplots: A Visual Guide") of the output files from `f_boxplot()`.
+
+## Bug Fixes
+
+* `f_boxplot()` with a formula and explicit data (e.g. `f_boxplot(hp ~ cyl, mtcars)`) now plots only the response variable named on the LHS of the formula. Previously the LHS was ignored and a plot was generated for every numeric column in `data`.
+
+* `f_boxplot()` with a formula referencing bare vectors (e.g. `f_boxplot(hp1 ~ cyl1)`) no longer errors with "argument 'data' is missing, with no default", and the output filename is derived from the formula variables.
+
+* `check_lhs_is_names()` (internal LHS guard) no longer emits a misleading "Expressions on the LHS of the formula are ignored: NULL" warning when called with `formula = NULL` or with a one-sided formula. This affected any rfriend function accepting a data.frame without a formula (`f_boxplot(mtcars)`, `f_summary(mtcars)`, etc.).
+
+* `f_summary()`, `f_scan()` and `f_outliers()` now accept a bare data.frame without requiring `columns`. When `columns` is omitted, all numeric columns in `data` are used (excluding any named in `group_vars` and, for `f_outliers()`, `id_var`). This matches the behaviour added to `f_boxplot()` in the same release and mirrors base R's `summary(mtcars)`.
+
+* `f_scan()` no longer crashes with "Column `All Data` not found" on the second response variable when called without `group_vars`. The dummy grouping column was being added only on the first iteration of a multi-column loop.
+
+* The print methods for `f_summary()` and `f_outliers()` now show a header naming each response variable when several are summarised. Previously, multi-column calls produced a stack of unlabelled tables.
+
+* `f_summary()` now computes the standard error (`se`) using the number of non-missing observations rather than the full vector length. Previously a column containing `NA` values produced a standard error that was biased towards zero, because the `NA` entries were counted in the denominator `sqrt(n)`. The new confidence interval relies on the same corrected count.
+
+
 # rfriend 3.0.0 (2026-04-21)
 
 ## Breaking Changes

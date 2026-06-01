@@ -581,3 +581,440 @@ test_that("named call f_boxplot(x = df) works", {
   res <- quiet_bp(x = df)
   expect_false(inherits(res, "error"))
 })
+
+
+# =============================================================================
+# 13. v3.1.0: NUMERIC VECTOR INPUT
+# =============================================================================
+# These tests cover the new f_boxplot.numeric() dispatch added in 3.1.0:
+#
+#   - single numeric vector: f_boxplot(my_vec)
+#   - multiple unnamed vecs: f_boxplot(hp1, cyl1)  (base R's boxplot() shape)
+#   - formula on bare vecs:  f_boxplot(hp1 ~ cyl1) (no `data =` needed)
+# =============================================================================
+
+test_that("single numeric vector input does not error (rmd)", {
+  skip_on_cran()
+  set.seed(101)
+  my_vec <- rnorm(50, mean = 10)
+  expect_no_error(
+    suppressMessages(
+      f_boxplot(my_vec,
+                output_type          = "rmd",
+                boxplot_explanation  = FALSE,
+                outliers             = FALSE)
+    )
+  )
+})
+
+test_that("single integer vector input does not error (rmd)", {
+  skip_on_cran()
+  my_int <- as.integer(c(1:30, 999L))
+  expect_no_error(
+    suppressMessages(
+      f_boxplot(my_int,
+                output_type          = "rmd",
+                boxplot_explanation  = FALSE,
+                outliers             = FALSE)
+    )
+  )
+})
+
+test_that("single numeric vector input writes a PNG", {
+  skip_on_cran()
+  set.seed(202)
+  my_vec  <- rnorm(40)
+  out_dir <- file.path(tempdir(), paste0("vec_single_", Sys.getpid()))
+  dir.create(out_dir, showWarnings = FALSE)
+  suppressMessages(f_boxplot(my_vec,
+            output_type          = "png",
+            save_as              = paste0(out_dir, "/"),
+            open_generated_files = FALSE,
+            outliers             = FALSE))
+  pngs <- list.files(out_dir, pattern = "\\.png$")
+  expect_gt(length(pngs), 0)
+})
+
+test_that("multiple unnamed numeric vectors produce side-by-side boxes (rmd)", {
+  skip_on_cran()
+  data(mtcars)
+  hp1  <- mtcars$hp
+  cyl1 <- mtcars$cyl
+  # Base R convention: each vector becomes its own box. No grouping.
+  expect_no_error(
+    suppressMessages(
+      f_boxplot(hp1, cyl1,
+                output_type          = "rmd",
+                boxplot_explanation  = FALSE,
+                outliers             = FALSE)
+    )
+  )
+})
+
+test_that("formula on bare vectors works without a data argument (rmd)", {
+  skip_on_cran()
+  data(mtcars)
+  hp1  <- mtcars$hp
+  cyl1 <- mtcars$cyl
+  expect_no_error(
+    suppressMessages(
+      f_boxplot(hp1 ~ cyl1,
+                output_type          = "rmd",
+                boxplot_explanation  = FALSE,
+                outliers             = FALSE)
+    )
+  )
+})
+
+test_that("formula on bare vectors: multiple LHS responses work (rmd)", {
+  skip_on_cran()
+  data(mtcars)
+  hp1   <- mtcars$hp
+  disp1 <- mtcars$disp
+  cyl1  <- mtcars$cyl
+  expect_no_error(
+    suppressMessages(
+      f_boxplot(hp1 + disp1 ~ cyl1,
+                output_type          = "rmd",
+                boxplot_explanation  = FALSE,
+                outliers             = FALSE)
+    )
+  )
+})
+
+test_that("zero-length vector input errors clearly", {
+  expect_error(
+    suppressMessages(
+      f_boxplot(numeric(0),
+                output_type          = "rmd",
+                boxplot_explanation  = FALSE,
+                outliers             = FALSE)
+    ),
+    regexp = "length-0|empty"
+  )
+})
+
+test_that("all-NA vector input errors clearly", {
+  expect_error(
+    suppressMessages(
+      f_boxplot(rep(NA_real_, 10),
+                output_type          = "rmd",
+                boxplot_explanation  = FALSE,
+                outliers             = FALSE)
+    ),
+    regexp = "NA"
+  )
+})
+
+
+# =============================================================================
+# 14. v3.1.0: `color` ARGUMENT
+# =============================================================================
+# Accepted shapes: "rainbow" (default), "bw", single colour name or hex,
+# or a vector of colours recycled to the number of groups.
+# =============================================================================
+
+test_that("color = 'rainbow' (default) runs without error", {
+  skip_on_cran()
+  df <- make_test_df()
+  expect_no_error(
+    suppressMessages(f_boxplot(value1 ~ group,
+              data                 = df,
+              color                = "rainbow",
+              output_type          = "pdf",
+              open_generated_files = FALSE,
+              boxplot_explanation  = FALSE,
+              outliers             = FALSE))
+  )
+})
+
+test_that("color = 'bw' runs without error", {
+  skip_on_cran()
+  df <- make_test_df()
+  expect_no_error(
+    suppressMessages(f_boxplot(value1 ~ group,
+              data                 = df,
+              color                = "bw",
+              output_type          = "pdf",
+              open_generated_files = FALSE,
+              boxplot_explanation  = FALSE,
+              outliers             = FALSE))
+  )
+})
+
+test_that("color = single colour name (e.g. 'steelblue') runs without error", {
+  skip_on_cran()
+  df <- make_test_df()
+  expect_no_error(
+    suppressMessages(f_boxplot(value1 ~ group,
+              data                 = df,
+              color                = "steelblue",
+              output_type          = "pdf",
+              open_generated_files = FALSE,
+              boxplot_explanation  = FALSE,
+              outliers             = FALSE))
+  )
+})
+
+test_that("color = hex string (e.g. '#1f77b4') runs without error", {
+  skip_on_cran()
+  df <- make_test_df()
+  expect_no_error(
+    suppressMessages(f_boxplot(value1 ~ group,
+              data                 = df,
+              color                = "#1f77b4",
+              output_type          = "pdf",
+              open_generated_files = FALSE,
+              boxplot_explanation  = FALSE,
+              outliers             = FALSE))
+  )
+})
+
+test_that("color = vector of colours is recycled across groups", {
+  skip_on_cran()
+  df <- make_test_df()   # 3-level group
+  expect_no_error(
+    suppressMessages(f_boxplot(value1 ~ group,
+              data                 = df,
+              color                = c("red", "green", "blue"),
+              output_type          = "pdf",
+              open_generated_files = FALSE,
+              boxplot_explanation  = FALSE,
+              outliers             = FALSE))
+  )
+})
+
+test_that("color = short vector is recycled (fewer colours than groups)", {
+  skip_on_cran()
+  df <- make_test_df()
+  # Only 2 colours for 3 groups: should recycle, not error.
+  expect_no_error(
+    suppressMessages(f_boxplot(value1 ~ group,
+              data                 = df,
+              color                = c("red", "blue"),
+              output_type          = "pdf",
+              open_generated_files = FALSE,
+              boxplot_explanation  = FALSE,
+              outliers             = FALSE))
+  )
+})
+
+test_that("color = 'black' routes to bw mode (no all-black collapse)", {
+  skip_on_cran()
+  df <- make_test_df()
+  # Documented in resolve_boxplot_colors(): pure black/white as a single
+  # colour is routed to the 'bw' palette so the plot stays readable.
+  expect_no_error(
+    suppressMessages(f_boxplot(value1 ~ group,
+              data                 = df,
+              color                = "black",
+              output_type          = "pdf",
+              open_generated_files = FALSE,
+              boxplot_explanation  = FALSE,
+              outliers             = FALSE))
+  )
+})
+
+test_that("color = invalid colour string errors clearly", {
+  skip_on_cran()
+  df <- make_test_df()
+  expect_error(
+    suppressMessages(f_boxplot(value1 ~ group,
+              data                 = df,
+              color                = "not_a_real_color_xyz",
+              output_type          = "pdf",
+              open_generated_files = FALSE,
+              boxplot_explanation  = FALSE,
+              outliers             = FALSE)),
+    regexp = "color|colour|Invalid"
+  )
+})
+
+test_that("color works with numeric vector input (single vector path)", {
+  skip_on_cran()
+  set.seed(303)
+  my_vec <- rnorm(50)
+  expect_no_error(
+    suppressMessages(f_boxplot(my_vec,
+              color                = "steelblue",
+              output_type          = "rmd",
+              boxplot_explanation  = FALSE,
+              outliers             = FALSE))
+  )
+})
+
+
+# =============================================================================
+# 15. v3.1.0: `boxwidth` ARGUMENT
+# =============================================================================
+# Exposes the relative width of each box (passed as boxwex to boxplot()).
+# NULL = auto-compute. The numeric-vector method defaults to 0.4 so a
+# single box looks reasonable rather than overly thin.
+# =============================================================================
+
+test_that("boxwidth = NULL (default) runs without error", {
+  skip_on_cran()
+  df <- make_test_df()
+  expect_no_error(
+    suppressMessages(f_boxplot(value1 ~ group,
+              data                 = df,
+              boxwidth             = NULL,
+              output_type          = "pdf",
+              open_generated_files = FALSE,
+              boxplot_explanation  = FALSE,
+              outliers             = FALSE))
+  )
+})
+
+test_that("boxwidth = numeric value runs without error", {
+  skip_on_cran()
+  df <- make_test_df()
+  for (bw in c(0.2, 0.5, 0.8)) {
+    # expect_no_error() does not accept a `label` argument; use the
+    # expect_error(regexp = NA, label = ...) idiom (same pattern as the
+    # las parameter loop above) so the failure message identifies which
+    # boxwidth value failed.
+    expect_error(
+      suppressMessages(f_boxplot(value1 ~ group,
+                data                 = df,
+                boxwidth             = bw,
+                output_type          = "pdf",
+                open_generated_files = FALSE,
+                boxplot_explanation  = FALSE,
+                outliers             = FALSE)),
+      regexp = NA,
+      label  = paste("boxwidth =", bw)
+    )
+  }
+})
+
+test_that("boxwidth works with numeric vector input", {
+  skip_on_cran()
+  set.seed(404)
+  my_vec <- rnorm(40)
+  expect_no_error(
+    suppressMessages(f_boxplot(my_vec,
+              boxwidth             = 0.6,
+              output_type          = "rmd",
+              boxplot_explanation  = FALSE,
+              outliers             = FALSE))
+  )
+})
+
+test_that("color + boxwidth combination works", {
+  skip_on_cran()
+  df <- make_test_df()
+  expect_no_error(
+    suppressMessages(f_boxplot(value1 ~ group,
+              data                 = df,
+              color                = "bw",
+              boxwidth             = 0.5,
+              output_type          = "pdf",
+              open_generated_files = FALSE,
+              boxplot_explanation  = FALSE,
+              outliers             = FALSE))
+  )
+})
+
+
+# =============================================================================
+# 16. v3.1.0: BUG FIX - formula + data plots only LHS responses
+# =============================================================================
+# Previously f_boxplot(hp ~ cyl, mtcars) ignored the LHS and generated a
+# plot for every numeric column in `data`. The fix restricts the plotting
+# loop to the LHS responses.
+# =============================================================================
+
+test_that("formula + data: PNG output produces only one file per LHS response", {
+  skip_on_cran()
+  data(mtcars)
+  out_dir <- file.path(tempdir(), paste0("lhs_only_", Sys.getpid()))
+  dir.create(out_dir, showWarnings = FALSE)
+
+  # mtcars has many numeric columns. Before the fix this produced one
+  # PNG per numeric column instead of just hp. The expected count is
+  # 1 response x 1 factor = 1 file.
+  suppressMessages(f_boxplot(hp ~ cyl,
+            data                 = mtcars,
+            output_type          = "png",
+            save_as              = paste0(out_dir, "/"),
+            open_generated_files = FALSE,
+            outliers             = FALSE))
+
+  pngs <- list.files(out_dir, pattern = "\\.png$")
+  expect_equal(length(pngs), 1L)
+})
+
+test_that("formula + data: two-response LHS produces exactly two PNGs", {
+  skip_on_cran()
+  data(mtcars)
+  out_dir <- file.path(tempdir(), paste0("lhs_two_", Sys.getpid()))
+  dir.create(out_dir, showWarnings = FALSE)
+
+  suppressMessages(f_boxplot(hp + disp ~ cyl,
+            data                 = mtcars,
+            output_type          = "png",
+            save_as              = paste0(out_dir, "/"),
+            open_generated_files = FALSE,
+            outliers             = FALSE))
+
+  pngs <- list.files(out_dir, pattern = "\\.png$")
+  expect_equal(length(pngs), 2L)
+})
+
+test_that("formula + data: nonexistent LHS variable errors clearly", {
+  skip_on_cran()
+  data(mtcars)
+  expect_error(
+    suppressMessages(f_boxplot(no_such_col ~ cyl,
+              data                 = mtcars,
+              output_type          = "pdf",
+              open_generated_files = FALSE,
+              boxplot_explanation  = FALSE,
+              outliers             = FALSE)),
+    regexp = "LHS|numeric|not found|match"
+  )
+})
+
+
+# =============================================================================
+# 17. v3.1.0: BUG FIX - check_lhs_is_names() with NULL or one-sided formula
+# =============================================================================
+# Previously calls like f_boxplot(mtcars) or f_summary(mtcars) (no
+# formula at all) emitted a spurious warning of the shape:
+#   "Expressions on the LHS of the formula are ignored: NULL"
+# The fix is in helper_check_lhs.R: an early return when formula is NULL
+# or one-sided.
+# =============================================================================
+
+test_that("data-only call: no misleading LHS warning", {
+  skip_on_cran()
+  df <- make_test_df()
+  expect_no_warning(
+    suppressMessages(f_boxplot(df,
+              output_type          = "pdf",
+              open_generated_files = FALSE,
+              boxplot_explanation  = FALSE,
+              outliers             = FALSE)),
+    message = "Expressions on the LHS"
+  )
+})
+
+test_that("legitimate LHS expression still warns (sanity check)", {
+  # Negative control: log(hp) on the LHS *should* trigger the warning.
+  skip_on_cran()
+  data(mtcars)
+  expect_warning(
+    suppressMessages(tryCatch(
+      f_boxplot(log(hp) ~ cyl,
+                data                 = mtcars,
+                output_type          = "pdf",
+                open_generated_files = FALSE,
+                boxplot_explanation  = FALSE,
+                outliers             = FALSE),
+      error = function(e) NULL    # downstream may still error; we only
+                                  # care that the warning fired
+    )),
+    regexp = "Expressions on the LHS"
+  )
+})

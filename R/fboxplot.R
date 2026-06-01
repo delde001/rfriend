@@ -1,7 +1,7 @@
 #' Generate a Boxplot Report of a data.frame
 #'
 #' Generates boxplots for all numeric variables in a given dataset, grouped by factor variables. The function automatically detects numeric and factor variables. It allows two output formats ('pdf', 'Word') and includes an option to add a general explanation about interpreting boxplots.
-#' @param x A data.frame or formula (dispatches to the right method).
+#' @param x A data.frame, formula, or numeric/integer vector (dispatches to the correct method). When a single numeric or integer vector is supplied, it is treated as a single response variable, plotted on the y-axis with the variable name as label, and grouped by a single dummy factor (one box). When several unnamed numeric vectors are supplied (as in base R's \code{boxplot()}, e.g. \code{f_boxplot(x1, x2)}), each becomes its own box side by side, labelled with the original variable name on the x-axis.
 #' @param formula A formula specifying the factor to be plotted. More response variables can be added using \code{-} or \code{+} (e.g., \code{response1 + response2 ~ predictor}) to generate multiple boxplots. If the formula is omitted and only \code{data} is provided all data will be used for creating boxplots.
 #' @param data A \code{data.frame} containing the data to be used for creating boxplots.
 #' @param fancy_names An optional named vector mapping column names in \code{data} to more readable names for display in plots (name map). Defaults to \code{NULL}.
@@ -29,6 +29,8 @@
 #' @param outliers Logical. If \code{TRUE}, scans for outliers using Tukey's fences and if they exist, adds them to the report using \code{f_outliers}. Default \code{TRUE}.
 #' @param coef Numeric. The multiplier for the Interquartile Range (IQR) used for outlier detection. Default \code{1.5}.
 #' @param limit_columns Integer or \code{NULL}. Defines the number of columns shown in the outlier table. Default = \code{7}. \code{NULL} = all columns are shown.
+#' @param color Colour scheme for the boxes. One of: \code{"rainbow"} (default; one hue per group), \code{"bw"} (white fill with black lines, outliers and mean marker, suitable for publication), a single R colour name or hex string applied to all boxes (with a transparent fill and a darker outline derived from it), or a vector of colours which is recycled to the number of groups for a custom per-group palette.
+#' @param boxwidth Numeric or \code{NULL}. Relative width of each box, passed as \code{boxwex} to \code{boxplot()}. When \code{NULL} (default) the width is computed automatically as \code{num.bars/18}, keeping boxes roughly comparable across plots with different numbers of groups. Supply a numeric value (for example \code{0.5}) to override. The numeric/integer vector method uses \code{0.4} by default to avoid an overly thin single box.
 #' @param ... Further arguments forwarded to \code{f_boxplot_worker},
 #'   such as \code{fancy_names}, \code{title}, \code{fill}, etc.
 #'
@@ -97,6 +99,23 @@
 #'            output_type = "word"
 #'            )
 #'
+#' # Pass a bare numeric vector. Its name is used as the y-axis label
+#' # and as the data_name in the output filename.
+#' set.seed(1)
+#' my_vec <- rnorm(50, mean = 10)
+#' f_boxplot(my_vec, output_type = "png")
+#'
+#' # Formula with bare vectors (no data.frame): group hp by cyl.
+#' hp1  <- mtcars$hp
+#' cyl1 <- mtcars$cyl
+#' f_boxplot(hp1 ~ cyl1, output_type = "png")
+#'
+#' # Multiple unnamed numeric vectors, base R's boxplot() convention:
+#' # each vector becomes its own box, labelled on the x-axis with its
+#' # original variable name. Use the formula syntax above when you
+#' # instead want to group one response by a factor.
+#' f_boxplot(hp1, cyl1, output_type = "png")
+#'
 #' # Capture the R Markdown output as a string and render it inline.
 #' # Use output_type = "rmd" to get the markdown back as a character value
 #' # instead of writing a file. Useful for embedding in a larger knitr document.
@@ -113,6 +132,8 @@
 #' #   ```{r, echo=FALSE, results='asis'}
 #' #   cat(rmd)
 #' #   ```
+#'
+#'
 #' }
 #'
 #' @export
@@ -124,8 +145,43 @@ f_boxplot <- function(x, ...) {
 #' @export
 #' @rdname f_boxplot
 # Dispatch when first argument is a formula
-f_boxplot.formula <- function(formula, data, ...) {
-  f_boxplot_worker(formula = formula, data = data, ...)
+f_boxplot.formula <- function(formula, data = NULL, ...) {
+  # Capture a sensible data_name from the original call and pass it
+  # explicitly via .data_name. This is set BEFORE we touch do.call()
+  # because do.call replaces the original 'data' expression with the
+  # data.frame value itself; the worker's fallback path
+  # `deparse(substitute(data))` would then deparse the whole data.frame
+  # into a multi-line character vector, breaking downstream paste/grepl
+  # calls with "the condition has length > 1".
+  #
+  # Two cases:
+  #   data supplied    -> use the original expression for 'data' (typically
+  #                       a symbol like 'mtcars') captured via match.call().
+  #   data omitted     -> derive from the formula's variables, so
+  #                       f_boxplot(hp1 ~ cyl1) yields 'hp1_cyl1'.
+  args <- list(...)
+  if (is.null(args$.data_name)) {
+    if (!is.null(data)) {
+      data_expr <- tryCatch(match.call()$data,
+                            error = function(e) NULL)
+      if (!is.null(data_expr)) {
+        # paste with collapse = "" flattens any multi-line deparse (rare,
+        # but possible for complex expressions) into a single string.
+        args$.data_name <- paste(deparse(data_expr), collapse = "")
+      } else {
+        args$.data_name <- "data"
+      }
+    } else {
+      vars <- all.vars(formula)
+      if (length(vars) > 0L) {
+        args$.data_name <- paste(vars, collapse = "_")
+      }
+    }
+  }
+  do.call(
+    f_boxplot_worker,
+    c(list(formula = formula, data = data), args)
+  )
 }
 
 #' @export
@@ -134,6 +190,249 @@ f_boxplot.formula <- function(formula, data, ...) {
 f_boxplot.data.frame <- function(x, ...) {
   data <- x  # alias for readability inside the body
   f_boxplot_worker(formula = NULL, data = data, ...)
+}
+
+#' @export
+#' @rdname f_boxplot
+# Dispatch when first argument is a numeric vector. Handles two shapes:
+#   single vector  -> one box, vector name on y-axis
+#   N vectors      -> N boxes side by side (base R's boxplot() convention),
+#                     vector names on x-axis, shared y-axis labelled "value"
+f_boxplot.numeric <- function(x, ...) {
+
+  # Capture x's original symbol name for labelling
+  sx <- substitute(x)
+  x_name <- if (is.name(sx)) as.character(sx) else "value"
+
+  # Inspect ... to separate "extra response vectors" (unnamed numeric)
+  # from "worker options" (named, or non-numeric).
+  dots <- list(...)
+  dot_names <- if (is.null(names(dots))) {
+    rep("", length(dots))
+  } else {
+    names(dots)
+  }
+
+  is_extra_vec <- vapply(seq_along(dots), function(i) {
+    dot_names[i] == "" &&
+      is.numeric(dots[[i]]) &&
+      length(dots[[i]]) > 0L
+  }, logical(1))
+
+  if (any(is_extra_vec)) {
+
+    ## ---- Multi-vector path: base R boxplot(x1, x2, ...) convention ----
+
+    extra_idx <- which(is_extra_vec)
+
+    # Recover original symbols for the extra vectors from the unevaluated
+    # call. match.call(expand.dots = FALSE) gives us mc$`...` as a
+    # pairlist of the original argument expressions; we map back through
+    # the same indices we used into 'dots'. Falls back to V2, V3, ... if
+    # an entry is a literal call rather than a bare symbol.
+    extra_names <- character(length(extra_idx))
+    mc <- tryCatch(match.call(expand.dots = FALSE), error = function(e) NULL)
+    dot_exprs <- if (!is.null(mc)) as.list(mc$`...`) else list()
+
+    for (k in seq_along(extra_idx)) {
+      i <- extra_idx[k]
+      e <- if (length(dot_exprs) >= i) dot_exprs[[i]] else NULL
+      if (!is.null(e) && is.symbol(e)) {
+        extra_names[k] <- as.character(e)
+      } else {
+        # k + 1 because position 1 is x; first extra is V2
+        extra_names[k] <- paste0("V", k + 1L)
+      }
+    }
+
+    # Assemble all vectors and their labels in plot order
+    all_vecs  <- c(list(unname(x)), lapply(dots[extra_idx], unname))
+    all_names <- c(x_name, extra_names)
+
+    # Basic validation: at least the first vector must have non-NA data
+    if (length(x) == 0L) {
+      stop("Cannot create a boxplot from a length-0 vector.")
+    }
+    if (all(is.na(x))) {
+      stop("Cannot create a boxplot: vector contains only NA values.")
+    }
+
+    # Long-format data.frame: one row per observation, with the original
+    # variable name carried as a factor level on the .group column.
+    # The response column is named 'value' (the package's data.frame is
+    # synthetic, so there is no collision risk with user columns).
+    lengths_vec <- vapply(all_vecs, length, integer(1))
+    df <- data.frame(
+      value  = unlist(all_vecs, use.names = FALSE),
+      .group = factor(
+        rep(all_names, times = lengths_vec),
+        levels = all_names
+      ),
+      stringsAsFactors = FALSE
+    )
+
+    fml       <- as.formula("value ~ `.group`")
+    data_name <- paste(all_names, collapse = "_")
+
+    # Everything else in ... goes to the worker as options
+    worker_args <- dots[!is_extra_vec]
+
+    do.call(
+      f_boxplot_worker,
+      c(list(formula = fml, data = df, .data_name = data_name),
+        worker_args)
+    )
+
+  } else {
+
+    ## ---- Single-vector path (unchanged) ----
+
+    if (length(x) == 0L) {
+      stop("Cannot create a boxplot from a length-0 vector.")
+    }
+    if (all(is.na(x))) {
+      stop("Cannot create a boxplot: vector contains only NA values.")
+    }
+
+    # Drop names so the data.frame is clean.
+    x <- unname(x)
+
+    # Build a one-column data.frame with the vector under its original name
+    # and add a single-level dummy factor so the worker (which currently
+    # requires at least one factor) can process it. The empty-string level
+    # produces a clean, unlabelled x-axis tick.
+    df <- data.frame(x, stringsAsFactors = FALSE)
+    names(df)[1] <- x_name
+    df[[".group"]] <- factor(rep("", length(x)), levels = "")
+
+    # Construct the formula vec_name ~ .group, backticking both sides so
+    # non-syntactic vector names are handled safely.
+    fml <- as.formula(
+      paste0("`", x_name, "` ~ `.group`")
+    )
+
+    # Default boxwidth to 0.4 so a single box looks reasonable, but only
+    # when the caller has not supplied boxwidth via ... .
+    args <- list(...)
+    if (is.null(args$boxwidth)) {
+      args$boxwidth <- 0.4
+    }
+
+    do.call(
+      f_boxplot_worker,
+      c(list(formula = fml, data = df, .data_name = x_name), args)
+    )
+  }
+}
+
+#' @export
+#' @rdname f_boxplot
+# Integer vectors behave the same as numerics for plotting purposes
+f_boxplot.integer <- f_boxplot.numeric
+
+
+# Internal helper. Resolves the user-facing 'color' argument into the three
+# palettes (c1, c2, c3) the boxplot code uses internally:
+#   c1 = whiskers, points, jitter, outlier marks
+#   c2 = box fill (transparent in coloured modes)
+#   c3 = median line, box outline, staples, mean marker
+#
+# Accepted shapes for 'color':
+#   "rainbow"           default; one hue per group
+#   "bw"                white fill, black lines/outliers/mean
+#   single colour name  all boxes the same hue, with a transparent fill and
+#                       a darkened outline derived from it
+#   colour vector       custom palette, recycled to num.bars; each entry
+#                       gets its own transparent fill and darkened outline
+#
+# Not exported; lives below the public S3 methods so the roxygen doc block
+# at the top of the file stays attached to the f_boxplot generic.
+resolve_boxplot_colors <- function(color, num.bars) {
+
+  # Pure black or pure white as a single colour would collapse the plot
+  # to one tone (lines, whiskers and outliers vanish into the background
+  # or the fill). Route both to the dedicated 'bw' mode so the user gets
+  # a proper publication-style plot regardless of which extreme they pass.
+  if (length(color) == 1L &&
+      (identical(color, "black") || identical(color, "white"))) {
+    color <- "bw"
+  }
+
+  # Default rainbow palette: keeps existing behaviour byte-for-byte
+  if (is.null(color) ||
+      (length(color) == 1L && identical(color, "rainbow"))) {
+    return(list(
+      c1 = rainbow(num.bars),
+      c2 = rainbow(num.bars, alpha = 0.2),
+      c3 = rainbow(num.bars, v = 0.7)
+    ))
+  }
+
+  # Pure black-and-white mode for publication-style plots
+  if (length(color) == 1L && identical(color, "bw")) {
+    return(list(
+      c1 = rep("black", num.bars),
+      c2 = rep("white", num.bars),
+      c3 = rep("black", num.bars)
+    ))
+  }
+
+  # Otherwise treat 'color' as one or more R colours. Validate up front
+  # so the user gets a clear message rather than a cryptic col2rgb error.
+  tryCatch(
+    col2rgb(color),
+    error = function(e) {
+      stop(
+        "Invalid value for 'color': ", conditionMessage(e),
+        ". 'color' should be 'rainbow', 'bw', a valid R colour name or ",
+        "hex string, or a vector of such colours.",
+        call. = FALSE
+      )
+    }
+  )
+
+  # Recycle the user's colour(s) to one entry per box
+  cols <- rep_len(color, num.bars)
+
+  # Decompose each colour into HSV once; both the fill and the darker
+  # outline are derived from these components.
+  rgb_mat <- col2rgb(cols) / 255
+  hsv_mat <- rgb2hsv(rgb_mat[1, ], rgb_mat[2, ], rgb_mat[3, ])
+
+  # Light-tint fill derived in HSV space: keep the hue, knock saturation
+  # down, pin value high. Alpha-blending pure RGB blue onto a white
+  # background drifts perceptually into purple/lavender, which is the
+  # wrong hue family. Reducing saturation in HSV stays in the same hue
+  # family, so 'blue' produces a blue-tinted fill rather than a purple
+  # one. The same recipe also gives sensible pinks for 'red', light
+  # greens for 'green', etc.
+  fill <- hsv(hsv_mat["h", ],
+              hsv_mat["s", ] * 0.3,
+              pmax(hsv_mat["v", ], 0.95))
+
+  # Darker outline derived in HSV space, mirroring rainbow(..., v = 0.7)
+  darker <- hsv(hsv_mat["h", ],
+                hsv_mat["s", ],
+                hsv_mat["v", ] * 0.7)
+
+  # Per-entry override: pure black or pure white inside a vector palette
+  # gets the same publication-style treatment as the dedicated 'bw' mode
+  # (white fill, black lines/outliers/mean). The standard derivation
+  # collapses these extremes (transparent black renders as grey fill;
+  # transparent white plus a grey outline is nearly invisible on a white
+  # background), so we substitute the bw triplet for those positions.
+  bw_idx <- cols %in% c("black", "white")
+  if (any(bw_idx)) {
+    cols[bw_idx]   <- "black"
+    fill[bw_idx]   <- "white"
+    darker[bw_idx] <- "black"
+  }
+
+  list(
+    c1 = unname(cols),
+    c2 = unname(fill),
+    c3 = unname(darker)
+  )
 }
 
 #' @export
@@ -162,12 +461,28 @@ f_boxplot_worker <- function(formula = NULL, data, fancy_names = NULL,
                       height = 7,
                       units = "in",
                       res = 300,
-                      las = 2
+                      las = 2,
+                      # Colour scheme: 'rainbow', 'bw', a single colour, or
+                      # a vector of colours (recycled to num.bars).
+                      color = "rainbow",
+                      # Relative width of each box (boxwex). NULL = auto.
+                      boxwidth = NULL,
+                      # Internal: explicit data_name override used by
+                      # f_boxplot.numeric so the output filename and
+                      # headings reflect the original vector name rather
+                      # than the synthetic data.frame name.
+                      ...
 
 )
 {
 
-  ########## Reset initial settings on exit #################################
+    # Internal backchannel set by f_boxplot.formula and f_boxplot.numeric.
+    # Not part of the public API; deliberately read from `...` so it does
+    # not appear in the function signature or the Rd usage section.
+    .dots      <- list(...)
+    .data_name <- if (".data_name" %in% names(.dots)) .dots[[".data_name"]] else NULL
+
+    ########## Reset initial settings on exit #################################
   .session_state <- save_session_state()  # Helper function: helper_session_state
   on.exit(restore_session_state(.session_state), add = TRUE) # Helper function: helper_session_state
 
@@ -186,18 +501,25 @@ f_boxplot_worker <- function(formula = NULL, data, fancy_names = NULL,
 
   ####### Save dataframe name and Handle input from vectors (dataframe column) #####
 
-  if(!is.null(data)){
-    # Save dataframe name
+  # Resolve data_name. Priority: explicit .data_name (supplied by the
+  # vector method), then deparse(substitute(data)), then a name derived
+  # from the formula when data is NULL.
+  if (!is.null(.data_name)) {
+    data_name <- .data_name
+  } else if (!is.null(data)) {
     data_name <- deparse(substitute(data))
+  }
 
-  } else if(is.null(data)){
+  if (is.null(data)) {
 
-    if(length(formula_extract_df_names(formula)) == 0){
-      data_name <- "data"
-    } else if(length(formula_extract_df_names(formula)) == 1){
-      data_name <- formula_extract_df_names(formula)
-    } else if(length(formula_extract_df_names(formula)) > 1){
-      data_name <- paste(formula_extract_df_names(formula), collapse = "_")
+    if (is.null(.data_name)) {
+      if (length(formula_extract_df_names(formula)) == 0) {
+        data_name <- "data"
+      } else if (length(formula_extract_df_names(formula)) == 1) {
+        data_name <- formula_extract_df_names(formula)
+      } else if (length(formula_extract_df_names(formula)) > 1) {
+        data_name <- paste(formula_extract_df_names(formula), collapse = "_")
+      }
     }
 
     # Make a data.frame based on the formula
@@ -381,6 +703,35 @@ f_boxplot_worker <- function(formula = NULL, data, fancy_names = NULL,
       }
     }
     factor_vars <- all.vars(formula[[3]])  # bare names for data frame indexing
+
+    # Restrict the plotting loop to the responses listed on the LHS of
+    # the formula. Without this, the main loop below iterates over every
+    # numeric column in 'data', so a call like f_boxplot(hp ~ cyl, mtcars)
+    # would generate plots for mpg, disp, hp, drat, wt and qsec instead
+    # of just hp.
+    #
+    # Behaviour preserved:
+    #   hp ~ cyl              -> only hp
+    #   hp + mpg ~ cyl        -> hp and mpg (in formula order)
+    #   ~ cyl   (no LHS)      -> all numeric columns (length(response_vars)==0
+    #                            leaves numeric_vars untouched)
+    #   data only, no formula -> all numeric columns (this branch never runs)
+    #
+    # Extraction happens AFTER fancy_names renaming so the names match
+    # numeric_vars, which was computed from the (possibly renamed) data.
+    response_vars <- all.vars(formula[[2]])
+    if (length(response_vars) > 0L) {
+      keep <- response_vars[response_vars %in% numeric_vars]
+      if (length(keep) == 0L) {
+        stop(
+          "None of the LHS variables (",
+          paste(response_vars, collapse = ", "),
+          ") match a numeric column in 'data'.",
+          call. = FALSE
+        )
+      }
+      numeric_vars <- keep
+    }
   }
 
 
@@ -398,9 +749,12 @@ A **boxplot** (or box-and-whisker plot) is a statistical tool for visualizing th
 1. **The Five-Number Summary**:
    - **Minimum**: The smallest value in the dataset (excluding outliers).
    - **First Quartile (Q1)**: The value below which 25% of the data falls.
-   - **Median (Q2)**: The middle value of the dataset, splitting it into two equal halves.
+   - **Median (Q2)**: The middle value of the dataset, splitting it into two halves.
    - **Third Quartile (Q3)**: The value below which 75% of the data lies.
-   - **Maximum (Q4)**: The largest value in the dataset (excluding outliers).
+   - **Maximum**: The largest value in the dataset (excluding outliers).
+
+
+ A note on quartiles: Q1, Q2, and Q3 are cut points, not the four parts of the data themselves. Like slicing a cake into four pieces with three cuts, three quartiles divide the data into four equal quarters.
 
 &nbsp;  \n   \n
 
@@ -411,13 +765,14 @@ A **boxplot** (or box-and-whisker plot) is a statistical tool for visualizing th
 &nbsp;  \n   \n
 
 3. **The Whiskers**:
-   - Whiskers extend from the box to the smallest and largest data points within **1.5 times the IQR range** from Q1 and Q3.
+   - Whiskers extend from the box to the smallest and largest data points that still lie within **1.5 times the IQR** of the quartiles; that is, above Q1 - 1.5 x IQR (lower) and below Q3 + 1.5 x IQR (upper). These limits are called the fences.
    - Values outside this range are considered **outliers**.
 
 &nbsp;  \n   \n
 
 4. **Outliers**:
    - These are individual points plotted beyond the whiskers. They highlight extreme values that may warrant further investigation.
+
 &nbsp;  \n   \n
 
 5. **Mean**:
@@ -438,13 +793,13 @@ cat("
   - The **IQR** (length of the box) captures the variability of the middle 50% of the data.
   - The whiskers show the overall spread of values within the dataset.
 - **Skewness**:
-  - If the median is closer to one end of the box or if one whisker is longer, the dataset is skewed in that direction. Normal distribution should be evenanly distributed around the median and the median and mean should be similar.
+  - If the median is closer to one end of the box or if one whisker is longer, the dataset is skewed in that direction. A symmetric distribution is balanced around the median, with the median and mean close to each other.
 - **Outliers**: Points outside the whiskers indicate unusual or extreme values that could influence the dataset's overall analysis.
 
 
 ## Why and When to Use Boxplots?
 
-Boxplots are particularly valuable when comparing distributions across multiple groups or datasets. They allow you to quickly assess differences in central tendency, variability, and the presence of outliers, making them a powerful tool for exploratory data analysis. If data is not normally distributed and the mean is not a good summary measure, scientist resort to boxplot instead of barplot in their publications.")
+Boxplots are particularly valuable when comparing distributions across multiple groups or datasets. They allow you to quickly assess differences in central tendency, variability, and the presence of outliers, making them a powerful tool for exploratory data analysis. If data is not normally distributed and the mean is not a good summary measure, scientists resort to boxplots instead of barplot in their publications.")
 
     if(output_type != "rmd"){
       # Pagebreak
@@ -486,14 +841,22 @@ Boxplots are particularly valuable when comparing distributions across multiple 
         # Get the number of bars per boxplot and store in num.bars
         num.bars <- prod(level_count, na.rm = FALSE)
 
-        # Define colors for boxplot
-        c1 <- rainbow(num.bars)
-        c2 <- rainbow(num.bars, alpha=0.2)
-        c3 <- rainbow(num.bars, v=0.7)
+        # Resolve colours via the helper so 'color' (rainbow/bw/single/vector)
+        # is honoured consistently across all boxplot elements.
+        .pal <- resolve_boxplot_colors(color, num.bars)
+        c1 <- .pal$c1
+        c2 <- .pal$c2
+        c3 <- .pal$c3
 
-        # Determine width of the boxes by making it relative to max here max boxes=9
-        # this times two is 18, thus 9/18 = 0.5 the lower the num.bars the lower the relative width.
-        box.width <- num.bars/18
+        # Determine width of the boxes. When boxwidth is supplied, use it
+        # as-is. Otherwise scale by num.bars/18 so boxes stay roughly
+        # comparable across plots with different numbers of groups
+        # (max bars = 9 -> 0.5).
+        if (is.null(boxwidth)) {
+          box.width <- num.bars / 18
+        } else {
+          box.width <- boxwidth
+        }
 
 
         temp_file <- tempfile(fileext = ".png")
@@ -557,26 +920,31 @@ Boxplots are particularly valuable when comparing distributions across multiple 
         dev.off()
 
         if (output_type != "png"){
-        # Include the saved plots in R Markdown
-        cat(paste0("![](", temp_file, ")"), "   \n  \n")
+          # Include the saved plots in R Markdown
+          cat(paste0("![](", temp_file, ")"), "   \n  \n")
 
-          if(outliers == TRUE){
-          suppressMessages(
-            out <- f_outliers(
+          if (outliers == TRUE){
+            suppressMessages(
+              out <- f_outliers(
                 data,
-                columns = response_name,
+                columns    = response_name,
                 group_vars = factor_cols,
-                coef = coef
+                coef       = coef
               )
-          )
-            if (!is.null(out) &&
-                is.data.frame(out) && nrow(out) > 0 && ncol(out) > 0) {
+            )
+
+            # f_outliers() returns a list of class "f_outliers".
+            # For a single response column the data.frame lives in out$output_df.
+            out_df <- NULL
+            out_df <- extract_outlier_df(out)
+
+            if (!is.null(out_df) && nrow(out_df) > 0 && ncol(out_df) > 0) {
               cat("##  Outlier Table of: ",
                   response_name,
                   " as function of ",
                   RHS,
                   "  \n")
-              cat(f_pander(out, limit_columns = limit_columns))
+              cat(f_pander(out_df, limit_columns = limit_columns))
             } else {
               cat("*No outliers found in:* ",
                   response_name,
@@ -585,7 +953,6 @@ Boxplots are particularly valuable when comparing distributions across multiple 
                   "  \n  \n")
             }
           }
-
         }
 
         if (output_type == "png"){
@@ -623,14 +990,22 @@ Boxplots are particularly valuable when comparing distributions across multiple 
       # Get the number of bars per boxplot and store in num.bars
       num.bars <- length(levels(data[[factor_name]]))
 
-      # Define colors for boxplot
-      c1 <- rainbow(num.bars)
-      c2 <- rainbow(num.bars, alpha=0.2)
-      c3 <- rainbow(num.bars, v=0.7)
+      # Resolve colours via the helper so 'color' (rainbow/bw/single/vector)
+      # is honoured consistently across all boxplot elements.
+      .pal <- resolve_boxplot_colors(color, num.bars)
+      c1 <- .pal$c1
+      c2 <- .pal$c2
+      c3 <- .pal$c3
 
-      # Determine width of the boxes by making it relative to max here max boxes=9
-      # this times two is 18, thus 9/18 = 0.5 the lower the num.bars the lower the relative width.
-      box.width <- num.bars/18
+      # Determine width of the boxes. When boxwidth is supplied, use it
+      # as-is. Otherwise scale by num.bars/18 so boxes stay roughly
+      # comparable across plots with different numbers of groups
+      # (max bars = 9 -> 0.5).
+      if (is.null(boxwidth)) {
+        box.width <- num.bars / 18
+      } else {
+        box.width <- boxwidth
+      }
 
 
 
@@ -723,19 +1098,24 @@ Boxplots are particularly valuable when comparing distributions across multiple 
           suppressMessages(
             out <- f_outliers(
               data,
-              columns = response_name,
+              columns    = response_name,
               group_vars = factor_name,
-              coef = coef
+              coef       = coef
             )
           )
-          if (!is.null(out) &&
-              is.data.frame(out) && nrow(out) > 0 && ncol(out) > 0) {
+
+          # f_outliers() returns a list of class "f_outliers".
+          # For a single column the data.frame lives in out$output_df.
+          out_df <- NULL
+          out_df <- extract_outlier_df(out)
+
+          if (!is.null(out_df) && nrow(out_df) > 0 && ncol(out_df) > 0) {
             cat("##  Outlier Table of: ",
                 response_name,
                 " as function of ",
                 factor_name,
                 "  \n")
-            cat(f_pander(out, limit_columns = limit_columns))
+            cat(f_pander(out_df, limit_columns = limit_columns))
           } else {
             cat("*No outliers found in:* ",
                 response_name,

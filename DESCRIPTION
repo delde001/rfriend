@@ -2,7 +2,7 @@ Package: rfriend
 Type: Package
 Title: Provides Batch Functions and Visualisation for Basic Statistical
         Procedures
-Version: 3.0.0
+Version: 3.1.0
 Authors@R: c(person("Sander H.", "van Delden", role = c("aut", "cre"), email = "plantmind@proton.me"))
 Description: Designed to streamline data analysis and statistical testing, reducing the length of R 
     scripts while generating well-formatted outputs in 'pdf', 'Microsoft Word', and 'Microsoft Excel' 
@@ -33,12 +33,11 @@ License: GPL-3
 Encoding: UTF-8
 Depends: R (>= 4.4.0)
 Imports: bestNormalize, crayon, DHARMa, dplyr, emmeans, ggplot2, grDevices, 
-         gridExtra, knitr, lme4, lmerTest, magick, magrittr, multcomp, 
+         gridExtra, knitr, lme4, lmerTest, magick, multcomp, 
          multcompView, MuMIn, nortest, pander, png, rlang, 
-         rmarkdown, rstatix, rstudioapi, stringr, this.path, tidyr, writexl, xfun
+         rmarkdown, rstatix, rstudioapi, this.path, tidyr, writexl, xfun
 Suggests: MASS, nnet, pbkrtest, testthat (>= 3.0.0), tibble
 Config/testthat/edition: 3
-RoxygenNote: 7.3.3
 Roxygen: list(markdown = FALSE)
 SystemRequirements: Pandoc (>= 3.2)
 NeedsCompilation: no
@@ -46,3 +45,4 @@ Packaged: 2025-06-22 20:29:49 UTC; sander
 Author: Sander H. van Delden [aut, cre]
 Maintainer: Sander H. van Delden <plantmind@proton.me>
 URL: https://delde001.github.io/rfriend/
+Config/roxygen2/version: 8.0.0

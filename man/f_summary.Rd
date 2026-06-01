@@ -12,13 +12,15 @@ f_summary(x, ...)
 
 \method{f_summary}{data.frame}(
   x,
-  columns,
+  columns = NULL,
   group_vars = NULL,
   show_name = TRUE,
   show_n = TRUE,
   show_mean = TRUE,
   show_sd = TRUE,
   show_se = TRUE,
+  show_ci = FALSE,
+  conf_level = 0.95,
   show_min = TRUE,
   show_max = TRUE,
   show_median = TRUE,
@@ -45,7 +47,7 @@ f_summary(x, ...)
 
 \item{data}{A 'data.frame', 'data.table', or 'tibble'.}
 
-\item{columns}{The numerical column(s) to summarize if no formula is used. Can be entered as a single character string (e.g., \code{"weight"}) or as a character vector \code{c("weight", "length"}).}
+\item{columns}{The numerical column(s) to summarize if no formula is used. Can be entered as a single character string (e.g., \code{"weight"}) or as a character vector \code{c("weight", "length"}). When omitted, defaults to all numeric columns in \code{data} (excluding any columns named in \code{group_vars}).}
 
 \item{group_vars}{A character vector specifying the grouping variables in \code{data}
 (e.g., \code{c("species", "fertilizer")}) if no formula is used. If \code{NULL}, the entire dataset is summarized.}
@@ -59,6 +61,15 @@ f_summary(x, ...)
 \item{show_sd}{Logical. Include standard deviation. Default \code{TRUE}.}
 
 \item{show_se}{Logical. Include standard error. Default \code{TRUE}.}
+
+\item{show_ci}{Logical. Include the lower and upper bounds of a confidence
+interval for the mean (columns \code{CI_lower} and \code{CI_upper}).
+Default \code{FALSE}. This interval is most meaningful when the data are
+approximately normal or \code{n} is large; see Details.}
+
+\item{conf_level}{Numeric. Confidence level for the interval requested by
+\code{show_ci}, given as a proportion between 0 and 1. Default \code{0.95}
+(a 95\% confidence interval).}
 
 \item{show_min}{Logical. Include minimum value. Default \code{TRUE}.}
 
@@ -109,7 +120,7 @@ A list of class \code{f_summary} containing the results data frame.
 }
 \description{
 Computes summary statistics (n, mean, sd, etc.) for a specified numerical columns
-in a data frame. The data can be analyzed as a whole or split by one or more
+in a data frame. The dataset can be analyzed as a whole or split by one or more
 grouping variables.
 
 The function returns a formatted data frame and includes options to export
@@ -122,6 +133,8 @@ The function computes the following statistics:
   \item \code{mean}: arithmetic mean
   \item \code{sd}: standard deviation
   \item \code{se}: standard error (\eqn{sd / \sqrt{n}})
+  \item \code{CI_lower}, \code{CI_upper}: lower and upper bounds of the
+    confidence interval for the mean (if requested)
   \item \code{min}: minimum value
   \item \code{max}: maximum value
   \item \code{median}: median value
@@ -143,6 +156,17 @@ The function computes the following statistics:
     \item \code{> 0}: Heavier tails than normal (Leptokurtic) -- indicates frequent outliers.
     \item \code{< 0}: Lighter tails than normal (Platykurtic) -- indicates fewer (or less extreme) outliers than a normal distribution.
  }
+The confidence interval reported when \code{show_ci = TRUE} is a parametric
+interval for the mean based on the t-distribution, computed as
+\eqn{mean \pm t_{(1 - (1 - conf\_level)/2,\, n - 1)} \times se}, where \code{n}
+is the number of non-missing observations. This matches the interval
+reported by \code{\link[stats]{t.test}}. It assumes the data are
+approximately normally distributed (or that \code{n} is large enough for the
+central limit theorem to apply); for strongly skewed data, indicated for
+example by a large \code{skew} or \code{kurt}, the interval may be
+unreliable. Groups with fewer than two non-missing observations yield
+\code{NA} bounds.
+
 If \code{group_vars} are provided, the statistics are calculated for each group combination.
 When \code{export_to_excel = TRUE}, the file is automatically generated.
 }
@@ -185,6 +209,21 @@ print(summary_dist)
 # --- Example 5: Custom Print Formatting ---
 summary_iris <- f_summary(iris, "Sepal.Length", group_vars = "Species")
 print(summary_iris, col_width = 10, table_width = 70)
+
+
+# --- Example 6: Confidence Interval for the Mean ---
+# Add a 95\% CI for the mean of Sepal.Length within each Species.
+summary_ci <- f_summary(Sepal.Length ~ Species,
+                        data    = iris,
+                        show_ci = TRUE)
+print(summary_ci)
+
+# Use a 90\% interval instead
+summary_ci90 <- f_summary(Sepal.Length ~ Species,
+                          data       = iris,
+                          show_ci    = TRUE,
+                          conf_level = 0.90)
+print(summary_ci90)
 }
 \author{
 Sander H. van Delden \email{plantmind@proton.me}

@@ -666,3 +666,213 @@ test_that("print.f_scan accepts an advice argument without erroring", {
     utils::capture.output(print(res, advice = FALSE))
   )
 })
+
+
+# =============================================================================
+# 14. v3.1.0: NUMERIC VECTOR INPUT
+# =============================================================================
+# These tests cover the new f_scan.numeric() dispatch added in 3.1.0:
+#
+#   - single numeric vector: f_scan(my_vec)
+#   - positional shorthand:  f_scan(disp1, cyl1) == f_scan(disp1 ~ cyl1)
+#   - formula on bare vecs:  f_scan(disp1 + hp1 ~ cyl1)   (no `data =`)
+# =============================================================================
+
+test_that("single numeric vector: carries vector name as the column key", {
+  set.seed(101)
+  my_vec <- rnorm(60, mean = 50, sd = 5)
+  my_vec[1] <- 200  # inject one obvious outlier so f_outliers fires
+  result <- f_scan(my_vec, output_type = "default",
+                   open_generated_files = FALSE)
+  expect_s3_class(result, "f_scan")
+  expect_true("my_vec" %in% names(result))
+  expect_fscan_structure(result, "my_vec", summary = TRUE, outliers = TRUE)
+})
+
+test_that("single integer vector dispatches via f_scan.integer", {
+  my_int <- as.integer(c(rep(10:20, 3), 999L))   # tail outlier
+  result <- f_scan(my_int, output_type = "default",
+                   open_generated_files = FALSE)
+  expect_s3_class(result, "f_scan")
+  expect_true("my_int" %in% names(result))
+})
+
+test_that("single numeric vector | inline c(): falls back to a label", {
+  # Inline c(...) has no symbol name; the function should still produce
+  # an f_scan object, even if the column key is something synthetic.
+  result <- f_scan(c(1, 2, 3, 4, 5, 100),
+                   output_type = "default",
+                   open_generated_files = FALSE)
+  expect_s3_class(result, "f_scan")
+  expect_equal(length(result), 1L)
+})
+
+test_that("positional shorthand: f_scan(disp1, cyl1) equals f_scan(disp1 ~ cyl1)", {
+  disp1 <- mtcars$disp
+  cyl1  <- factor(mtcars$cyl)
+
+  r_pos <- f_scan(disp1, cyl1,
+                  output_type = "default", open_generated_files = FALSE)
+  r_fml <- f_scan(disp1 ~ cyl1,
+                  output_type = "default", open_generated_files = FALSE)
+
+  expect_s3_class(r_pos, "f_scan")
+  expect_s3_class(r_fml, "f_scan")
+  expect_identical(names(r_pos), names(r_fml))
+  expect_true("disp1" %in% names(r_pos))
+
+  # The summary tables for the response should agree (numerically), even
+  # if the internal_data_name differs.
+  if ("f_summary" %in% names(r_pos[["disp1"]]) &&
+      "f_summary" %in% names(r_fml[["disp1"]])) {
+    expect_equal(
+      r_pos[["disp1"]][["f_summary"]],
+      r_fml[["disp1"]][["f_summary"]]
+    )
+  }
+})
+
+test_that("positional shorthand: multiple grouping vectors are accepted", {
+  disp1 <- mtcars$disp
+  cyl1  <- factor(mtcars$cyl)
+  am1   <- factor(mtcars$am)
+  expect_no_error(
+    res <- f_scan(disp1, cyl1, am1,
+                  output_type = "default",
+                  open_generated_files = FALSE)
+  )
+  expect_s3_class(res, "f_scan")
+  expect_true("disp1" %in% names(res))
+})
+
+test_that("positional shorthand: mismatched lengths error clearly", {
+  short_resp  <- rnorm(20)
+  long_group  <- factor(rep(c("a", "b"), 50))   # length 100 vs 20
+  expect_error(
+    f_scan(short_resp, long_group,
+           output_type = "default", open_generated_files = FALSE),
+    regexp = "length|different"
+  )
+})
+
+test_that("formula on bare vectors works without a data argument", {
+  disp1 <- mtcars$disp
+  hp1   <- mtcars$hp
+  cyl1  <- factor(mtcars$cyl)
+  expect_no_error(
+    res <- f_scan(disp1 + hp1 ~ cyl1,
+                  output_type = "default",
+                  open_generated_files = FALSE)
+  )
+  expect_s3_class(res, "f_scan")
+  expect_true(all(c("disp1", "hp1") %in% names(res)))
+})
+
+test_that("formula on bare vectors: single response, no grouping", {
+  disp1 <- mtcars$disp
+  expect_no_error(
+    res <- f_scan(disp1 ~ 1,
+                  output_type = "default",
+                  open_generated_files = FALSE)
+  )
+  expect_s3_class(res, "f_scan")
+  expect_true("disp1" %in% names(res))
+})
+
+
+# =============================================================================
+# 15. v3.1.0: BARE DATA.FRAME WITHOUT `columns`
+# =============================================================================
+# `columns` is now optional. When omitted, all numeric columns in `data`
+# are scanned (excluding any column named in `group_vars`).
+# =============================================================================
+
+test_that("bare data.frame: f_scan(mtcars) uses all numeric columns", {
+  res <- f_scan(mtcars, output_type = "default",
+                open_generated_files = FALSE)
+  expect_s3_class(res, "f_scan")
+  # mtcars has 11 numeric columns. All of them should appear as keys.
+  numeric_cols <- names(mtcars)[vapply(mtcars, is.numeric, logical(1))]
+  expect_true(all(numeric_cols %in% names(res)))
+})
+
+test_that("bare data.frame with group_vars excludes the grouping columns", {
+  # `cyl` is numeric in mtcars; if it is the grouping variable, it should
+  # not also be scanned as a response.
+  res <- f_scan(mtcars, group_vars = "cyl",
+                output_type = "default",
+                open_generated_files = FALSE)
+  expect_s3_class(res, "f_scan")
+  expect_false("cyl" %in% names(res))
+})
+
+test_that("bare data.frame with no numeric columns errors clearly", {
+  df_no_num <- data.frame(
+    g1 = letters[1:5],
+    g2 = factor(rep(c("x", "y"), length.out = 5)),
+    stringsAsFactors = FALSE
+  )
+  expect_error(
+    f_scan(df_no_num, output_type = "default",
+           open_generated_files = FALSE),
+    regexp = "numeric"
+  )
+})
+
+
+# =============================================================================
+# 16. v3.1.0: REGRESSION - multi-column without group_vars
+# =============================================================================
+# Previously f_scan() crashed with "Column `All Data` not found" on the
+# second response variable when called without `group_vars`. The dummy
+# grouping column was being added only on the first iteration of the loop.
+# =============================================================================
+
+test_that("multi-column, no group_vars: no 'All Data' crash on second column", {
+  expect_no_error(
+    res <- f_scan(mtcars,
+                  columns = c("mpg", "hp"),
+                  output_type = "default",
+                  open_generated_files = FALSE)
+  )
+  expect_s3_class(res, "f_scan")
+  expect_true(all(c("mpg", "hp") %in% names(res)))
+})
+
+test_that("multi-column, no group_vars: every key has the expected slots", {
+  res <- f_scan(mtcars,
+                columns = c("mpg", "hp", "wt"),
+                output_type = "default",
+                open_generated_files = FALSE)
+  expect_fscan_structure(res, c("mpg", "hp", "wt"),
+                         summary = TRUE, outliers = TRUE)
+})
+
+test_that("formula multi-response with no RHS variables also runs", {
+  # `mpg + hp ~ 1` is the formula equivalent of the no-group case above.
+  expect_no_error(
+    res <- f_scan(mpg + hp ~ 1, data = mtcars,
+                  output_type = "default",
+                  open_generated_files = FALSE)
+  )
+  expect_s3_class(res, "f_scan")
+  expect_true(all(c("mpg", "hp") %in% names(res)))
+})
+
+
+# =============================================================================
+# 17. v3.1.0: MULTI-COLUMN PRINT HEADER
+# =============================================================================
+# When several responses are summarised, the print method shows a header
+# naming each response variable to distinguish the tables.
+# =============================================================================
+
+test_that("print.f_scan: multi-column output shows a 'Variable:' header per response", {
+  res <- f_scan(mtcars, columns = c("mpg", "hp"),
+                output_type = "default",
+                open_generated_files = FALSE)
+  out_txt <- paste(utils::capture.output(print(res)), collapse = "\n")
+  # The header should mention each response key
+  expect_match(out_txt, "mpg", fixed = TRUE)
+  expect_match(out_txt, "hp",  fixed = TRUE)
+})

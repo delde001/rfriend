@@ -12,8 +12,7 @@
 #' More columns or groups can be added using \code{-} or \code{+} (e.g., \code{col1 + col2 ~ group1 + group2})
 #' to do a sequential analysis for each column parameter.
 #' @param data A  \code{vector}, \code{data.frame},  \code{data.table}, or  \code{tibble}.
-#' @param columns The numerical columns to analyze if no formula is used. Can be entered
-#' as a single character string (e.g., \code{"weight"}) or as a character vector \code{c("weight", "length"}).
+#' @param columns The numerical columns to analyze if no formula is used. Can be entered as a single character string (e.g., \code{"weight"}) or as a character vector \code{c("weight", "length"}). When omitted, defaults to all numeric columns in \code{data} (excluding any columns named in \code{group_vars} or \code{id_var}).
 #' @param group_vars A character vector specifying the grouping variables in \code{data}
 #'   If \code{NULL} (default), the entire dataset is treated as one group (e.g., \code{c("species", "fertilizer")}).
 #' @param id_var (Optional) A character string naming a user-specific ID columns (e.g., \code{"EmployeeID"}).
@@ -243,7 +242,7 @@ f_outliers.formula <- function(formula, data, ...) {
 #' @export
 #' @rdname f_outliers
 f_outliers.data.frame <- function(x,
-                                  columns,
+                                  columns = NULL,
                                   group_vars = NULL,
                                   id_var = NULL,
                                   coef = 1.5,
@@ -263,6 +262,18 @@ f_outliers.data.frame <- function(x,
   # Input Validation & Setup
   if (!is.data.frame(data))
     stop("Input must be a data.frame.")
+
+  # Default 'columns' to all numeric columns in 'data' so that a bare call
+  # like f_outliers(mtcars) works analogously to f_boxplot(mtcars). Any
+  # columns named in 'group_vars' or 'id_var' are excluded so that
+  # grouping factors and identifiers are not scanned as response data.
+  if (is.null(columns)) {
+    numeric_cols <- names(data)[vapply(data, is.numeric, logical(1))]
+    columns <- setdiff(numeric_cols, c(group_vars, id_var))
+    if (length(columns) == 0L) {
+      stop("No numeric columns found in 'data' for outlier detection.", call. = FALSE)
+    }
+  }
 
   # Check if there is one or multiple columns to summarize
   if(length(columns) == 1){
@@ -469,6 +480,7 @@ print.f_outliers <- function(x,
     digits <- attr(x, "digits")
   }
 
+
   # Loop over each category (a, b, etc.)
   for (category in names(x)) {
     # Get the sublist for this category
@@ -477,6 +489,14 @@ print.f_outliers <- function(x,
     # Round numbers if digits is not NULL
     if (!is.null(digits)) {
       sublist <- f_conditional_round(sublist, digits = digits, allow_integer_decimal_mix = allow_integer_decimal_mix)
+    }
+
+    # Header naming which response the table belongs to. Only printed
+    # when there is more than one table to distinguish; for a single
+    # response f_outliers uses a legacy entry name, so a header would
+    # be misleading rather than helpful.
+    if (length(x) > 1L) {
+      cat("\n Variable: ", category, sep = "")
     }
 
     f_pander(sublist, col_width = col_width, table_width = table_width)

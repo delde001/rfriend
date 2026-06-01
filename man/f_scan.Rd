@@ -3,16 +3,22 @@
 \name{f_scan}
 \alias{f_scan}
 \alias{f_scan.formula}
+\alias{f_scan.numeric}
+\alias{f_scan.integer}
 \alias{f_scan.data.frame}
 \title{Perform a visual check on your data}
 \usage{
 f_scan(x, ...)
 
-\method{f_scan}{formula}(formula, data, ...)
+\method{f_scan}{formula}(formula, data = NULL, ...)
+
+\method{f_scan}{numeric}(x, ...)
+
+\method{f_scan}{integer}(x, ...)
 
 \method{f_scan}{data.frame}(
   x,
-  columns,
+  columns = NULL,
   group_vars = NULL,
   summary = TRUE,
   outliers = TRUE,
@@ -38,7 +44,7 @@ f_scan(x, ...)
 
 \item{data}{A 'data.frame', 'data.table', or 'tibble'.}
 
-\item{columns}{The numerical column(s) to summarize if no formula is used. Can be entered as a single character string (e.g., \code{"weight"}) or as a character vector \code{c("weight", "length"}).}
+\item{columns}{The numerical column(s) to summarize if no formula is used. Can be entered as a single character string (e.g., \code{"weight"}) or as a character vector \code{c("weight", "length"}). When omitted, defaults to all numeric columns in \code{data} (excluding any columns named in \code{group_vars}).}
 
 \item{group_vars}{Character vector of up to 3 grouping variables (e.g., \code{c("species", "fertilizer")}).}
 
@@ -191,6 +197,34 @@ result <- f_scan(
 )
 #' print(result)
 result[["Sepal.Length"]]$advice$y_type
+
+
+# 8. Vector input | Single numeric vector (no formula, no data.frame)
+# When you only have loose vectors in your workspace, pass one
+# directly to f_scan(). The vector's name is used as the column label
+# in the dashboard and outlier table.
+disp1 <- mtcars$disp
+result <- f_scan(disp1)
+print(result)
+
+# 9. Formula on vectors | Multiple responses | One grouping vector
+# f_scan() also accepts a formula built from bare vectors, i.e.
+# no `data =` argument is needed. Multiple
+# response variables are combined with `+` on the
+# left hand side of the formula, exactly as
+# in the data.frame form.
+disp1 <- mtcars$disp
+hp1   <- mtcars$hp
+cyl1  <- factor(mtcars$cyl)
+result <- f_scan(disp1 + hp1 ~ cyl1)
+print(result)
+
+# 10. Positional vector form: equivalent to f_scan(disp1 ~ cyl1).
+# The first vector is the response, the rest are grouping variables.
+disp1 <- mtcars$disp
+cyl1  <- factor(mtcars$cyl)
+f_scan(disp1, cyl1)
+
 }
 
 }

@@ -18,7 +18,7 @@ f_outliers(x, ...)
 
 \method{f_outliers}{data.frame}(
   x,
-  columns,
+  columns = NULL,
   group_vars = NULL,
   id_var = NULL,
   coef = 1.5,
@@ -45,8 +45,7 @@ to do a sequential analysis for each column parameter.}
 
 \item{data}{A  \code{vector}, \code{data.frame},  \code{data.table}, or  \code{tibble}.}
 
-\item{columns}{The numerical columns to analyze if no formula is used. Can be entered
-as a single character string (e.g., \code{"weight"}) or as a character vector \code{c("weight", "length"}).}
+\item{columns}{The numerical columns to analyze if no formula is used. Can be entered as a single character string (e.g., \code{"weight"}) or as a character vector \code{c("weight", "length"}). When omitted, defaults to all numeric columns in \code{data} (excluding any columns named in \code{group_vars} or \code{id_var}).}
 
 \item{group_vars}{A character vector specifying the grouping variables in \code{data}
 If \code{NULL} (default), the entire dataset is treated as one group (e.g., \code{c("species", "fertilizer")}).}

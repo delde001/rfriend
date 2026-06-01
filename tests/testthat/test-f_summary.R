@@ -431,6 +431,91 @@ test_that("stress: mtcars, 3 columns, 2 groups, formula, digits = 1", {
 
 
 # =============================================================================
+# 11b. CONFIDENCE INTERVAL (show_ci / conf_level) and NA-aware se
+# =============================================================================
+test_that("show_ci = TRUE adds CI_lower and CI_upper (no groups)", {
+  res  <- f_summary(test_data, columns = "value", show_ci = TRUE)
+  cols <- names(res$output_df)
+  expect_true("CI_lower" %in% cols)
+  expect_true("CI_upper" %in% cols)
+})
+
+test_that("CI columns absent by default", {
+  res  <- f_summary(test_data, columns = "value")
+  cols <- names(res$output_df)
+  expect_false("CI_lower" %in% cols)
+  expect_false("CI_upper" %in% cols)
+})
+
+test_that("CI bounds match t.test (no groups)", {
+  res <- f_summary(test_data, columns = "value", show_ci = TRUE)
+  tt  <- t.test(test_data$value, conf.level = 0.95)
+  expect_equal(res$output_df$CI_lower, unname(tt$conf.int[1]))
+  expect_equal(res$output_df$CI_upper, unname(tt$conf.int[2]))
+})
+
+test_that("CI bounds match t.test at conf_level = 0.90", {
+  res <- f_summary(test_data, columns = "value",
+                   show_ci = TRUE, conf_level = 0.90)
+  tt  <- t.test(test_data$value, conf.level = 0.90)
+  expect_equal(res$output_df$CI_lower, unname(tt$conf.int[1]))
+  expect_equal(res$output_df$CI_upper, unname(tt$conf.int[2]))
+})
+
+test_that("CI is symmetric around the mean", {
+  res  <- f_summary(test_data, columns = "value", show_ci = TRUE)
+  mid  <- (res$output_df$CI_lower + res$output_df$CI_upper) / 2
+  expect_equal(mid, res$output_df$mean)
+})
+
+test_that("grouped CI bounds match per-group t.test", {
+  res    <- f_summary(test_data, columns = "value",
+                      group_vars = "group_a", show_ci = TRUE)
+  tt_a   <- t.test(test_data$value[test_data$group_a == "A"])
+  row_a  <- res$output_df[res$output_df$group_a == "A", ]
+  expect_equal(row_a$value.CI_lower, unname(tt_a$conf.int[1]))
+  expect_equal(row_a$value.CI_upper, unname(tt_a$conf.int[2]))
+})
+
+test_that("CI bounds are NA when a group has fewer than two observations", {
+  res   <- f_summary(tiny_data, columns = "value",
+                     group_vars = "group", show_ci = TRUE)
+  expect_true(all(is.na(res$output_df$value.CI_lower)))
+  expect_true(all(is.na(res$output_df$value.CI_upper)))
+})
+
+test_that("CI columns honour show_ci = FALSE explicitly", {
+  res  <- f_summary(test_data, columns = "value", show_ci = FALSE)
+  expect_false("CI_lower" %in% names(res$output_df))
+})
+
+test_that("invalid conf_level raises an error", {
+  expect_error(
+    f_summary(test_data, columns = "value", show_ci = TRUE, conf_level = 1.5),
+    regexp = "conf_level"
+  )
+  expect_error(
+    f_summary(test_data, columns = "value", show_ci = TRUE, conf_level = 0),
+    regexp = "conf_level"
+  )
+})
+
+test_that("se uses non-NA count, matching sd / sqrt(n_obs)", {
+  res    <- f_summary(na_data, columns = "value")
+  n_obs  <- sum(!is.na(na_data$value))
+  exp_se <- sd(na_data$value, na.rm = TRUE) / sqrt(n_obs)
+  expect_equal(res$output_df$se, exp_se)
+})
+
+test_that("CI with NAs matches t.test on the non-missing values", {
+  res <- f_summary(na_data, columns = "value", show_ci = TRUE)
+  tt  <- t.test(na_data$value)  # t.test drops NAs by default
+  expect_equal(res$output_df$CI_lower, unname(tt$conf.int[1]))
+  expect_equal(res$output_df$CI_upper, unname(tt$conf.int[2]))
+})
+
+
+# =============================================================================
 # 12. PRINT METHOD SMOKE TEST
 # =============================================================================
 test_that("print.f_summary runs without error", {

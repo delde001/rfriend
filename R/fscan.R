@@ -7,7 +7,7 @@
 #' @param x A data.frame or formula (dispatches to the right method).
 #' @param formula A formula specifying the columns (right hand side) to be summarized by maximal 3 groups (left hand side). More columns or groups can be added using \code{-} or \code{+} (e.g., \code{col1 + col2 ~ group1 + group2}) to do a sequential summary for each column parameter.
 #' @param data A 'data.frame', 'data.table', or 'tibble'.
-#' @param columns The numerical column(s) to summarize if no formula is used. Can be entered as a single character string (e.g., \code{"weight"}) or as a character vector \code{c("weight", "length"}).
+#' @param columns The numerical column(s) to summarize if no formula is used. Can be entered as a single character string (e.g., \code{"weight"}) or as a character vector \code{c("weight", "length"}). When omitted, defaults to all numeric columns in \code{data} (excluding any columns named in \code{group_vars}).
 #' @param group_vars Character vector of up to 3 grouping variables (e.g., \code{c("species", "fertilizer")}).
 #' @param summary Logical. Show a summary table of the data. Default is \code{TRUE}.
 #' @param outliers Logical. If \code{TRUE}, scans for outliers using Tukey's fences and if they exist, adds them to the result object. Default \code{TRUE}.
@@ -144,6 +144,34 @@
 #' )
 #' #' print(result)
 #' result[["Sepal.Length"]]$advice$y_type
+#'
+#'
+#' # 8. Vector input | Single numeric vector (no formula, no data.frame)
+#' # When you only have loose vectors in your workspace, pass one
+#' # directly to f_scan(). The vector's name is used as the column label
+#' # in the dashboard and outlier table.
+#' disp1 <- mtcars$disp
+#' result <- f_scan(disp1)
+#' print(result)
+#'
+#' # 9. Formula on vectors | Multiple responses | One grouping vector
+#' # f_scan() also accepts a formula built from bare vectors, i.e.
+#' # no `data =` argument is needed. Multiple
+#' # response variables are combined with `+` on the
+#' # left hand side of the formula, exactly as
+#' # in the data.frame form.
+#' disp1 <- mtcars$disp
+#' hp1   <- mtcars$hp
+#' cyl1  <- factor(mtcars$cyl)
+#' result <- f_scan(disp1 + hp1 ~ cyl1)
+#' print(result)
+#'
+#' # 10. Positional vector form: equivalent to f_scan(disp1 ~ cyl1).
+#' # The first vector is the response, the rest are grouping variables.
+#' disp1 <- mtcars$disp
+#' cyl1  <- factor(mtcars$cyl)
+#' f_scan(disp1, cyl1)
+#'
 #' }
 #'
 #' @export
@@ -170,44 +198,147 @@ f_scan <- function(x, ...) {
 
 #' @export
 #' @rdname f_scan
-f_scan.formula <- function(formula, data, ...) {
-  # x is the formula (e.g., y ~ B0 + B1)
+f_scan.formula <- function(formula, data = NULL, ...) {
   x <- formula
 
   # Warn if LHS has expressions like log(y) before silently stripping them
-  check_lhs_is_names(x) #use helper_check_lhs.R
+  check_lhs_is_names(x)
 
-  # Parse LHS (Response Variable)
+  # Parse LHS (Response Variable(s))
   lhs_vars <- all.vars(x[[2]])
-
 
   # Parse RHS (Grouping Variables)
   rhs_vars  <- all.vars(x[[3]])
   if (length(rhs_vars) == 0)
     rhs_vars <- NULL
 
-  # Capture the name of the data object passed to the formula method
-  data_name_str <- deparse(substitute(data))
+  # Vector-from-formula support, e.g. f_scan(disp1 + hp1 ~ cyl1)
+  # When `data` is NULL, build it by evaluating the formula's variable
+  # names in the caller's environment. This mirrors the f_boxplot
+  # worker so behaviour is consistent across the two functions.
+  if (is.null(data)) {
+    df_names <- formula_extract_df_names(formula)
+    if (length(df_names) == 0L) {
+      data_name_str <- paste(all.vars(formula), collapse = "_")
+    } else if (length(df_names) == 1L) {
+      data_name_str <- df_names
+    } else {
+      data_name_str <- paste(df_names, collapse = "_")
+    }
+    data    <- formula_to_dataframe(formula)
+    formula <- clean_formula(formula)
+  } else {
+    data_name_str <- deparse(substitute(data))
+    if (length(data_name_str) > 1L) data_name_str <- "data"
+  }
+
   column_name_str <- deparse(substitute(lhs_vars))
 
-  if (length(data_name_str) > 1)
-    data_name_str <- "data"
-
-  # Pass it to the data.frame method
   f_scan.data.frame(
-    x = data,
-    columns = lhs_vars,
-    group_vars = rhs_vars,
-    internal_data_name = data_name_str,
+    x                    = data,
+    columns              = lhs_vars,
+    group_vars           = rhs_vars,
+    internal_data_name   = data_name_str,
     internal_column_name = column_name_str,
     ...
   )
 }
+
+#' @export
+#' @rdname f_scan
+# Dispatch when first argument is a numeric vector. Two shapes:
+#   single vector             -> one dashboard, no grouping
+#   vector + extra vectors    -> first vector is the response, the
+#                                remaining unnamed numeric/factor
+#                                vectors are grouping variables.
+#                                Equivalent to:
+#                                  f_scan(vec1 ~ vec2 + vec3 + ...)
+f_scan.numeric <- function(x, ...) {
+
+  # Capture x's original symbol for labelling
+  sx     <- substitute(x)
+  x_name <- if (is.name(sx)) as.character(sx) else "value"
+
+  # Inspect ... to separate "extra grouping vectors" (unnamed, vector-like)
+  # from "worker options" (named, or non-vector).
+  dots      <- list(...)
+  dot_names <- if (is.null(names(dots))) rep("", length(dots)) else names(dots)
+
+  is_extra_vec <- vapply(seq_along(dots), function(i) {
+    dot_names[i] == "" &&
+      (is.numeric(dots[[i]]) || is.integer(dots[[i]]) ||
+         is.factor(dots[[i]])  || is.character(dots[[i]])) &&
+      length(dots[[i]]) > 0L
+  }, logical(1))
+
+  # Recover original symbols for the extra vectors from the unevaluated call.
+  extra_idx   <- which(is_extra_vec)
+  extra_names <- character(length(extra_idx))
+  mc          <- tryCatch(match.call(expand.dots = FALSE), error = function(e) NULL)
+  dot_exprs   <- if (!is.null(mc)) as.list(mc$`...`) else list()
+
+  for (k in seq_along(extra_idx)) {
+    i <- extra_idx[k]
+    e <- if (length(dot_exprs) >= i) dot_exprs[[i]] else NULL
+    extra_names[k] <- if (!is.null(e) && is.symbol(e)) {
+      as.character(e)
+    } else {
+      paste0("group", k)
+    }
+  }
+
+  # --- Basic validation on the response vector ---
+  if (length(x) == 0L)  stop("Cannot run f_scan on a length-0 vector.")
+  if (all(is.na(x)))    stop("Cannot run f_scan: vector contains only NA values.")
+
+  # --- Build the data.frame ---
+  df <- data.frame(unname(x), stringsAsFactors = FALSE)
+  names(df)[1] <- x_name
+
+  if (length(extra_idx) > 0L) {
+    # Length check: every group vector must match the response
+    bad_len <- vapply(dots[extra_idx], length, integer(1)) != length(x)
+    if (any(bad_len)) {
+      stop(sprintf(
+        "Grouping vector(s) %s have a different length than '%s'.",
+        paste(extra_names[bad_len], collapse = ", "), x_name
+      ))
+    }
+    for (k in seq_along(extra_idx)) {
+      df[[ extra_names[k] ]] <- dots[[ extra_idx[k] ]]
+    }
+    group_vars_val <- extra_names
+    data_name_str  <- paste(c(x_name, extra_names), collapse = "_")
+  } else {
+    group_vars_val <- NULL
+    data_name_str  <- x_name
+  }
+
+  # Worker options are whatever was passed as named arguments
+  worker_args <- dots[!is_extra_vec]
+
+  do.call(
+    f_scan.data.frame,
+    c(list(x                    = df,
+           columns              = x_name,
+           group_vars           = group_vars_val,
+           internal_data_name   = data_name_str,
+           internal_column_name = x_name),
+      worker_args)
+  )
+}
+
+
+#' @export
+#' @rdname f_scan
+# Integer vectors behave the same as numerics.
+f_scan.integer <- f_scan.numeric
+
 #'
 #' @export
 #' @rdname f_scan
 f_scan.data.frame <- function(x,
-                              columns,
+                              columns = NULL,
                               group_vars = NULL,
                               summary = TRUE,
                               outliers = TRUE,
@@ -235,6 +366,18 @@ f_scan.data.frame <- function(x,
     stop(
       "Character string specifying the output format (output_type = ) should be either: 'pdf', 'word', 'excel', 'console','rmd', 'default'"
     )
+  }
+
+  # Default 'columns' to all numeric columns in 'data' so that a bare call
+  # like f_scan(mtcars) works analogously to f_boxplot(mtcars). Any
+  # columns named in 'group_vars' are excluded so a grouping factor that
+  # happens to be numeric is not also summarised as a response.
+  if (is.null(columns)) {
+    numeric_cols <- names(data)[vapply(data, is.numeric, logical(1))]
+    columns <- setdiff(numeric_cols, group_vars)
+    if (length(columns) == 0L) {
+      stop("No numeric columns found in 'data' to scan.", call. = FALSE)
+    }
   }
 
   # Safe filename logic
@@ -453,10 +596,16 @@ f_scan.data.frame <- function(x,
   # render = FALSE: only builds the R objects (plots, tables) -- much faster
   generate_report <- function(render = FALSE) {
     for (target_col in target_cols) {
-      # Prepare Plot Data
-      # If no groups provided, create a dummy "All Data" column for plotting consistency
       plot_data <- data
-      if (is.null(main_cat)) {
+      # When the user did not supply any group_vars, inject a constant
+      # dummy column named "All Data" so ggplot has something to map the
+      # x/colour/fill aesthetic to. This must run on EVERY iteration of
+      # the target_col loop because plot_data is freshly assigned from
+      # data at the top of each iteration; relying on a one-shot mutation
+      # of main_cat (the original behaviour) silently broke the second
+      # and subsequent iterations once 'columns' could expand to more
+      # than one entry.
+      if (is.null(group_vars)) {
         main_cat <- "All Data"
         plot_data[[main_cat]] <- factor("All Data")
       }
@@ -641,24 +790,33 @@ f_scan.data.frame <- function(x,
 
       if (outliers == TRUE) {
         # Outlier Table Option
-        # Suppress message "No outliers found" inside the scan to keep console clean
+        # Suppress "No outliers found" messages from f_outliers so the f_scan
+        # console stays clean; absence of outliers is handled below.
         suppressMessages({
-          out_table <- f_outliers(
-            data = data,
-            column = target_col,
+          out_obj <- f_outliers(
+            x          = data,
+            columns    = target_col,
             group_vars = group_vars,
-            coef = coef
-          )$output_df
+            coef       = coef
+          )
         })
+
+        # Pull the data.frame out of the f_outliers list via the shared helper.
+        # Keeps f_scan aligned with f_boxplot and shields both from any future
+        # change in f_outliers' return shape.
+        out_table <- extract_outlier_df(out_obj)
+
         # Safely add Outlier Table
-        # Check if 'out_table' is not NULL
-        if (!is.null(out_table)) {
+        if (!is.null(out_table) && nrow(out_table) > 0L) {
           output_list[[target_col]][["f_outliers"]] <- out_table
         } else {
           # If NULL (no outliers), add a placeholder sheet so the user knows
-          output_list[[target_col]][["f_outliers"]] <- data.frame(Message = "No outliers detected")
+          output_list[[target_col]][["f_outliers"]] <-
+            data.frame(Message = "No outliers detected")
+          # Force NULL so the render branch below picks the "no outliers" path
+          out_table <- NULL
         }
-       }
+      }
 
 
       # --- Markdown rendering (ggsave + cat) only when needed for word/pdf/rmd ---
@@ -984,6 +1142,13 @@ print.f_scan <- function(x,
     # Get the sublist for this category
     sublist <- x[[category]]
     if (!is.list(sublist)) next
+
+    # Header naming which variable the following blocks refer to. Only
+    # printed when there is more than one variable, so single-column
+    # calls keep their previous concise output.
+    if (length(x) > 1L) {
+      cat("\n Variable: ", category, sep = "")
+    }
 
     # Print Summary Table
     if (summary && !is.null(sublist[["f_summary"]])) {

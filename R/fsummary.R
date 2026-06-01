@@ -2,7 +2,7 @@
 #'
 #' @description
 #' Computes summary statistics (n, mean, sd, etc.) for a specified numerical columns
-#' in a data frame. The data can be analyzed as a whole or split by one or more
+#' in a data frame. The dataset can be analyzed as a whole or split by one or more
 #' grouping variables.
 #'
 #' The function returns a formatted data frame and includes options to export
@@ -11,7 +11,7 @@
 #' @param x A data.frame or formula (dispatches to the right method).
 #' @param formula A formula specifying the columns (right hand side) to be summarized by groups (left hand side). More columns or groups can be added using \code{-} or \code{+} (e.g., \code{col1 + col2 ~ group1 + group2}) to do a sequential summary for each column parameter.
 #' @param data A 'data.frame', 'data.table', or 'tibble'.
-#' @param columns The numerical column(s) to summarize if no formula is used. Can be entered as a single character string (e.g., \code{"weight"}) or as a character vector \code{c("weight", "length"}).
+#' @param columns The numerical column(s) to summarize if no formula is used. Can be entered as a single character string (e.g., \code{"weight"}) or as a character vector \code{c("weight", "length"}). When omitted, defaults to all numeric columns in \code{data} (excluding any columns named in \code{group_vars}).
 #' @param group_vars A character vector specifying the grouping variables in \code{data}
 #'   (e.g., \code{c("species", "fertilizer")}) if no formula is used. If \code{NULL}, the entire dataset is summarized.
 #' @param show_name Logical. Include variable name. Default \code{TRUE}.
@@ -19,6 +19,13 @@
 #' @param show_mean Logical. Include mean. Default \code{TRUE}.
 #' @param show_sd Logical. Include standard deviation. Default \code{TRUE}.
 #' @param show_se Logical. Include standard error. Default \code{TRUE}.
+#' @param show_ci Logical. Include the lower and upper bounds of a confidence
+#'   interval for the mean (columns \code{CI_lower} and \code{CI_upper}).
+#'   Default \code{FALSE}. This interval is most meaningful when the data are
+#'   approximately normal or \code{n} is large; see Details.
+#' @param conf_level Numeric. Confidence level for the interval requested by
+#'   \code{show_ci}, given as a proportion between 0 and 1. Default \code{0.95}
+#'   (a 95\% confidence interval).
 #' @param show_min Logical. Include minimum value. Default \code{TRUE}.
 #' @param show_max Logical. Include maximum value. Default \code{TRUE}.
 #' @param show_median Logical. Include median. Default \code{TRUE}.
@@ -55,6 +62,8 @@
 #'   \item \code{mean}: arithmetic mean
 #'   \item \code{sd}: standard deviation
 #'   \item \code{se}: standard error (\eqn{sd / \sqrt{n}})
+#'   \item \code{CI_lower}, \code{CI_upper}: lower and upper bounds of the
+#'     confidence interval for the mean (if requested)
 #'   \item \code{min}: minimum value
 #'   \item \code{max}: maximum value
 #'   \item \code{median}: median value
@@ -76,6 +85,17 @@
 #'     \item \code{> 0}: Heavier tails than normal (Leptokurtic) -- indicates frequent outliers.
 #'     \item \code{< 0}: Lighter tails than normal (Platykurtic) -- indicates fewer (or less extreme) outliers than a normal distribution.
 #'  }
+#' The confidence interval reported when \code{show_ci = TRUE} is a parametric
+#' interval for the mean based on the t-distribution, computed as
+#' \eqn{mean \pm t_{(1 - (1 - conf\_level)/2,\, n - 1)} \times se}, where \code{n}
+#' is the number of non-missing observations. This matches the interval
+#' reported by \code{\link[stats]{t.test}}. It assumes the data are
+#' approximately normally distributed (or that \code{n} is large enough for the
+#' central limit theorem to apply); for strongly skewed data, indicated for
+#' example by a large \code{skew} or \code{kurt}, the interval may be
+#' unreliable. Groups with fewer than two non-missing observations yield
+#' \code{NA} bounds.
+#'
 #' If \code{group_vars} are provided, the statistics are calculated for each group combination.
 #' When \code{export_to_excel = TRUE}, the file is automatically generated.
 #'
@@ -123,6 +143,21 @@
 #' # --- Example 5: Custom Print Formatting ---
 #' summary_iris <- f_summary(iris, "Sepal.Length", group_vars = "Species")
 #' print(summary_iris, col_width = 10, table_width = 70)
+#'
+#'
+#' # --- Example 6: Confidence Interval for the Mean ---
+#' # Add a 95% CI for the mean of Sepal.Length within each Species.
+#' summary_ci <- f_summary(Sepal.Length ~ Species,
+#'                         data    = iris,
+#'                         show_ci = TRUE)
+#' print(summary_ci)
+#'
+#' # Use a 90% interval instead
+#' summary_ci90 <- f_summary(Sepal.Length ~ Species,
+#'                           data       = iris,
+#'                           show_ci    = TRUE,
+#'                           conf_level = 0.90)
+#' print(summary_ci90)
 
 #' @export
 f_summary <- function(x, ...) {
@@ -178,7 +213,7 @@ f_summary.formula <- function(x, data, ...) {
 #' @export
 #' @rdname f_summary
 f_summary.data.frame <- function(x,
-                                 columns,
+                                 columns = NULL,
                                  group_vars = NULL,
                                  show_name = TRUE,
                                  # Statistics Toggles
@@ -186,6 +221,8 @@ f_summary.data.frame <- function(x,
                                  show_mean = TRUE,
                                  show_sd = TRUE,
                                  show_se = TRUE,
+                                 show_ci = FALSE,
+                                 conf_level = 0.95,
                                  show_min = TRUE,
                                  show_max = TRUE,
                                  show_median = TRUE,
@@ -210,6 +247,28 @@ f_summary.data.frame <- function(x,
   # Input Validation & Setup
   if (!is.data.frame(data))
     stop("Input must be a data.frame.")
+
+  if (show_ci) {
+    if (!is.numeric(conf_level) || length(conf_level) != 1 ||
+        is.na(conf_level) || conf_level <= 0 || conf_level >= 1) {
+      stop("'conf_level' must be a single number between 0 and 1.",
+           call. = FALSE)
+    }
+  }
+
+
+
+  # Default 'columns' to all numeric columns in 'data' so that a bare call
+  # like f_summary(mtcars) works analogously to f_boxplot(mtcars). Any
+  # columns named in 'group_vars' are excluded so a grouping factor that
+  # happens to be numeric is not also summarised as a response.
+  if (is.null(columns)) {
+    numeric_cols <- names(data)[vapply(data, is.numeric, logical(1))]
+    columns <- setdiff(numeric_cols, group_vars)
+    if (length(columns) == 0L) {
+      stop("No numeric columns found in 'data' to summarise.", call. = FALSE)
+    }
+  }
 
   # Check if there is one or multiple columns to summarize
   if(length(columns) == 1){
@@ -249,14 +308,30 @@ f_summary.data.frame <- function(x,
   # --- WORKER FUNCTION ---
   summary_fun <- function(vec) {
     result <- c()
+    # Number of non-missing observations, reused for n, se and the CI so a
+    # column containing NAs is not penalised by counting the NAs in the
+    # denominator of the standard error.
+    n_obs <- sum(!is.na(vec))
     if (show_n)
-      result["n"] <- sum(!is.na(vec))
+      result["n"] <- n_obs
     if (show_mean)
       result["mean"] <- mean(vec, na.rm = TRUE)
     if (show_sd)
       result["sd"] <- sd(vec, na.rm = TRUE)
     if (show_se)
-      result["se"] <- sd(vec, na.rm = TRUE) / sqrt(length(vec))
+      result["se"] <- sd(vec, na.rm = TRUE) / sqrt(n_obs)
+    if (show_ci) {
+      if (n_obs < 2) {
+        result["CI_lower"] <- NA
+        result["CI_upper"] <- NA
+      } else {
+        m      <- mean(vec, na.rm = TRUE)
+        se_val <- sd(vec, na.rm = TRUE) / sqrt(n_obs)
+        tcrit  <- qt(1 - (1 - conf_level) / 2, df = n_obs - 1)
+        result["CI_lower"] <- m - tcrit * se_val
+        result["CI_upper"] <- m + tcrit * se_val
+      }
+    }
     if (show_min)
       result["min"] <- min(vec, na.rm = TRUE)
     if (show_Q1)
@@ -372,6 +447,13 @@ f_summary.data.frame <- function(x,
   }
 
   attr(output_list, "digits") <- digits
+  # Record the confidence level only when a CI was actually requested, so the
+  # print method can both detect that CI columns are present and report the
+  # level. Kept as an attribute (rather than encoded in the column names) so
+  # the CI columns keep stable, script-safe names regardless of conf_level.
+  if (show_ci) {
+    attr(output_list, "conf_level") <- conf_level
+  }
   return(output_list)
 }
 
@@ -400,6 +482,16 @@ print.f_summary <- function(x,
     digits <- attr(x, "digits")
   }
 
+  # If a confidence interval was requested, report its level once up front.
+  # The CI_lower / CI_upper columns themselves carry generic names, so this
+  # note is where the human-readable level (e.g. "95%") is surfaced.
+  conf_level <- attr(x, "conf_level")
+  if (!is.null(conf_level)) {
+    cat("Confidence interval: ",
+        format(conf_level * 100, trim = TRUE),
+        "% (t-distribution)\n", sep = "")
+  }
+
   # Loop over each category (a, b, etc.)
   for (category in names(x)) {
     # Get the sublist for this category
@@ -408,6 +500,15 @@ print.f_summary <- function(x,
     # Round numbers if digits is not NULL
     if (!is.null(digits)) {
       sublist <- f_conditional_round(sublist, digits = digits, allow_integer_decimal_mix = allow_integer_decimal_mix)
+    }
+
+    # Header naming which response the table belongs to. Only printed
+    # when there is more than one table to distinguish; with a single
+    # response, f_summary names the entry "output_df" for backward
+    # compatibility (see fsummary.R), so printing that as a "Variable:"
+    # header would be misleading.
+    if (length(x) > 1L) {
+      cat("\n Variable: ", category, sep = "")
     }
 
     f_pander(sublist, col_width = col_width, table_width = table_width)

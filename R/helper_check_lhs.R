@@ -26,6 +26,7 @@
 # ---------------------------
 #   y ~ group                        bare name
 #   y1 + y2 ~ group                  multiple responses (rfriend convention)
+#   y1 - y2 ~ group                  same; minus also treated as a separator
 #   y1 + y2 + y3 ~ group             any number of responses
 #   `my column` ~ group              backtick-quoted non-syntactic name
 #   y1 + `my column` ~ group         mix of bare and backticked names
@@ -43,10 +44,27 @@
 
 check_lhs_is_names <- function(formula) {
 
+  # Nothing to check when no formula was supplied. Several rfriend
+  # functions accept either a formula or a bare data.frame (f_boxplot,
+  # f_summary, f_scan, f_outliers, ...). In the data.frame-only path
+  # 'formula' is NULL; deparsing NULL would produce the literal string
+  # "NULL", which then fails the bare-name test and emits a misleading
+  # warning naming NULL as an offending LHS term.
+  if (is.null(formula)) {
+    return(invisible(NULL))
+  }
+
+  # Some callers may also pass a one-sided formula (e.g. ~ group) with
+  # no LHS at all. length(formula) is 2 in that case (operator + RHS);
+  # there is nothing to validate, so return early.
+  if (length(formula) < 3L) {
+    return(invisible(NULL))
+  }
+
   # Deparse the LHS back to source text. Split on '+' to recover the
   # individual response terms as rfriend would see them.
   lhs_deparsed <- deparse(formula[[2]])
-  lhs_terms    <- trimws(strsplit(lhs_deparsed, "\\+")[[1]])
+  lhs_terms <- trimws(strsplit(lhs_deparsed, "[+\\-]")[[1]])
 
   # Strip surrounding backticks from a term, if present.
   # A backtick-quoted name like `my column` is syntactically a valid

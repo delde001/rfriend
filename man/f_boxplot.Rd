@@ -4,14 +4,20 @@
 \alias{f_boxplot}
 \alias{f_boxplot.formula}
 \alias{f_boxplot.data.frame}
+\alias{f_boxplot.numeric}
+\alias{f_boxplot.integer}
 \alias{f_boxplot_worker}
 \title{Generate a Boxplot Report of a data.frame}
 \usage{
 f_boxplot(x, ...)
 
-\method{f_boxplot}{formula}(formula, data, ...)
+\method{f_boxplot}{formula}(formula, data = NULL, ...)
 
 \method{f_boxplot}{data.frame}(x, ...)
+
+\method{f_boxplot}{numeric}(x, ...)
+
+\method{f_boxplot}{integer}(x, ...)
 
 f_boxplot_worker(
   formula = NULL,
@@ -32,11 +38,14 @@ f_boxplot_worker(
   height = 7,
   units = "in",
   res = 300,
-  las = 2
+  las = 2,
+  color = "rainbow",
+  boxwidth = NULL,
+  ...
 )
 }
 \arguments{
-\item{x}{A data.frame or formula (dispatches to the right method).}
+\item{x}{A data.frame, formula, or numeric/integer vector (dispatches to the correct method). When a single numeric or integer vector is supplied, it is treated as a single response variable, plotted on the y-axis with the variable name as label, and grouped by a single dummy factor (one box). When several unnamed numeric vectors are supplied (as in base R's \code{boxplot()}, e.g. \code{f_boxplot(x1, x2)}), each becomes its own box side by side, labelled with the original variable name on the x-axis.}
 
 \item{...}{Further arguments forwarded to \code{f_boxplot_worker},
 such as \code{fancy_names}, \code{title}, \code{fill}, etc.}
@@ -86,6 +95,10 @@ Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.}
 \item{res}{Numeric, png figure resolution default 300 dpi}
 
 \item{las}{An integer (\code{0} t/m \code{3}), \code{las = 0}: Axis labels are parallel to the axis. \code{las = 1}: Axis labels are always horizontal. \code{las = 2}: Axis labels are perpendicular to the axis. (default setting). \code{las = 3}: Axis labels are always vertical.}
+
+\item{color}{Colour scheme for the boxes. One of: \code{"rainbow"} (default; one hue per group), \code{"bw"} (white fill with black lines, outliers and mean marker, suitable for publication), a single R colour name or hex string applied to all boxes (with a transparent fill and a darker outline derived from it), or a vector of colours which is recycled to the number of groups for a custom per-group palette.}
+
+\item{boxwidth}{Numeric or \code{NULL}. Relative width of each box, passed as \code{boxwex} to \code{boxplot()}. When \code{NULL} (default) the width is computed automatically as \code{num.bars/18}, keeping boxes roughly comparable across plots with different numbers of groups. Supply a numeric value (for example \code{0.5}) to override. The numeric/integer vector method uses \code{0.4} by default to avoid an overly thin single box.}
 }
 \value{
 The return value depends on \code{output_type}:
@@ -152,6 +165,23 @@ f_boxplot(hp + disp ~ gear*cyl,
            output_type = "word"
            )
 
+# Pass a bare numeric vector. Its name is used as the y-axis label
+# and as the data_name in the output filename.
+set.seed(1)
+my_vec <- rnorm(50, mean = 10)
+f_boxplot(my_vec, output_type = "png")
+
+# Formula with bare vectors (no data.frame): group hp by cyl.
+hp1  <- mtcars$hp
+cyl1 <- mtcars$cyl
+f_boxplot(hp1 ~ cyl1, output_type = "png")
+
+# Multiple unnamed numeric vectors, base R's boxplot() convention:
+# each vector becomes its own box, labelled on the x-axis with its
+# original variable name. Use the formula syntax above when you
+# instead want to group one response by a factor.
+f_boxplot(hp1, cyl1, output_type = "png")
+
 # Capture the R Markdown output as a string and render it inline.
 # Use output_type = "rmd" to get the markdown back as a character value
 # instead of writing a file. Useful for embedding in a larger knitr document.
@@ -168,6 +198,8 @@ cat(rmd)
 #   ```{r, echo=FALSE, results='asis'}
 #   cat(rmd)
 #   ```
+
+
 }
 
 }

@@ -553,11 +553,12 @@ test_that("numeric predictor with <= 10 unique values triggers a warning", {
   skip_on_cran()
   d <- mtcars
   d$vs <- as.integer(d$vs)
-  # cyl is numeric with 3 unique values (4, 6, 8) - should warn
-
   expect_warning(
-    suppressMessages(
-      f_glm(vs ~ cyl, family = binomial, data = d, output_type = "default")
+    expect_warning(
+      suppressMessages(
+        f_glm(vs ~ cyl, family = binomial, data = d, output_type = "default")
+      ),
+      regexp = "continuous predictor"
     ),
     regexp = "numeric"
   )

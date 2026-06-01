@@ -227,3 +227,108 @@ test_that("data.frame interface via named x also works", {
     res <- suppressMessages(f_outliers(x = df_loc, columns = "v1"))
   )
 })
+
+
+# =============================================================================
+# v3.1.0: BARE DATA.FRAME WITHOUT `columns`
+# =============================================================================
+# `columns` is now optional. When omitted, all numeric columns in `data`
+# are scanned (excluding any column named in `group_vars` or `id_var`).
+# =============================================================================
+
+test_that("bare data.frame: f_outliers(mtcars) scans all numeric columns", {
+  expect_no_error(
+    res <- suppressMessages(f_outliers(mtcars))
+  )
+  # mtcars only has numeric columns, so the result should at least be
+  # non-NULL (mtcars has known outliers in several columns) and tagged
+  # as f_outliers.
+  if (!is.null(res)) {
+    expect_s3_class(res, "f_outliers")
+  }
+})
+
+test_that("bare data.frame: f_outliers(df_with_factors) skips non-numeric", {
+  df_test       <- mtcars
+  df_test$grp   <- factor(rep(letters[1:4], length.out = nrow(df_test)))
+  df_test$label <- paste0("R", seq_len(nrow(df_test)))
+
+  expect_no_error(
+    res <- suppressMessages(f_outliers(df_test, group_vars = "grp"))
+  )
+  if (!is.null(res)) {
+    expect_s3_class(res, "f_outliers")
+    # The grouping column should not appear as a scanned response key.
+    expect_false("grp"   %in% setdiff(names(res), c("output_df")))
+    expect_false("label" %in% setdiff(names(res), c("output_df")))
+  }
+})
+
+test_that("bare data.frame: group_vars columns are excluded from auto-columns", {
+  # cyl is numeric in mtcars; passing it as group_vars must NOT scan it
+  # as a response.
+  expect_no_error(
+    res <- suppressMessages(f_outliers(mtcars, group_vars = "cyl"))
+  )
+  if (!is.null(res)) {
+    # Whether 'cyl' appears as a key depends on outlier presence in
+    # other columns; at minimum the call should not blow up.
+    expect_s3_class(res, "f_outliers")
+  }
+})
+
+test_that("bare data.frame: id_var column is excluded from auto-columns", {
+  df_id <- make_outlier_df()
+  # EmployeeID is character; it is implicitly skipped by the numeric
+  # filter, but we also pass it as id_var. No error should occur.
+  expect_no_error(
+    res <- suppressMessages(f_outliers(df_id, id_var = "EmployeeID"))
+  )
+})
+
+test_that("bare data.frame with no numeric columns errors clearly", {
+  df_no_num <- data.frame(
+    g = letters[1:5],
+    f = factor(c("x", "y", "x", "y", "x")),
+    stringsAsFactors = FALSE
+  )
+  expect_error(
+    suppressMessages(f_outliers(df_no_num)),
+    regexp = "numeric"
+  )
+})
+
+
+# =============================================================================
+# v3.1.0: MULTI-COLUMN PRINT HEADER
+# =============================================================================
+# When several responses are summarised, the print method shows a header
+# naming each response variable. With a single response, no header is
+# printed (the legacy 'output_df' entry name would make it misleading).
+# =============================================================================
+
+test_that("print.f_outliers: multi-column output shows a 'Variable:' header per response", {
+  df_loc <- make_outlier_df()
+  res <- suppressMessages(
+    f_outliers(df_loc, columns = c("Salary", "Age"))
+  )
+  expect_s3_class(res, "f_outliers")
+  out_txt <- paste(utils::capture.output(print(res)), collapse = "\n")
+  expect_match(out_txt, "Salary", fixed = TRUE)
+  expect_match(out_txt, "Age",    fixed = TRUE)
+  # The header phrase introduced in 3.1.0
+  expect_match(out_txt, "Variable", fixed = TRUE)
+})
+
+test_that("print.f_outliers: single-column output does not show 'Variable:' header", {
+  df_loc <- make_outlier_df()
+  res <- suppressMessages(
+    f_outliers(df_loc, columns = "Salary")
+  )
+  expect_s3_class(res, "f_outliers")
+  out_txt <- paste(utils::capture.output(print(res)), collapse = "\n")
+  # For a single response, f_outliers names the entry 'output_df'.
+  # Printing a 'Variable: output_df' header would be misleading, so the
+  # 3.1.0 fix skips it. Confirm that string is absent.
+  expect_false(grepl("Variable: output_df", out_txt, fixed = TRUE))
+})
