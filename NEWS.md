@@ -1,3 +1,257 @@
+# rfriend 3.2.0 (2026-07-04)
+
+## New Functions
+
+* `f_lm()` fits ordinary least squares linear regression (`stats::lm()`).  It uses the same assumption checks, optional Box-Cox / bestNormalize transformation workflow, object structure
+  and figure theme  as `f_aov()` . Unlike `f_aov()` it keeps numeric predictors numeric,
+  so they are modelled as continuous regression terms, and it adds a
+  coefficient table, a coefficient forest plot, a Type II ANOVA table, the
+  overall R-squared / adjusted R-squared / model F-test, and regression plots.
+  Several responses can be analysed in sequence (via `+`), with output to
+  console, 'pdf', 'Word', 'Excel' or R Markdown.
+
+* `f_friedman()` adds the Friedman rank sum test, the non-parametric
+  alternative to the one-way repeated-measures ANOVA, for unreplicated
+  complete block designs. It follows the same workflow and output options as
+  `f_kruskal_test()`: it takes a `response ~ group | block` formula (multiple
+  responses allowed via `+`), validates that the data form a valid
+  unreplicated complete block design, reports Kendall's W effect size, runs pairwise paired Wilcoxon signed-rank tests as post hoc with a compact letter display, and produces density and boxplot figures. Output can be returned as an object or written to 'pdf', 'Word', 'Excel' or R Markdown. Includes `print()` and  `plot()` methods.
+
+* `f_example_data()` gives access to a bundled example datasets shipped with the package. With no arguments it lists the available files; given a file  name it returns the installed file path (ready for `read.csv()`,  `readxl::read_excel()` or `f_open_file()`) and can optionally copy the file  to a destination. A simulated plant-science field trial (a randomized  complete block design with repeated measures) is now bundled as a teaching dataset.
+
+## Changes
+
+*  `f_aov()` now calculates the main ANOVA table using Type II sums of squares (via car::Anova()). This replaces the Type I method used in previous versions. For \strong{unbalanced}
+  designs this changes the reported main-effect sums of squares, F-statistics
+  and p-values, because a Type I table depends on the order in which terms
+  enter the formula while a Type II table does not; balanced designs are
+  unaffected. A new `anova_type` argument selects the type: `2` (Type II, the
+  new default) or `3` (Type III). Type III is also order-invariant but only
+  tests meaningful main effects in the presence of interactions when sum /
+  effect contrasts are used, so when `anova_type = 3` and the user has not
+  supplied their own contrasts. Type II keeps the main ANOVA table both order-invariant and consistent
+  with R's default treatment contrasts and with the `emmeans` post hoc
+  comparisons.
+
+* `f_lmer()` the `norm_plots` argument has been renamed to `diagnostic_plots`.
+  `norm_plots` is now deprecated (via \pkg{lifecycle}): it still works but
+  emits a deprecation warning and forwards its value to `diagnostic_plots`.
+  Please update scripts to use `diagnostic_plots`.
+
+## New Features in Existing Functions
+
+* Effect and interaction plots across `f_aov()`, `f_glm()`, `f_lmer()`,
+  `f_t_test()`, `f_wilcox_test()` and `f_kruskal_test()` are now
+  publication-ready \pkg{ggplot2} objects sharing a common theme
+  (`f_theme_pub()`) and colour palette (`f_pub_palette()`, in the new
+  `helper_pub_theme.R`). They are stored in the returned object (e.g.
+  `out$y1$effect_plot_treatment`, `out$y1$interaction_plot_a_b_1`) so they can
+  be retrieved and customised, and `plot()` re-prints them so the interactive
+  output matches the report. The per-function additions below build on this.
+
+* `f_glm()` adds a coefficient forest plot (stored as
+  `out$y1$coef_forest_plot`), a `contrast_plots` argument (default `FALSE`)
+  that adds a pairwise contrast forest plot per categorical post hoc term on
+  the link scale (stored as `out$y1$contrast_plot_<term>` and
+  `out$y1$interaction_contrast_plot_<term>`), and an `effect_plot` argument
+  (default `TRUE`) that toggles the estimated-means and interaction plots.
+
+* `f_aov()` interaction plots now support two-, three- and four-way
+  categorical interactions: a two-way uses x-axis plus colour (both
+  orientations), while three- and four-way interactions add facet panels for
+  the remaining factor(s); interactions of five or more categorical factors
+  are skipped with a warning. A `contrast_plots` argument (default `FALSE`)
+  adds the same pairwise contrast forest plots as `f_glm()` and `f_lmer()`,
+  stored as `out$y1$contrast_plot_<term>` and
+  `out$y1$interaction_contrast_plot_<term>`.
+
+* `f_lmer()` plotting is brought in line with `f_aov()` and extended: markdown
+  headings and figure captions now match `f_aov()`; interaction plots cover
+  three- and four-way categorical interactions (extra factors become facet
+  panels, one plot per choice of x-axis factor; order greater than four is
+  skipped with a note); a slope plot is drawn for a significant numeric x
+  categorical interaction (raw-data scatter with one model-fitted line per
+  factor level and a confidence band, going beyond `f_aov()`, which holds
+  covariates at their mean); and a coefficient forest plot (fixed-effect
+  estimates with confidence intervals and a zero reference line, scaling to
+  many predictors) is stored as `out$y1$coef_forest_plot`. New `contrast_plots`
+  (default `FALSE`) and `effect_plot` (default `TRUE`) arguments match
+  `f_glm()`; `contrast_plots` adds one row per pairwise difference with its
+  adjusted confidence interval and a zero reference line (no cap on the number
+  of contrasts), stored as `out$y1$contrast_plot_<term>` and
+  `out$y1$interaction_contrast_plot_<term>`.
+
+* `f_lmer()` now produces an interaction post hoc cell-means table (estimated
+  means for every factor-level combination, compared simultaneously, with a
+  compact letter display and pairwise contrasts) for each significant
+  categorical interaction, matching `f_aov()`, stored as
+  `out$y1$post_hoc[["a:b"]]`.
+
+* `f_lmer()` adds several interpretive notes and caveats to the report:
+
+  * a caution above a main effect's marginal-means table when that effect
+    takes part in a significant interaction (the heading is annotated and the
+    note points to the artifacts that exist for that interaction: cell-means
+    table and plot, slope plot or coefficient slopes), since those means
+    average over the interacting factor and can hide or reverse the pattern;
+
+  * when an interaction is present, a note that the Type III F tests and the
+    coefficient t tests are different hypotheses (so t^2 will not equal F): the
+    F averages a main effect over the interacting term with sum-to-zero coding,
+    while each coefficient is the simple effect at the reference level under
+    treatment coding;
+
+  * a corrected multiple-response multiple-testing note stating that the
+    p-value adjustment only controls error within a single model and only when
+    that model has categorical terms that trigger post hoc comparisons; and
+
+  * a caveat on the observed-descriptives table that its rows pool over
+    repeated measurements and other predictors, so the reported sd/se mix
+    within- and between-subject variation and the observations within a row
+    are not independent.
+
+* `f_lmer()` refines its assumption and variance reporting:
+
+  * Levene's test now runs on nested and crossed random-effects grouping
+    factors. Previously, for a model such as `(1 | block/plant_id)` the
+    grouping factor `"plant_id:block"` was looked up directly in the model
+    frame, where it does not exist as a single column, so the test was skipped
+    with a misleading "fewer than two levels" reason; it is now reconstructed
+    from its component columns, and any remaining skip message states the
+    actual reason.
+
+  * Levene's test is corroborated against the Scale-Location panel before the
+    heteroscedasticity recommendations are triggered, since a by-group Levene
+    test on its own over-fires. The recommendations now appear only when Levene
+    is significant and the Scale-Location trend supports it; if the
+    corroborating signal cannot be computed, the function falls back to the
+    Levene result and says so rather than suppressing it silently.
+
+  * for models with two or more intercept grouping factors, an "ICC by
+    grouping factor" table gives each factor's variance and its share of the
+    total (with the residual as its own row, so the shares sum to 1), stored as
+    `$icc_by_group`; the combined ICC in the Model fit table is now labelled
+    the adjusted (total) ICC.
+
+* `f_lmer()` the displayed Type III fixed-effects table now reports NumDF,
+  DenDF, F and p only. The `Sum Sq` and `Mean Sq` columns are removed from the
+  display because, for an REML-fitted mixed model, they are back-computed by
+  `lmerTest` and do not form an additive variance decomposition. The full
+  `lmerTest` table, including those columns, is available programmatically in
+  the new `$fixed_effects_full` slot.
+
+* `f_lmer()` console and interactive output now match the report:
+  `print.f_lmer()` shows the per-grouping-factor ICC table and uses Model fit
+  labels consistent with the report for random-slope models
+  (`Var(group, int)` / `ICC (approx)`), and `plot()` replays the stored
+  effect, interaction, slope, coefficient-forest and contrast-forest plots.
+
+* The reference-level caption under the coefficient forest plot no longer
+  contains a non-runnable `relevel()` example: the hard-coded `ref = "drug"`
+  that matched no real factor level is replaced by the factor's actual current
+  reference level, so the example runs on copy-paste.
+
+* Fixed several markdown rendering artifacts in the Word output: orphaned bold
+  markup around grouping-factor names (e.g.
+  `**Levels of**** ****Subject****:**`), emphasis spans broken across source
+  line breaks (e.g. *how fast*, *Residuals vs Fitted*), and the exponent in the
+  multiple-response note, which `pandoc` rendered as `(1-0.05)2` (reading as a
+  multiplication) instead of a power; the note now uses a Unicode superscript
+  that renders correctly in both the PDF and Word paths.
+
+* `f_t_test()` and `f_wilcox_test()` now produce a main effect plot for every
+  response, stored as `out$<response>$main_effect_plot` and rendered into the
+  reports. For `f_t_test()` the figure shows the estimate with its confidence
+  interval against the raw data, one display per test type: a two-sample test
+  shows the two group means each with its own confidence interval, a one-sample
+  test shows the sample mean with its confidence interval and a dashed
+  reference line at `mu`, and a paired test shows the mean of the per-pair
+  differences with its confidence interval and a dashed reference line at `mu`
+  (unifying the paired and one-sample displays); when the response was
+  transformed, the estimate and interval are back-transformed and labelled as a
+  median. For `f_wilcox_test()`, two-sample and paired tests plot the
+  Hodges-Lehmann estimate and confidence interval directly.
+
+* `f_kruskal_test()` compact letter display now runs high-to-low by descending
+  median via the shared `compact_letters()` helper, consistent with `f_aov()`,
+  `f_glm()` and `f_lmer()`.
+
+* `f_factors()` gains a `ref` argument to set the reference level of converted
+  factors (the level models contrast against under R's default treatment
+  contrasts). Accepts a single string or a named vector mapping columns to
+  reference levels, e.g. `ref = c(treatment = "control", dose = "low")`.
+  Useful before `f_glm()` and `f_lmer()`. A level not present in a given factor
+  is skipped with a warning.
+
+* `df_to_table()` now accepts `label_col` as a column name as well as a column
+  index.
+
+## Minor Changes
+
+* New shared internal helpers underpin the publication output: a common theme
+  and palette (`helper_pub_theme.R`), forest-plot drawing
+  (`helper_forest_plot.R`, `helper_contrast_forest.R`), coefficient reference
+  captions (`helper_coef_ref_caption.R`), compact letter displays
+  (`helper_compact_letters.R`, `helper_cld_emmeans.R`) and a safe
+  Anderson-Darling wrapper (`helper_safe_ad.R`).
+
+* `multcomp` and `multcompView` are no longer imported; compact letter
+  displays are now produced by internal helpers. `lifecycle` is added to
+  Imports, and `car` and `readxl` are added to Suggests.
+
+## Bug Fixes
+
+* Improved the stability of the `save_as = ` option.
+
+* `f_t_test()` errored with "sample size must be greater than 7" from
+  `nortest::ad.test()` whenever a response (or, for a paired test, the set of
+  per-pair differences) had fewer than 8 observations, aborting the whole
+  analysis. The Anderson-Darling diagnostic is now obtained through a new
+  internal `safe_ad()` wrapper (mirroring `safe_shapiro()`) that returns a
+  shaped result with an informative "skipped: n < 8"  label instead of
+  erroring. The report states clearly when the test was skipped; when both
+  Shapiro-Wilk and Anderson-Darling are unavailable at very small sample
+  sizes, no transformation is triggered automatically and the user is directed
+  to the Q-Q plot and histogram. The same guard is applied inside
+  `f_bestNormalize()`, so small-sample transformed t-tests no longer error
+  either.
+
+* `f_t_test()` reported a wrong p-value on the one-sample and paired
+  transformation paths when `transformation = "bestnormalize"` (or when
+  bestNormalize was selected automatically). `bestNormalize` standardizes its
+  output to mean 0 and standard deviation 1 by default, so the subsequent
+  one-sample test of the transformed values against `mu = 0` was true by
+  construction (p approximately 1) regardless of the data, and a non-zero `mu`
+  together with the back-transformed interval was distorted. The
+  transformation is now requested with `standardize = FALSE`, preserving the
+  location and scale needed for a valid test against `mu` and an interpretable
+  back-transformed confidence interval. The reported p-value now agrees with
+  the untransformed paired or one-sample test.
+
+* `f_lmer()` no longer errors when a random effect has (near) zero variance,
+  which previously caused the Shapiro-Wilk normality check on the BLUPs to
+  fail with "all 'x' values are identical". The check now returns NA and falls
+  back to the qq-plot diagnostics.
+
+* `f_chisq_test()` now also accepts a factor and the two-vector form, and
+  detects a violated small-expected-count assumption by reading the expected
+  counts directly rather than parsing base R's warning text, so the note
+  recommending a Monte Carlo p-value is robust to translation and version
+  changes. When `simulate.p.value = TRUE` is requested the (now circular)
+  small-count note is suppressed.
+
+* `f_setwd()` called with no argument now stops with a clear, actionable error
+  when the script directory cannot be determined (run from the console or an
+  unsaved file), instead of issuing a silent warning and leaving the working
+  directory unchanged.
+
+* `f_boxplot()` mean markers now ignore `NA` values when computing group means.
+
+* The order of the compact-letter display was not consistently from large (a)
+  to small (z); all functions using letters are now consistent.
+
+* `f_wilcox_test()` diagnostic density plots now show the whole curve and are no longer cut off.
+
 # rfriend 3.1.0 (2026-05-30)
 
 ## New Features

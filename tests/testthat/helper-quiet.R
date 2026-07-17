@@ -141,6 +141,30 @@ quiet_f_kruskal_test <- function(...) {
   result
 }
 
+quiet_f_lm <- function(...) {
+  suppressMessages(
+    utils::capture.output(
+      result <- f_lm(..., output_type = "default",
+                     norm_plots = FALSE, effect_plots = FALSE,
+                     intro_text = FALSE, open_generated_files = FALSE),
+      file = nullfile()
+    )
+  )
+  result
+}
+
+quiet_f_friedman <- function(...) {
+  suppressMessages(suppressWarnings(
+    utils::capture.output(
+      result <- f_friedman(..., output_type = "default",
+                           plot = FALSE, intro_text = FALSE,
+                           open_generated_files = FALSE),
+      file = nullfile()
+    )
+  ))
+  result
+}
+
 quiet_f_chisq_test <- function(...) {
   suppressMessages(
     utils::capture.output(

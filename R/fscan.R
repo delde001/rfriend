@@ -990,7 +990,7 @@ f_scan.data.frame <- function(x,
       paste0(
         "
 ---
-title: \"f_Scan Data Analysis Report\"
+title: \"Data Scan Report\"
 date: \"`r Sys.Date()`\"
 output:
    word_document:

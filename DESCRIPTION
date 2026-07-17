@@ -2,7 +2,7 @@ Package: rfriend
 Type: Package
 Title: Provides Batch Functions and Visualisation for Basic Statistical
         Procedures
-Version: 3.1.0
+Version: 3.2.0
 Authors@R: c(person("Sander H.", "van Delden", role = c("aut", "cre"), email = "plantmind@proton.me"))
 Description: Designed to streamline data analysis and statistical testing, reducing the length of R 
     scripts while generating well-formatted outputs in 'pdf', 'Microsoft Word', and 'Microsoft Excel' 
@@ -14,8 +14,8 @@ Description: Designed to streamline data analysis and statistical testing, reduc
     f_boxcox() in part based on 'MASS/boxcox' and 'rcompanion', and f_bestNormalize() 
     which wraps and extends functionality from the 'bestNormalize' package. Furthermore, 'rfriend' 
     can automatically (or on request) generate visualizations such as boxplots, f_boxplot(), 
-    QQ-plots, f_qqnorm(), histograms f_hist(), and density plots f_density(). Additionally, the package 
-    includes several statistical test functions: f_aov(), f_chisq_test(), f_corplot(), f_kruskal_test(), 
+    QQ-plots, f_qqnorm(), and histograms f_hist(). Additionally, the package includes several 
+    statistical test functions: f_aov(), f_chisq_test(), f_corplot(), f_kruskal_test(), 
     f_lmer(), f_glm(), f_t_test(), f_wilcox_test(),  for sequential testing and visualisation of the 
     similar named 'stats' functions. These functions, except for f_chisq_test(), support testing multiple
     response variables and predictors, while also handling assumption checks, data transformations, 
@@ -32,11 +32,11 @@ Note: When loading, both MuMIn and rstatix are imported. Since rstatix internall
 License: GPL-3
 Encoding: UTF-8
 Depends: R (>= 4.4.0)
-Imports: bestNormalize, crayon, DHARMa, dplyr, emmeans, ggplot2, grDevices, 
-         gridExtra, knitr, lme4, lmerTest, magick, multcomp, 
-         multcompView, MuMIn, nortest, pander, png, rlang, 
+Imports: bestNormalize, crayon, car, DHARMa, dplyr, emmeans, ggplot2, grDevices, 
+         gridExtra, knitr, lifecycle, lme4, lmerTest, magick, 
+         MuMIn, nortest, pander, png, rlang, 
          rmarkdown, rstatix, rstudioapi, this.path, tidyr, writexl, xfun
-Suggests: MASS, nnet, pbkrtest, testthat (>= 3.0.0), tibble
+Suggests: MASS, nnet, pbkrtest, testthat (>= 3.0.0), tibble, readxl
 Config/testthat/edition: 3
 Roxygen: list(markdown = FALSE)
 SystemRequirements: Pandoc (>= 3.2)
@@ -45,4 +45,7 @@ Packaged: 2025-06-22 20:29:49 UTC; sander
 Author: Sander H. van Delden [aut, cre]
 Maintainer: Sander H. van Delden <plantmind@proton.me>
 URL: https://delde001.github.io/rfriend/
+BugReports: https://github.com/delde001/rfriend/issues
 Config/roxygen2/version: 8.0.0
+LazyData: true
+RoxygenNote: 8.0.0

@@ -117,7 +117,26 @@
 #'   set. For the default (vector) method, \code{...} is currently
 #'   unused.
 #'
-#' @return An object of class \code{'f_wilcox_test'}.
+#' @return An object of class \code{'f_wilcox_test'}, a named list with one
+#'   element per response variable. Each element contains the
+#'   \code{stats::wilcox.test()} result, the formatted console/markdown text
+#'   blocks, the diagnostic plot file path, and a publication-ready main effect
+#'   plot as a \pkg{ggplot2} object (\code{main_effect_plot}). The plot shows
+#'   the estimated parameter with its confidence interval against the raw data:
+#'   the two group medians each with a distribution-free median confidence
+#'   interval (two-sample), the sample pseudo-median (Hodges-Lehmann estimate)
+#'   with a reference line at \code{mu} (one-sample), or the pseudo-median of
+#'   the per-pair differences with a reference line at \code{mu} (paired).
+#'
+#' @examples
+#' \donttest{
+#' # Two-sample Wilcoxon rank-sum test
+#' f_wilcox_test(mpg ~ am, data = mtcars, output_type = "console")
+#'
+#' # Retrieve and customise the stored main effect plot (ggplot object)
+#' result <- f_wilcox_test(mpg ~ am, data = mtcars, output_type = "default")
+#' result[["mpg"]]$main_effect_plot
+#' }
 #'
 #' @export
 f_wilcox_test <- function(x, ...) {
@@ -550,8 +569,12 @@ f_wilcox_test.formula <- function(formula,
         if (paired) {
           plot(group1 - group2, main = "Paired Differences", ylab = "Differences")
         } else {
-          plot(density(group1), col = "blue", main = "Group Densities")
-          lines(density(group2), col = "red")
+          den1 <- density(group1)
+          den2 <- density(group2)
+          xlim <- range(c(den1$x, den2$x))
+          ylim <- range(c(den1$y, den2$y))
+          plot(den1, col = "blue", main = "Group Densities", xlim = xlim, ylim = ylim)
+          lines(den2, col = "red")
           legend("topright", legend = levs, col = c("blue", "red"), lty = 1)
         }
       }
@@ -741,7 +764,7 @@ f_wilcox_test.formula <- function(formula,
               " (Hodges-Lehmann estimator); ",
               "the median of all pairwise averages of your data points. Both the ",
               "sample median and the pseudo-median are valid descriptions of your data; ",
-              "they just measure slightly different things (see `?f_wilcox_test` for details)."
+              "they just measure slightly different things (see `?f_wilcox_test` for details).\n"
             )
           } else if (paired) {
             txt <-paste0(
@@ -766,7 +789,7 @@ f_wilcox_test.formula <- function(formula,
               "the CI may not be centred on the difference in sample medians. ",
               "Both the raw median difference and the location shift are valid ",
               "descriptions of the gap between groups; they just measure it ",
-              "slightly differently (see `?f_wilcox_test` for details)."
+              "slightly differently (see `?f_wilcox_test` for details).\n"
             )
           }
           # prepare text for console usage
@@ -823,7 +846,259 @@ f_wilcox_test.formula <- function(formula,
       cat("&nbsp;\n  \n&nbsp;  \n  \n")
       cat(ci_note)
 
+      # -----------------------------------------------------------------------
+      # MAIN EFFECT PLOT (publication-ready ggplot2, stored + rendered)
+      # -----------------------------------------------------------------------
+      # Unified "estimate +/- CI against the data" figure, mirroring f_t_test()
+      # and the f_aov() means plot (shared f_theme_pub() theme and
+      # f_pub_palette() colours). One design across all three modes:
+      #   * one-sample : single column, sample median + its median CI, with a
+      #                  dashed reference line at mu.
+      #   * paired     : single column of the per-pair DIFFERENCES, median of
+      #                  the differences + its median CI, dashed line at mu.
+      #                  This maps one-to-one onto what the signed-rank test
+      #                  estimates (a pseudo-median of the differences).
+      #   * two-sample : the two group medians, each with its own median CI,
+      #                  plus raw jittered points. The plotted error bars are
+      #                  PER-GROUP median CIs; the quantity the test estimates
+      #                  (the Hodges-Lehmann location shift) is reported in the
+      #                  caption, so the plotted intervals and the tested
+      #                  quantity are never silently conflated.
+      #
+      # The Wilcoxon test is distribution-free and reports a Hodges-Lehmann
+      # (pseudo-median) estimate with a CI in test_res$estimate /
+      # test_res$conf.int. For the single-column (one-sample / paired) figure
+      # we plot that HL estimate and CI directly, because they are exactly the
+      # quantity the test infers. For the two-sample figure we overlay the two
+      # group medians; a median is summarised with a distribution-free CI based
+      # on order statistics (binomial method). With fewer than 6 observations
+      # in a group there are too few order statistics to bracket the median at
+      # the requested confidence, so no bar is drawn for that group. Rather
+      # than letting the bar vanish silently (which looks like a rendering
+      # bug), the caption states in plain language that the bar is omitted and
+      # why (fail loud, never fake; no statistical jargon for novice users).
+      build_main_effect_plot <- function() {
+        if (!requireNamespace("ggplot2", quietly = TRUE)) {
+          warning("f_wilcox_test: 'ggplot2' not available; main effect plot ",
+                  "skipped.", call. = FALSE)
+          return(NULL)
+        }
 
+        sig_star <- if (test_res$p.value <= alpha) " \\*" else " (ns)"
+        sub_p <- paste0("p = ", f_conditional_round(test_res$p.value),
+                        sig_star, ", ", conf_pct, "% CI")
+
+        # Distribution-free CI for a single median via order statistics
+        # (binomial method). Returns c(median, lower, upper); the interval is
+        # NA when the sample has fewer than 6 observations (too few order
+        # statistics to bracket the median at typical confidence levels).
+        median_ci <- function(v, conf = conf.level) {
+          v <- sort(v[!is.na(v)])
+          n <- length(v)
+          m <- stats::median(v)
+          if (n < 2L) return(c(m, NA_real_, NA_real_))
+          a  <- 1 - conf
+          lo <- stats::qbinom(a / 2, n, 0.5)
+          hi <- n - lo + 1L
+          if (lo < 1L || hi > n || lo >= hi)
+            return(c(m, NA_real_, NA_real_))
+          c(m, v[lo], v[hi])
+        }
+
+        # ---- two-sample: two group medians, each with its own median CI ----
+        if (!is_one_sample && !paired) {
+          aA <- median_ci(group1); aB <- median_ci(group2)
+          plot_df <- data.frame(
+            x_grp  = factor(levs, levels = levs),
+            centre = c(aA[1], aB[1]),
+            lower  = c(aA[2], aB[2]),
+            upper  = c(aA[3], aB[3]),
+            stringsAsFactors = FALSE
+          )
+          raw_df <- data.frame(
+            x_grp = factor(rep(levs, c(length(group1), length(group2))),
+                           levels = levs),
+            y_val = c(group1, group2),
+            stringsAsFactors = FALSE
+          )
+          raw_df <- raw_df[stats::complete.cases(raw_df), ]
+          lvl_cols <- f_pub_palette(2)
+
+          hl_shift <- round(unname(test_res$estimate), 3)
+
+          # Plain-language note when a group's CI bar cannot be drawn, so the
+          # missing bar reads as an explained choice, not a broken figure.
+          no_ci <- levs[is.na(c(aA[2], aB[2])) | is.na(c(aA[3], aB[3]))]
+          ci_omit_note <- if (length(no_ci) > 0L) {
+            grp_word <- if (length(no_ci) == 1L) "group" else "groups"
+            paste0(" No confidence interval bar is shown for ", grp_word, " ",
+                   paste(no_ci, collapse = " and "),
+                   ", because there are too few measurements (fewer than 6) to ",
+                   "calculate one reliably.")
+          } else ""
+
+          me_caption <- paste0(
+            "Points are (jittered) raw data; the filled points with bars are ",
+            "the per-group medians with their ", conf_pct,
+            "% confidence intervals. The Hodges-Lehmann location shift (",
+            levs[1], " - ", levs[2], ") = ", hl_shift, "; ", sub_p,
+            " for the shift",
+            if (test_res$p.value <= alpha)
+              " (significant)." else " (not significant).",
+            ci_omit_note)
+
+          p <- ggplot2::ggplot(
+            plot_df,
+            ggplot2::aes(x = .data[["x_grp"]], y = .data[["centre"]],
+                         colour = .data[["x_grp"]])
+          )
+          if (nrow(raw_df) > 0L) {
+            p <- p + ggplot2::geom_jitter(
+              data = raw_df,
+              ggplot2::aes(x = .data[["x_grp"]], y = .data[["y_val"]]),
+              inherit.aes = FALSE, width = 0.15, height = 0,
+              shape = 1, colour = "grey30", alpha = 0.5
+            )
+          }
+          p <- p +
+            ggplot2::geom_errorbar(
+              ggplot2::aes(ymin = .data[["lower"]], ymax = .data[["upper"]]),
+              width = 0.12, linewidth = 0.8, na.rm = TRUE) +
+            ggplot2::geom_point(size = 3) +
+            ggplot2::scale_colour_manual(values = lvl_cols, guide = "none") +
+            # Include the response origin (0) so the figure shows the
+            # baseline, plus every CI endpoint, so a bar whose bound falls
+            # outside the data range is never clipped off the panel edge.
+            ggplot2::expand_limits(
+              y = c(0, plot_df$lower, plot_df$upper)) +
+            ggplot2::labs(x = predictor_name, y = response_name) +
+            f_theme_pub(base_size = 14)
+          attr(p, "me_caption") <- me_caption
+          return(p)
+        }
+
+        # ---- one-sample / paired: single column estimate + CI vs mu --------
+        # The Hodges-Lehmann estimate and its CI come straight from the test.
+        centre_est <- unname(test_res$estimate)
+        ci_vals    <- test_res$conf.int
+        if (is.null(centre_est) || length(centre_est) == 0 ||
+            is.null(ci_vals) || anyNA(ci_vals)) {
+          warning("f_wilcox_test: could not assemble estimate/CI for the main ",
+                  "effect plot of '", response_name, "'; plot skipped.",
+                  call. = FALSE)
+          return(NULL)
+        }
+
+        if (is_one_sample) {
+          raw_vec <- y_vals
+          x_lab   <- response_name
+          est_desc <- "pseudo-median (Hodges-Lehmann estimate)"
+          pts_desc <- "raw data"
+        } else {
+          raw_vec <- group1 - group2
+          x_lab   <- paste0(levs[1], " - ", levs[2])
+          est_desc <- "pseudo-median of the per-pair differences"
+          pts_desc <- "per-pair differences"
+        }
+
+        plot_df <- data.frame(
+          x_grp  = factor(x_lab),
+          centre = centre_est,
+          lower  = ci_vals[1],
+          upper  = ci_vals[2],
+          stringsAsFactors = FALSE
+        )
+        raw_df <- data.frame(x_grp = factor(x_lab), y_val = raw_vec,
+                             stringsAsFactors = FALSE)
+        raw_df <- raw_df[stats::complete.cases(raw_df), ]
+        pt_col <- f_pub_palette(1)[1]
+
+        p <- ggplot2::ggplot(
+          plot_df,
+          ggplot2::aes(x = .data[["x_grp"]], y = .data[["centre"]])
+        ) +
+          ggplot2::geom_hline(yintercept = mu, linetype = "dashed",
+                              colour = "grey50")
+        if (nrow(raw_df) > 0L) {
+          p <- p + ggplot2::geom_jitter(
+            data = raw_df,
+            ggplot2::aes(x = .data[["x_grp"]], y = .data[["y_val"]]),
+            inherit.aes = FALSE, width = 0.12, height = 0,
+            shape = 1, colour = "grey30", alpha = 0.5
+          )
+        }
+        p <- p +
+          ggplot2::geom_errorbar(
+            ggplot2::aes(ymin = .data[["lower"]], ymax = .data[["upper"]]),
+            width = 0.10, linewidth = 0.8, colour = pt_col, na.rm = TRUE) +
+          ggplot2::geom_point(size = 3, colour = pt_col) +
+          # Include the response origin (0) so the figure shows the baseline,
+          # plus the CI endpoints and the mu reference line, so neither a
+          # whisker nor the dashed line is ever clipped off the panel edge.
+          ggplot2::expand_limits(
+            y = c(0, mu, ci_vals[1], ci_vals[2])) +
+          ggplot2::labs(x = x_lab, y = response_name) +
+          f_theme_pub(base_size = 14) +
+          ggplot2::theme(axis.text.x = ggplot2::element_blank(),
+                         axis.ticks.x = ggplot2::element_blank())
+
+        me_caption <- paste0(
+          "Points are (jittered) ", pts_desc,
+          "; the point with error bars is the ", est_desc, " (",
+          round(centre_est, 3), ") with its ", conf_pct, "% CI. ",
+          "The dashed line marks the null value mu = ", round(mu, 3),
+          ";\n", sub_p,
+          if (test_res$p.value <= alpha)
+            " (significant: the CI excludes mu)."
+          else " (not significant: the CI includes mu).")
+        attr(p, "me_caption") <- me_caption
+        p
+      }
+
+      main_effect_plot <- tryCatch(build_main_effect_plot(),
+                                    error = function(e) {
+                                      warning("f_wilcox_test: main effect plot ",
+                                              "for '", response_name,
+                                              "' could not be built: ",
+                                              conditionMessage(e), call. = FALSE,
+                                              immediate. = TRUE)
+                                      NULL
+                                    })
+
+      if (!is.null(main_effect_plot)) {
+        output_list[[response_name]][["main_effect_plot"]] <- main_effect_plot
+        tmp_me <- tempfile(fileext = ".png")
+        ok_me <- tryCatch({
+          suppressMessages(
+            ggplot2::ggsave(filename = tmp_me, plot = main_effect_plot,
+                            width = 5.1, height = 4.3, units = "in", dpi = 200)
+          )
+          file.exists(tmp_me)
+        }, error = function(e) {
+          warning("f_wilcox_test: ggsave failed for main effect plot of '",
+                  response_name, "': ", conditionMessage(e),
+                  call. = FALSE, immediate. = TRUE)
+          FALSE
+        })
+
+        if (!is_one_sample && !paired) {
+          cat("\n\n<div style=\"page-break-after: always;\"></div>\n\\newpage\n")
+        }
+
+        cat(paste0("\n## Main Effect Plot of: ", response_name, "  \n"))
+        if (isTRUE(ok_me)) {
+          cat(paste0("![](", tmp_me, ")"), "   \n  \n")
+        } else {
+          cat("*Main effect plot could not be rendered to file; ",
+              "the ggplot object is still stored in the result ",
+              "(`$", response_name, "$main_effect_plot`).*   \n  \n")
+        }
+        # Explanatory caption below the figure (the plot itself is kept clean:
+        # data, axes and legend only), matching f_t_test()/f_aov().
+        me_cap <- attr(main_effect_plot, "me_caption")
+        if (!is.null(me_cap))
+          cat(paste0("*", gsub("\n", "  \n", me_cap), "*", "   \n  \n"))
+      }
 
       if (n_before != n_after)
         cat(paste0("**WARNING** Removed ", n_before - n_after,
@@ -890,7 +1165,7 @@ f_wilcox_test.formula <- function(formula,
     word_pdf_preamble <- function() {
       paste0(
         "---\n",
-        "title: \"f_wilcox_test Analysis Report\"\n",
+        "title: \"Wilcoxon Test Report\"\n",
         "date: \"`r Sys.Date()`\"\n",
         "output:\n",
         "   word_document:\n",
@@ -1109,6 +1384,13 @@ plot.f_wilcox_test <- function(x, ...) {
       grid::grid.raster(img)
     } else {
       message("Plot file not found for variable: ", nm)
+    }
+    # Re-print the stored publication-ready ggplot main effect plot, so the
+    # interactive plot() output matches the report output exactly (shared
+    # f_theme_pub() theme and f_pub_palette() colours), mirroring f_t_test().
+    mep <- x[[nm]]$main_effect_plot
+    if (!is.null(mep) && inherits(mep, "ggplot")) {
+      print(mep)
     }
   }
 

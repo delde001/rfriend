@@ -13,6 +13,26 @@
 #'   the result of a call to a family function. (See \code{\link{family}} for details of family functions.)
 #' @param data A data frame containing the variables in the model.
 #' @param diagnostic_plots Logical. If \code{TRUE}, plots are included in the output files.
+#' @param effect_plot Logical. If \code{TRUE} (default), estimated marginal
+#'   means plots (or interaction plots, when a categorical interaction is
+#'   significant) are added after the post hoc table. See Details for what is
+#'   drawn and how the plots are stored.
+#' @param contrast_plots Logical. If \code{TRUE}, a \strong{contrast forest
+#'   plot} is added for each categorical post hoc term: one row per pairwise
+#'   comparison, showing the estimated difference between two levels with its
+#'   confidence interval and a reference line at zero. A CI that excludes zero
+#'   indicates a significant difference; because the interval is on the
+#'   difference itself, this "excludes zero" reading is exact (it is the same
+#'   information the compact-letter display encodes, but it also shows the
+#'   direction and magnitude of each difference). Default \code{FALSE} because
+#'   the number of pairwise contrasts grows quickly with the number of factor
+#'   levels (k levels give k(k-1)/2 contrasts); turn it on when you want the
+#'   detailed pairwise picture. Main-effect contrast plots are stored as
+#'   \code{out$y1$contrast_plot_<term>} and interaction cell-contrast plots as
+#'   \code{out$y1$interaction_contrast_plot_<term>}. Contrast CIs use the same
+#'   \code{adjust} method as the post hoc p-values, so figure and table agree.
+#'   The contrasts are computed on the link (model) scale, where differences
+#'   are additive and symmetric.
 #' @param alpha Numeric. Significance level for tests. Default is \code{0.05}.
 #' @param adjust Character string specifying the method used to adjust p-values
 #'   for multiple comparisons. Available methods include:
@@ -69,6 +89,25 @@
 #' It fits a Generalized Linear Model (GLM) using the specified formula, family, and data. Model diagnostics are performed with DHARMa (simulation-based residual checks including a KS test, dispersion test, and outlier test). High-leverage observations are flagged using hat values.
 #'
 #' Significance of each predictor is assessed via Type II Analysis of Deviance (\code{stats::drop1()}). If significant effects are found, post hoc pairwise comparisons are performed using estimated marginal means from \code{emmeans()} with the chosen p-value adjustment method (default: Sidak). When complete separation is detected, the function falls back to likelihood ratio test (LRT) based pairwise comparisons, which are robust to separation.
+#'
+#' \strong{Effect and interaction plots.} When \code{effect_plot = TRUE}, an
+#' estimated marginal means plot (estimate \eqn{\pm} 95\% CI on the response
+#' scale, with jittered raw data and compact-letter-display labels) is added
+#' after the post hoc table for each categorical predictor. For a significant
+#' categorical interaction, interaction plots are drawn instead: a two-way
+#' interaction uses the x-axis plus colour (both orientations), while three-
+#' and four-way interactions add facet panels for the remaining factor(s),
+#' with one plot per choice of x-axis factor. Interactions involving five or
+#' more categorical factors are not plotted (a warning is issued); consult the
+#' post hoc cell-means table instead. Estimates follow the \code{type}
+#' argument, so for non-gaussian families they are back-transformed to the
+#' response scale. The plots themselves are kept clean for publication (data,
+#' axes, and legend only); the descriptive label and explanatory caption are
+#' emitted as text above and below each figure in the report. All effect and
+#' interaction plots are \pkg{ggplot2} objects and are stored in the returned
+#' object (e.g. \code{out$y1$effect_plot_treatment},
+#' \code{out$y1$interaction_plot_a_b_1}) so they can be retrieved and
+#' customised afterwards. Matches \code{\link{f_aov}}.
 #'
 #' More response variables can be added using \code{+} (e.g., \code{response1 + response2 ~ predictor}) to fit a sequential GLM for each response variable, captured in one output file.
 #'
@@ -137,6 +176,8 @@ f_glm <- function(
     family = gaussian(),           # family for the GLM
     data = NULL,                   # data.frame used for glm
     diagnostic_plots = TRUE,       # Show diagnostic plots in output files
+    effect_plot = TRUE,            # Show estimated-means / interaction plots
+    contrast_plots = FALSE,        # Show pairwise contrast forest plots
     alpha = 0.05,                  # Significance level for tests
     adjust = "sidak",              # Method used to adjust p-values
     type = "response",             # Scale of emmeans posthoc results
@@ -431,7 +472,7 @@ f_glm <- function(
 
   # LRT-based pairwise comparisons -- robust to complete separation.
   # For each pair of factor levels, fits a reduced model with those levels merged,
-  # then takes the LRT vs the full model. Letters assigned via multcompLetters().
+  # then takes the LRT vs the full model. Letters assigned via compact_letters().
   # Returns a named character vector of letters (names = factor levels), or NULL.
   compute_pairwise_lrt_letters <- function(glm_fit, data, predictor_names, alpha, adjust) {
 
@@ -500,8 +541,15 @@ f_glm <- function(
 
     # Convert adjusted p-values to letters
     letter_result <- tryCatch(
-      multcompView::multcompLetters(adj_p, threshold = alpha),
-      error = function(e) NULL
+      compact_letters(adj_p,
+                      threshold = alpha,
+                      reversed = TRUE),
+      error = function(e) {
+        warning("f_glm: LRT pairwise letter assignment failed (",
+                conditionMessage(e), "). Letters fall back to '\u2014'.",
+                call. = FALSE)
+        NULL
+      }
     )
     if (is.null(letter_result)) return(NULL)
 
@@ -545,14 +593,16 @@ f_glm <- function(
 
     emm   <- emmeans::emmeans(model,
                               specs = emm_specs,
-                              type  = type)
+                              type  = type,
+                              level = 1 - alpha)
 
     pairs_emm <- pairs(emm, adjust = adjust)
 
-    mult_cld <- multcomp::cld(emm,
-                              Letters = letters,
-                              alpha   = alpha,
-                              adjust  = adjust)
+    mult_cld <- cld_emmeans(emm,
+                            alpha = alpha,
+                            Letters = letters,
+                            adjust = adjust,
+                            decreasing = TRUE)
 
     # Convert the result to a data frame
     summary_table <- as.data.frame(mult_cld)
@@ -657,7 +707,7 @@ f_glm <- function(
             paste0(
               "If letters show '\u2014', LRT comparisons could not be computed ",
               "(e.g. more than one predictor). ",
-              "Refer to the **Type II Analysis of Deviance** table for the overall test."
+              "Refer to the **Type II Analysis of Deviance** table for the overall test.\n"
             )
           } else {
             ""
@@ -681,7 +731,7 @@ f_glm <- function(
             "**not** significantly different (\u03B1 = ", alpha, "). Groups with ",
             "different letters are significantly different. Sharing a letter ",
             "indicates insufficient evidence to claim a difference; it does not ",
-            "prove the groups are identical.*"
+            "prove the groups are identical.*\n"
           )
         }
 
@@ -724,7 +774,7 @@ f_glm <- function(
 
     paste0("
 ---
-title: \"f_glm Analysis Report\"
+title: \"Generalized Linear Model Report\"
 date: \"`r Sys.Date()`\"
 output:
    word_document:
@@ -951,28 +1001,145 @@ This plot shows your residuals (errors) on the Y-axis against the model's predic
       }
       output_list[[response_name]][["sig_effects"]] <- sig_effects
 
-      # Detect separation early so perform_posthoc can handle letter assignment correctly.
-      # Heuristic: any predictor coefficient has SE > 100x its absolute estimate.
+      # Detect (quasi-)complete separation early so perform_posthoc and the
+      # plots can handle letter assignment correctly and the user is warned.
+      #
+      # Separation is a binomial/logistic phenomenon: it describes a predictor
+      # (combination) that perfectly predicts a 0/1 outcome, driving ML
+      # estimates to +/-Inf. The concept does not apply to gaussian, Poisson,
+      # Gamma, etc., where the linear predictor lives on the response scale and
+      # large |eta| is ordinary (e.g. a fitted mpg of 27 is not "separation").
+      # All three checks below are therefore gated to binomial families; for
+      # any other family the flag is simply FALSE.
+      is_binomial_fam <- family$family %in% c("binomial", "quasibinomial")
+
       coef_mat_early <- summary(glm_fit)$coefficients
-      sep_flag_early <- if (nrow(coef_mat_early) > 1) {
-        any(coef_mat_early[-1, "Std. Error"] > 100 * abs(coef_mat_early[-1, "Estimate"]),
-            na.rm = TRUE)
+
+      # (a) Coefficient heuristic: an SE that dwarfs its estimate is the classic
+      #     Wald symptom of separation (estimate driven to +/-Inf, SE explodes),
+      #     giving the deceptively wide back-transformed CI. The absolute floor
+      #     (se_abs_min) prevents a near-zero estimate with an ordinary SE from
+      #     tripping the ratio test spuriously.
+      se_abs_min <- 10
+      sep_by_coef <- if (is_binomial_fam && nrow(coef_mat_early) > 1) {
+        se_e  <- coef_mat_early[-1, "Std. Error"]
+        est_e <- coef_mat_early[-1, "Estimate"]
+        any(se_e > se_abs_min & se_e > 100 * abs(est_e), na.rm = TRUE)
       } else FALSE
+
+      # (b) Extreme linear predictor: |eta| beyond ~qlogis(1 - 1e-8) means at
+      #     least one fitted probability is numerically 0 or 1. Only meaningful
+      #     on the logit scale, hence binomial-only.
+      sep_by_eta <- if (is_binomial_fam) {
+        eta <- tryCatch(stats::predict(glm_fit, type = "link"),
+                        error = function(e) NULL)
+        !is.null(eta) && any(abs(eta) > 18, na.rm = TRUE)
+      } else FALSE
+
+      # (c) Empty outcome cell: any categorical predictor level whose response
+      #     is entirely 0 or entirely 1. The direct cause and most
+      #     interpretable signal. Mirrors the categorical-predictor detection
+      #     used for emmeans below.
+      sep_empty_cells <- character(0)
+      if (is_binomial_fam) {
+        mf_sep <- tryCatch(stats::model.frame(glm_fit), error = function(e) NULL)
+        if (is.null(mf_sep))
+          mf_sep <- tryCatch(glm_fit$model, error = function(e) NULL)
+        if (!is.null(mf_sep) && response_name %in% names(mf_sep)) {
+          y_sep <- mf_sep[[response_name]]
+          # Response on a 0/1 (or coercible) scale.
+          y_num <- suppressWarnings(as.numeric(as.character(y_sep)))
+          if (all(stats::na.omit(y_num) %in% c(0, 1))) {
+            cat_cols_sep <- names(mf_sep)[vapply(mf_sep, function(v)
+              is.factor(v) || is.character(v) || is.logical(v),
+              FUN.VALUE = logical(1))]
+            cat_cols_sep <- setdiff(cat_cols_sep, response_name)
+            for (cc in cat_cols_sep) {
+              grp_rate <- tapply(y_num, as.character(mf_sep[[cc]]),
+                                 mean, na.rm = TRUE)
+              empty <- names(grp_rate)[!is.na(grp_rate) &
+                                         (grp_rate %in% c(0, 1))]
+              if (length(empty) > 0)
+                sep_empty_cells <- c(sep_empty_cells,
+                                     paste0(cc, "=", empty))
+            }
+          }
+        }
+      }
+
+      sep_flag_early <- isTRUE(sep_by_coef) || isTRUE(sep_by_eta) ||
+        length(sep_empty_cells) > 0
       output_list[[response_name]][["sep_flag"]] <- sep_flag_early
+      output_list[[response_name]][["sep_empty_cells"]] <- sep_empty_cells
+
+      # Emit an immediate, plain-language warning so the issue is not silently
+      # buried in a deceptively wide confidence interval.
+      if (sep_flag_early) {
+        sep_detail <- if (length(sep_empty_cells) > 0)
+          paste0(" Group(s) with no outcome variation: ",
+                 paste(sep_empty_cells, collapse = ", "), ".")
+        else ""
+        warning("f_glm: (quasi-)complete separation detected for response '",
+                response_name, "'.", sep_detail,
+                " Maximum-likelihood estimates diverge, so Wald standard ",
+                "errors and back-transformed confidence intervals are not ",
+                "interpretable (this is why a CI can span nearly 0-1 even ",
+                "when a group is entirely 0 or entirely 1). Letters fall ",
+                "back to likelihood-ratio tests. Consider penalised/Firth ",
+                "logistic regression (logistf::logistf or ",
+                "brglm2::brglm_fit) for finite estimates.",
+                call. = FALSE, immediate. = TRUE)
+      }
 
       # ---- Interaction-aware emmeans mode (mirrors f_aov logic) ----
       # Parse drop1 term names to classify interactions vs main effects.
       # Determines whether emmeans returns cell means or marginal means,
       # and what note to show the user -- matching f_aov's emm_is_cells approach.
       drop1_for_int  <- output_list[[response_name]][["drop1"]]
-      cat_preds      <- predictor_names[vapply(predictor_names, function(v)
-        is.factor(data[[v]]) || is.character(data[[v]]),
-        FUN.VALUE = logical(1))]
+
+      # Categorical predictors are read from the fitted model FRAME, not the
+      # raw `data`, so that on-the-fly conversions in the formula (e.g.
+      # factor(dose), as.factor(g), ordered(d)) are honoured. Reading from
+      # raw `data` would miss these: a numeric column wrapped in factor()
+      # would look continuous, get dropped from cat_preds, and a genuine
+      # categorical interaction would then fail the two-categorical-factor
+      # test and fall back to per-main-effect means plots instead of the
+      # expected interaction plot. This mirrors f_aov(), which keys off the
+      # model frame for exactly this reason.
+      mf_int <- tryCatch(stats::model.frame(glm_fit), error = function(e) NULL)
+      if (is.null(mf_int)) mf_int <- tryCatch(glm_fit$model,
+                                              error = function(e) NULL)
+      fixed_labels_int <- tryCatch(
+        attr(stats::terms(glm_fit), "term.labels"),
+        error = function(e) character(0)
+      )
+      cat_preds <- character(0)
+      if (!is.null(mf_int)) {
+        # Single-column (main-effect) term labels that exist in the model
+        # frame; interaction labels (containing ":") are excluded here.
+        main_labels <- fixed_labels_int[!grepl(":", fixed_labels_int, fixed = TRUE)]
+        main_labels <- main_labels[main_labels %in% names(mf_int)]
+        if (length(main_labels) > 0L) {
+          is_cat_int <- vapply(mf_int[main_labels], function(v)
+            is.factor(v) || is.character(v) || is.logical(v),
+            FUN.VALUE = logical(1))
+          cat_preds <- main_labels[is_cat_int]
+        }
+      }
+      # Fallback to the raw-data heuristic only if the model frame gave
+      # nothing usable (keeps behaviour for unusual fits).
+      if (length(cat_preds) == 0L) {
+        cat_preds <- predictor_names[vapply(predictor_names, function(v)
+          (v %in% names(data)) &&
+            (is.factor(data[[v]]) || is.character(data[[v]])),
+          FUN.VALUE = logical(1))]
+      }
 
       emm_is_cells   <- FALSE
       sig_interactions  <- character(0)
       sig_main_effects  <- character(0)
       ns_main_effects   <- character(0)
+      ns_interactions   <- character(0)
 
       if (!is.null(drop1_for_int) && length(cat_preds) > 1) {
         d1_df      <- as.data.frame(drop1_for_int)
@@ -996,6 +1163,8 @@ This plot shows your residuals (errors) on the Y-axis against the model's predic
 
           sig_interactions <- int_terms[
             !is.na(p_vals_int[int_terms]) & p_vals_int[int_terms] < alpha]
+          ns_interactions  <- int_terms[
+            is.na(p_vals_int[int_terms]) | p_vals_int[int_terms] >= alpha]
           sig_main_effects <- main_terms[
             !is.na(p_vals_int[main_terms]) & p_vals_int[main_terms] < alpha &
               main_terms %in% cat_preds]
@@ -1011,6 +1180,7 @@ This plot shows your residuals (errors) on the Y-axis against the model's predic
       output_list[[response_name]][["sig_interactions"]]  <- sig_interactions
       output_list[[response_name]][["sig_main_effects"]]  <- sig_main_effects
       output_list[[response_name]][["ns_main_effects"]]   <- ns_main_effects
+      output_list[[response_name]][["ns_interactions"]]   <- ns_interactions
       output_list[[response_name]][["cat_preds"]]         <- cat_preds
 
       output_list[[response_name]][["posthoc"]] <- perform_posthoc(
@@ -1243,6 +1413,107 @@ main findings in the *Results* section, you **must** use the Emmeans table below
         ))
       }
 
+      ## ---------- Coefficient forest plot ----------------------------------
+      ## Dot-and-whisker plot of the model coefficients with their Wald CIs and
+      ## a reference line at zero. GLM coefficients are on the LINK scale (e.g.
+      ## log-odds for a logit model, log-rate for a log link), so the caption
+      ## says so and the reference levels of each factor are named explicitly
+      ## (helper_coef_ref_caption): under treatment contrasts each factor row is
+      ## a contrast against that factor's reference level, and which level that
+      ## is silently determines what every coefficient means. The intercept is
+      ## dropped (it is the reference-cell value, not an effect, and its
+      ## magnitude usually dwarfs the others). Wald CIs are used so the plot
+      ## matches the coefficient table above; they are unreliable under
+      ## separation, so the plot is skipped when sep_flag is TRUE.
+      if (isTRUE(effect_plot) && !isTRUE(sep_flag)) {
+        coef_fp <- tryCatch({
+          cf <- as.data.frame(coef_mat)
+          cf$Term <- rownames(cf)
+          est_col <- "Estimate"
+          se_col  <- intersect(c("Std. Error", "Std.Error"), names(cf))[1]
+          p_col   <- grep("^Pr\\(>", names(cf), value = TRUE)[1]
+          if (is.na(se_col)) stop("no SE column")
+
+          cf <- cf[cf$Term != "(Intercept)", , drop = FALSE]
+          if (nrow(cf) == 0L) stop("only an intercept; nothing to plot")
+
+          zcrit <- stats::qnorm(1 - alpha / 2)
+          fp_df <- data.frame(
+            label = cf$Term,
+            est   = cf[[est_col]],
+            lower = cf[[est_col]] - zcrit * cf[[se_col]],
+            upper = cf[[est_col]] + zcrit * cf[[se_col]],
+            stringsAsFactors = FALSE
+          )
+          fp_df$sig <- if (!is.na(p_col))
+            ifelse(!is.na(cf[[p_col]]) & cf[[p_col]] < alpha,
+                   "significant", "not significant")
+          else "not significant"
+
+          # Shared forest-plot drawing (helper_forest_plot); model order keeps
+          # the rows aligned with the coefficient table above.
+          build_forest_plot(
+            fp_df,
+            title    = paste0("Coefficients of ", response_name),
+            x_label  = "Estimate (95% CI)",
+            order_by = "model")
+        }, error = function(e) NULL)
+
+        if (!is.null(coef_fp)) {
+          output_list[[response_name]][["coef_forest_plot"]] <- coef_fp
+          tmp_fp <- tempfile(fileext = ".png")
+          n_rows <- length(levels(coef_fp$data$label))
+          ok <- tryCatch({
+            suppressMessages(
+              ggplot2::ggsave(filename = tmp_fp, plot = coef_fp,
+                              width = 7,
+                              height = max(3, 0.45 * n_rows + 1.5),
+                              units = "in", dpi = 200))
+            TRUE
+          }, error = function(e) FALSE)
+
+          if (isTRUE(ok)) {
+            ## GLM coefficients live on the link scale. Only the Gaussian
+            ## identity link makes "the response" literally correct; for every
+            ## other link the coefficient acts on the linear predictor.
+            identity_link <- isTRUE(family$link == "identity")
+            scale_phrase <- if (identity_link)
+              "the response"
+            else
+              paste0("the linear predictor (", family$link, " scale)")
+
+            ref_cap <- build_coef_ref_caption(glm_fit, fixed_only = FALSE)
+
+            cat("\n### Coefficient forest plot\n")
+            cat(paste0("![](", tmp_fp, ")"), "   \n  \n")
+            cat("*Each row is a coefficient (the intercept is omitted) with ",
+                "its ", 100 * (1 - alpha), "% Wald CI, on the ",
+                if (identity_link) "response" else
+                  paste0(family$link, "-link"),
+                " scale. The dashed line marks zero: a coefficient at zero ",
+                "has no effect relative to its reference. Points to the right ",
+                "increase ", scale_phrase, ", points to the left decrease it. ",
+                "A CI that touches or crosses zero means the term is not ",
+                "distinguishable from its reference at \u03b1 = ", alpha,
+                "; a CI clear of zero is a significant effect.*  \n  \n",
+                sep = "")
+
+            if (nzchar(ref_cap$reference))
+              cat("*", ref_cap$reference, "* ", sep = "")
+            if (nzchar(ref_cap$continuous))
+              cat("*", ref_cap$continuous, "* ", sep = "")
+            cat("*For a factor with k levels these are level-vs-reference ",
+                "contrasts, not all pairwise comparisons; see the post hoc ",
+                "tables below for the full pairwise picture. For significance ",
+                "decisions use the Type II Analysis of Deviance table, which ",
+                "is more reliable than Wald CIs for multi-predictor models.* ",
+                sep = "")
+            if (nzchar(ref_cap$how_to))
+              cat("*", ref_cap$how_to, "*  \n  \n", sep = "")
+          }
+        }
+      }
+
       # ---- Fix 10: Type II Analysis of Deviance via stats::drop1() ----
       # Reuse the already-computed result stored in output_list (no recomputation).
       is_quasi_lrt  <- family$family %in% c("quasipoisson", "quasibinomial", "quasi")
@@ -1355,6 +1626,7 @@ main findings in the *Results* section, you **must** use the Emmeans table below
         cat("*Likelihood ratio test vs. null model could not be computed.*  \n\n")
       }
 
+
       # Pagebreak
       if(output_type != "rmd"){
         # Pagebreak
@@ -1370,6 +1642,7 @@ main findings in the *Results* section, you **must** use the Emmeans table below
       sig_ints_out      <- output_list[[response_name]][["sig_interactions"]]
       sig_main_out      <- output_list[[response_name]][["sig_main_effects"]]
       ns_main_out       <- output_list[[response_name]][["ns_main_effects"]]
+      ns_ints_out       <- output_list[[response_name]][["ns_interactions"]]
       cat_preds_out     <- output_list[[response_name]][["cat_preds"]]
 
       # Interaction / marginal-means note -- mirrors f_aov's emm_is_cells logic
@@ -1382,7 +1655,10 @@ main findings in the *Results* section, you **must** use the Emmeans table below
           "every combination of ", paste(sig_int_preds, collapse = " \u00d7 "), ".  \n",
           "Letters compare all cells simultaneously. ",
           "Interpretation should focus on the full interaction pattern, ",
-          "not on individual factor effects in isolation.  \n\n"
+          "not on individual factor effects in isolation.  \n",
+          "These cell-means letters are the reference grouping: any effect ",
+          "plot that averages over a factor interacting with the one shown ",
+          "omits its own letters and refers back to this table.  \n\n"
         ))
       } else if (length(ns_main_out) > 0) {
         cat(paste0(
@@ -1392,6 +1668,19 @@ main findings in the *Results* section, you **must** use the Emmeans table below
           "non-significant factor(s), correcting for unbalanced designs. ",
           "Letter groups for non-significant terms are not meaningful but are ",
           "shown for completeness.  \n\n"
+        ))
+      }
+
+      # Interaction term(s) present but not significant: suggest refitting
+      # without the interaction term to gain power for the main effects.
+      if (length(ns_ints_out) > 0) {
+        cat(paste0(
+          "\n**NOTE:** The interaction term(s) ",
+          paste(ns_ints_out, collapse = ", "),
+          " were **not significant** (p \u2265 ", alpha, ").  \n",
+          "Consider refitting the model without the interaction term if the ",
+          "research question and research setup allow this; the main effects ",
+          "are then estimated with more power.  \n\n"
         ))
       }
 
@@ -1453,7 +1742,7 @@ main findings in the *Results* section, you **must** use the Emmeans table below
       # 5. Print the Combined Dynamic Text
       cat(
         "The table below shows the ", est_label, " (`emmeans` package). These are ", scale_desc, " for ", response_name, ". Unlike raw averages, these values correct
-      for unbalanced designs and reflect the statistical model."
+      for unbalanced designs and reflect the statistical model.\n"
       )
 
       cat(
@@ -1475,6 +1764,803 @@ main findings in the *Results* section, you **must** use the Emmeans table below
       # Add footnote
       cat(output_list[[response_name]][['posthoc']][['cld_text']])
       # --- DYNAMIC TEXT LOGIC END ---
+
+      # ---- Effect plot(s) --------------------------------------------------
+      # Estimated marginal means on the response scale (emmeans was called
+      # with type = `type`, so emm is already back-transformed for non-
+      # gaussian families). For a single categorical predictor: one
+      # means-plot with jittered raw data + CLD letters. For a significant
+      # two-way interaction between two categorical factors: interaction
+      # plots (both orientations), matching f_aov(). Otherwise one means
+      # plot per categorical main effect.
+      if (isTRUE(effect_plot)) {
+        emm_obj_doc  <- output_list[[response_name]][["posthoc"]][["emm"]]
+        ph_tab_doc   <- output_list[[response_name]][["posthoc"]][["post_hoc_summary_table"]]
+        cat_preds_pl <- cat_preds_out
+        sig_ints_pl  <- sig_ints_out
+        mf_doc       <- tryCatch(glm_fit$model, error = function(e) NULL)
+
+        # Resolve the estimate (centre) and CI column names. On the response
+        # scale emmeans names the estimate rate/prob/response; on the link
+        # scale (or gaussian) it is emmean (renamed emmean.. in the merged
+        # table). CI columns are lower.CL/upper.CL or asymp.LCL/asymp.UCL.
+        emm_d_doc <- tryCatch(as.data.frame(emm_obj_doc),
+                              error = function(e) NULL)
+
+        find_centre_col <- function(df) {
+          intersect(c("response", "rate", "prob", "emmean"), names(df))[1]
+        }
+        find_ci_cols <- function(df) {
+          lo <- intersect(c("lower.CL", "asymp.LCL", "LCL"), names(df))[1]
+          hi <- intersect(c("upper.CL", "asymp.UCL", "UCL"), names(df))[1]
+          c(lo, hi)
+        }
+
+        y_label_doc <- if (family$family == "gaussian" || type == "link")
+          response_name else paste0(response_name, " (response scale)")
+
+        # Overall model significance (LRT-based, robust under separation). When
+        # the model is not significant the post hoc table already shows "ns", so
+        # the plots draw no letters and the caption omits the letter sentence.
+        sig_effects_pl <- isTRUE(output_list[[response_name]][["sig_effects"]])
+
+        # Shared caption for every figure, split into two reusable pieces so the
+        # letter explanation can be dropped on figures where the letters were
+        # withheld (a banner is shown instead). This mirrors f_aov(); only
+        # eff_note_est is family/link-aware here, while eff_note_let is kept
+        # identical so the letter wording stays uniform across functions.
+        #   eff_note_est -> points / estimates / CI (always shown). Unlike the
+        #     linear-model phrasing, the GLM estimates live on the scale set by
+        #     `type`: the response scale (back-transformed through the link for
+        #     non-gaussian families) or the linear link scale.
+        #   eff_note_let -> how to read the grouping letters (only when shown).
+        est_scale_phrase <- if (type == "link") {
+          paste0("on the ", family$link, "-link (linear predictor) scale")
+        } else if (family$link == "identity") {
+          "on the response scale"          # identity link: no transformation, any family
+        } else {
+          paste0("back-transformed through the ", family$link,
+                 " link to the response scale")
+        }
+        eff_note_est <- paste0(
+          if (isTRUE(sep_flag))
+            paste0(
+              "[!] Separation: (quasi-)complete separation (\"near-perfect\" ",
+              "prediction) was detected, so the model estimates and especially ",
+              "their confidence intervals are driven to extreme values and are ",
+              "not reliable; treat the plotted intervals with caution. ")
+          else "",
+          "Points are (jittered) raw data on the response scale; estimates ",
+          "are model estimated marginal means ", est_scale_phrase, " with ",
+          100 * (1 - alpha), "% CI.")
+        eff_note_let <- paste0(
+          " Groups sharing a letter are not significantly different ",
+          "(\u03b1 = ", alpha, "); groups with different letters are ",
+          "significantly different. Sharing a letter indicates insufficient ",
+          "evidence of a difference, not proof that the groups are identical.")
+
+        # Assemble the single-piece figure caption in fixed reading order:
+        #   1. data / estimates / CI            (eff_note_est, always)
+        #   2. ALL letter information together   (eff_note_let + letter_extra),
+        #      OR the "Letters omitted" notice   (banner), OR nothing when the
+        #      figure shows no letters at all. letter_extra carries the
+        #      cross-panel reading note, which is itself about letters.
+        #   3. the interaction / line note "rest" (int_note: not-parallel,
+        #      panels, dotted line), interaction plots only.
+        # Exactly one short lead label is bold: "Letters omitted:" when letters
+        # were withheld, otherwise the interaction lead. The whole caption is one
+        # italic piece. `banner` is NULL when letters are shown; `int_note` is
+        # NULL for single-factor means plots; has_letters is FALSE when the
+        # figure carries no letters and no omission notice.
+        make_fig_caption <- function(banner = NULL, int_note = NULL,
+                                     letter_extra = NULL, has_letters = TRUE) {
+          est <- trimws(eff_note_est)
+          if (!is.null(banner)) {
+            let <- sub("^Letters omitted:", "**Letters omitted:**",
+                       trimws(banner))
+          } else if (isTRUE(has_letters)) {
+            let <- trimws(eff_note_let)
+            if (!is.null(letter_extra) && nzchar(trimws(letter_extra)))
+              let <- paste(let, trimws(letter_extra))
+          } else {
+            let <- ""  # no letters shown -> no letter explanation
+          }
+          intp <- ""
+          if (!is.null(int_note) && nzchar(trimws(int_note))) {
+            intp <- trimws(int_note)
+            # Bold the interaction lead only when it is the salient label, i.e.
+            # when no "Letters omitted:" notice already carries the bold.
+            if (is.null(banner))
+              intp <- sub(
+                "^(Significant interaction:|No significant interaction:)",
+                "**\\1**", intp)
+          }
+          parts <- c(est, let, intp)
+          paste(parts[nzchar(parts)], collapse = " ")
+        }
+
+        # ---- Per-plot compact letters (suppress across interaction) ---------
+        # The compact letters on a figure must answer the same question the
+        # figure asks. An effect / interaction plot shows the means of the
+        # factors in `display_factors` and AVERAGES over every other
+        # categorical predictor. Letters are honest only when BOTH:
+        #   (1) they are computed on exactly that displayed grid, so each letter
+        #       and its plotted point refer to the same marginal estimate (this
+        #       also removes the first-match-wins ambiguity of copying letters
+        #       from the full crossed cell-means table by a partial key), AND
+        #   (2) the averaging does not cross a significant interaction, i.e. no
+        #       significant interaction term has one factor inside
+        #       `display_factors` and another outside it.
+        # When (2) fails the means are still drawn but the letters are withheld
+        # and a visible banner explains why and points to the cell-means post
+        # hoc table (disclosed degraded mode, preferred over misleading
+        # letters). Returns list(safe, letters_df, banner): `letters_df` has the
+        # display-factor column(s) plus a `Letters` column when letters are
+        # shown, otherwise NULL; `banner` is the explanatory note (or NULL).
+        glm_plot_letters <- function(display_factors) {
+          D <- display_factors
+
+          # Separation: Wald-based grouping is unreliable. Withhold letters and
+          # point to the LRT-based pairwise comparisons in the post hoc table.
+          if (isTRUE(sep_flag))
+            return(list(
+              safe = TRUE, letters_df = NULL,
+              banner = paste0(
+                "Letters omitted: (quasi-)complete separation makes the ",
+                "Wald-based grouping unreliable here; refer to the LRT-based ",
+                "pairwise comparisons in the cell-means post hoc table.")))
+
+          # (2) Does any significant interaction straddle D / not-D?
+          crossing <- character(0)
+          for (it in sig_ints_pl) {
+            parts <- trimws(strsplit(it, ":", fixed = TRUE)[[1]])
+            in_D  <- intersect(parts, D)
+            out_D <- setdiff(parts, D)
+            if (length(in_D) > 0L && length(out_D) > 0L)
+              crossing <- union(crossing, out_D)
+          }
+          if (length(crossing) > 0L) {
+            banner <- paste0(
+              "Letters omitted: this view averages over ",
+              paste(crossing, collapse = ", "),
+              ", which interact(s) significantly with the factor(s) shown, ",
+              "so collapsed grouping letters could mislead. See the ",
+              "cell-means post hoc table for grouped significance.")
+            return(list(safe = FALSE, letters_df = NULL, banner = banner))
+          }
+
+          # Overall model not significant: the table already shows "ns" and no
+          # pairwise letters should be claimed. Draw points without letters.
+          if (!sig_effects_pl)
+            return(list(safe = TRUE, letters_df = NULL, banner = NULL))
+
+          # (1) Recompute emmeans on EXACTLY the displayed grid (same `type` as
+          # the main post hoc table), then derive the letters from that grid so
+          # points and letters match one-to-one.
+          letters_df <- tryCatch({
+            emm_D <- emmeans::emmeans(glm_fit, specs = D, type = type,
+                                      level = 1 - alpha)
+            cld_D <- cld_emmeans(emm_D, alpha = alpha, Letters = letters,
+                                 adjust = adjust, decreasing = TRUE)
+            if (!all(c(D, ".group") %in% names(cld_D)))
+              stop("recomputed CLD is missing expected columns")
+            ld <- cld_D[, c(D, ".group"), drop = FALSE]
+            names(ld)[names(ld) == ".group"] <- "Letters"
+            for (f in D) ld[[f]] <- as.character(ld[[f]])
+            ld$Letters <- trimws(ld$Letters)
+            ld
+          }, error = function(e) {
+            warning("f_glm: could not compute per-plot letters for '",
+                    paste(D, collapse = ":"), "': ", conditionMessage(e),
+                    call. = FALSE, immediate. = TRUE)
+            NULL
+          })
+          if (is.null(letters_df))
+            return(list(
+              safe = TRUE, letters_df = NULL,
+              banner = paste0(
+                "Letters unavailable: the grouping could not be computed for ",
+                "this view; see the cell-means post hoc table.")))
+          list(safe = TRUE, letters_df = letters_df, banner = NULL)
+        }
+
+        # Single-term means plot. The shared emmeans grid (emm_d_doc) spans
+        # ALL categorical predictors, so it can contain several rows per
+        # level of `var_name` (one per level of every other factor). Plotting
+        # that grid directly stacks multiple points on the same x position
+        # (the overlap problem). To show a clean one-estimate-per-level
+        # marginal-means plot, recompute emmeans for `var_name` alone; fall
+        # back to the shared grid only if that fails.
+        make_glm_means_plot <- function(var_name) {
+          emm_one <- tryCatch(
+            as.data.frame(emmeans::emmeans(
+              glm_fit, specs = var_name, type = type, level = 1 - alpha)),
+            error = function(e) NULL
+          )
+          src_df <- if (!is.null(emm_one) && var_name %in% names(emm_one))
+            emm_one else emm_d_doc
+          if (is.null(src_df) || !var_name %in% names(src_df))
+            return(NULL)
+          centre_col <- find_centre_col(src_df)
+          ci_cols    <- find_ci_cols(src_df)
+          if (is.na(centre_col) || any(is.na(ci_cols))) return(NULL)
+
+          plot_df <- data.frame(
+            x_grp  = as.character(src_df[[var_name]]),
+            centre = src_df[[centre_col]],
+            lower  = src_df[[ci_cols[1]]],
+            upper  = src_df[[ci_cols[2]]],
+            stringsAsFactors = FALSE
+          )
+          # Safety net: if duplicates per level remain (shared-grid
+          # fallback), average them so each level shows a single estimate.
+          if (anyDuplicated(plot_df$x_grp)) {
+            plot_df <- do.call(rbind, lapply(
+              split(plot_df, plot_df$x_grp), function(d) data.frame(
+                x_grp  = d$x_grp[1],
+                centre = mean(d$centre, na.rm = TRUE),
+                lower  = mean(d$lower,  na.rm = TRUE),
+                upper  = mean(d$upper,  na.rm = TRUE),
+                stringsAsFactors = FALSE)))
+          }
+
+          # CLD letters computed on EXACTLY this single-factor grid (see
+          # glm_plot_letters): they match the plotted marginal means one-to-one
+          # and are withheld (with a banner) when averaging over another factor
+          # would cross a significant interaction, under separation, or when the
+          # overall model is not significant.
+          letter_banner <- NULL
+          plot_df$Letters <- NA_character_
+          lres <- glm_plot_letters(var_name)
+          letter_banner <- lres$banner
+          if (!is.null(lres$letters_df) && var_name %in% names(lres$letters_df)) {
+            lut <- stats::setNames(lres$letters_df$Letters,
+                                   lres$letters_df[[var_name]])
+            plot_df$Letters <- lut[as.character(plot_df$x_grp)]
+          }
+          # Non-letter markers ("ns", em dash for uncomputable LRT pairs, or
+          # empty strings) carry no grouping information, so blank them out
+          # rather than drawing a stray dash above a bar.
+          plot_df$Letters <- trimws(plot_df$Letters)
+          plot_df$Letters[plot_df$Letters %in%
+                            c("ns", "\u2014", "-", "NA")] <- NA_character_
+
+          # Raw data overlay (original response scale) from the model frame.
+          raw_df <- NULL
+          if (!is.null(mf_doc) && var_name %in% names(mf_doc) &&
+              response_name %in% names(mf_doc)) {
+            raw_df <- data.frame(
+              x_grp = as.character(mf_doc[[var_name]]),
+              y_val = mf_doc[[response_name]],
+              stringsAsFactors = FALSE
+            )
+            raw_df <- raw_df[stats::complete.cases(raw_df), ]
+            if (!is.numeric(raw_df$y_val)) raw_df <- NULL
+          }
+
+          if (!is.null(mf_doc) && var_name %in% names(mf_doc) &&
+              is.factor(mf_doc[[var_name]])) {
+            lev <- levels(mf_doc[[var_name]])
+            plot_df$x_grp <- factor(plot_df$x_grp, levels = lev)
+            if (!is.null(raw_df)) raw_df$x_grp <- factor(raw_df$x_grp,
+                                                         levels = lev)
+          }
+
+          y_vals <- c(plot_df$upper, plot_df$lower,
+                      if (!is.null(raw_df)) raw_df$y_val)
+          y_top  <- max(y_vals, na.rm = TRUE)
+          y_bot  <- min(y_vals, na.rm = TRUE)
+          plot_df$y_letter <- y_top + 0.06 * (y_top - y_bot)
+
+          # One distinct colour per level so groups are easy to tell apart.
+          n_lvl <- length(unique(plot_df$x_grp))
+          lvl_cols <- f_pub_palette(n_lvl)
+
+          p <- ggplot2::ggplot(
+            plot_df,
+            ggplot2::aes(x = .data[["x_grp"]], y = .data[["centre"]],
+                         colour = .data[["x_grp"]])
+          )
+          if (!is.null(raw_df) && nrow(raw_df) > 0L) {
+            p <- p + ggplot2::geom_jitter(
+              data = raw_df,
+              ggplot2::aes(x = .data[["x_grp"]], y = .data[["y_val"]]),
+              inherit.aes = FALSE,
+              width = 0.15, height = 0,
+              shape = 1, color = "grey30", alpha = 0.5
+            )
+          }
+          p <- p +
+            ggplot2::geom_errorbar(
+              ggplot2::aes(ymin = .data[["lower"]], ymax = .data[["upper"]]),
+              width = 0.12, linewidth = 0.8
+            ) +
+            ggplot2::geom_point(size = 3) +
+            ggplot2::geom_text(
+              ggplot2::aes(y = .data[["y_letter"]],
+                           label = .data[["Letters"]]),
+              vjust = 0, show.legend = FALSE, colour = "black",
+              na.rm = TRUE
+            ) +
+            ggplot2::scale_colour_manual(values = lvl_cols, guide = "none") +
+            ggplot2::labs(
+              title = paste0("Estimated means of ", response_name,
+                             " by ", var_name),
+              x = var_name, y = y_label_doc) +
+            f_theme_pub(base_size = 14)
+          attr(p, "letter_banner") <- letter_banner
+          attr(p, "has_letters")   <- any(!is.na(plot_df$Letters))
+          p
+        }
+
+        # Interaction plot (two categorical predictors) on the response
+        # scale via emmip(..., type = type). `factors` is a character vector:
+        # the 1st element is the x-axis, the 2nd is the trace (colour), and any
+        # 3rd/4th elements become facet panels. Handles 2- to 4-way categorical
+        # interactions.
+        make_glm_interaction_plot <- function(factors, is_sig) {
+          x_var     <- factors[1]
+          trace_var <- factors[2]
+          facet_vars <- if (length(factors) > 2L) factors[-(1:2)] else character(0)
+
+          # Build the emmip formula: trace ~ x, with "| f1 * f2" appended when
+          # there are facet factors.
+          rhs <- x_var
+          if (length(facet_vars) > 0L)
+            rhs <- paste0(rhs, " | ", paste(facet_vars, collapse = " * "))
+          emmip_form <- stats::as.formula(paste(trace_var, "~", rhs))
+
+          # Call emmip on the already-built emmeans object (emm_obj_doc),
+          # mirroring f_aov(). That object was created with type = `type`, so
+          # its estimates are already on the requested (e.g. response) scale;
+          # passing the raw glm fit together with type = "response" and
+          # CIs = TRUE to emmip() instead can fail when emmip builds its own
+          # reference grid, which is why the interaction plot silently
+          # produced no figure.
+          ip <- tryCatch(
+            emmeans::emmip(emm_obj_doc, emmip_form, level = 1 - alpha,
+                           CIs = TRUE, plotit = FALSE),
+            error = function(e) {
+              warning("f_glm: emmip() failed for formula '",
+                      deparse(emmip_form), "': ",
+                      conditionMessage(e), call. = FALSE, immediate. = TRUE)
+              NULL
+            }
+          )
+          if (is.null(ip)) return(NULL)
+
+          ip_df <- data.frame(
+            x_grp = as.character(ip[[x_var]]),
+            trace = as.character(ip[[trace_var]]),
+            yvar  = ip[["yvar"]],
+            lower = ip[["LCL"]],
+            upper = ip[["UCL"]],
+            stringsAsFactors = FALSE
+          )
+          # Keep the x and trace factors under their REAL names, so the
+          # CLD-letter key join below (which keys on the factor names from the
+          # post hoc table) can find them. Without this the key columns would
+          # only exist as x_grp/trace and the join would silently produce no
+          # letters.
+          ip_df[[x_var]]     <- as.character(ip[[x_var]])
+          ip_df[[trace_var]] <- as.character(ip[[trace_var]])
+          # Carry facet columns through (as factors, preserving model order).
+          for (fv in facet_vars) {
+            fac_levels <- if (!is.null(mf_doc) && fv %in% names(mf_doc) &&
+                              is.factor(mf_doc[[fv]]))
+              levels(mf_doc[[fv]]) else unique(as.character(ip[[fv]]))
+            ip_df[[fv]] <- factor(as.character(ip[[fv]]), levels = fac_levels)
+          }
+
+          x_levels <- if (!is.null(mf_doc) && x_var %in% names(mf_doc) &&
+                          is.factor(mf_doc[[x_var]]))
+            levels(mf_doc[[x_var]]) else unique(ip_df$x_grp)
+          tr_levels <- if (!is.null(mf_doc) && trace_var %in% names(mf_doc) &&
+                           is.factor(mf_doc[[trace_var]]))
+            levels(mf_doc[[trace_var]]) else unique(ip_df$trace)
+          ip_df$x_grp <- factor(ip_df$x_grp, levels = x_levels)
+          ip_df$trace <- factor(ip_df$trace, levels = tr_levels)
+
+          # CLD letters computed on EXACTLY this displayed grid (see
+          # glm_plot_letters): they match the plotted cells one-to-one and are
+          # withheld (with a banner) when the view averages over a factor that
+          # interacts significantly with what is shown, under separation, or
+          # when the overall model is not significant.
+          all_factors <- c(x_var, trace_var, facet_vars)
+          ip_df$Letters <- NA_character_
+          int_letter_banner <- NULL
+          lres <- glm_plot_letters(all_factors)
+          int_letter_banner <- lres$banner
+          if (!is.null(lres$letters_df) &&
+              all(all_factors %in% names(lres$letters_df))) {
+            key_tab <- do.call(paste, c(
+              lapply(all_factors, function(f)
+                as.character(lres$letters_df[[f]])), list(sep = "\r")))
+            lut <- stats::setNames(lres$letters_df$Letters, key_tab)
+            key_ip <- do.call(paste, c(
+              lapply(all_factors, function(f)
+                as.character(ip_df[[f]])), list(sep = "\r")))
+            ip_df$Letters <- lut[key_ip]
+          }
+          ip_df$Letters <- trimws(ip_df$Letters)
+          ip_df$Letters[ip_df$Letters %in%
+                          c("ns", "\u2014", "-", "NA")] <- NA_character_
+
+          raw_df <- NULL
+          if (!is.null(mf_doc) && response_name %in% names(mf_doc) &&
+              all(all_factors %in% names(mf_doc)) &&
+              is.numeric(mf_doc[[response_name]])) {
+            raw_df <- data.frame(
+              x_grp = factor(as.character(mf_doc[[x_var]]), levels = x_levels),
+              trace = factor(as.character(mf_doc[[trace_var]]),
+                             levels = tr_levels),
+              y_val = mf_doc[[response_name]],
+              stringsAsFactors = FALSE
+            )
+            for (fv in facet_vars)
+              raw_df[[fv]] <- factor(as.character(mf_doc[[fv]]),
+                                     levels = levels(ip_df[[fv]]))
+            raw_df <- raw_df[stats::complete.cases(raw_df), ]
+          }
+
+          int_caption <- if (isTRUE(is_sig))
+            paste0("Significant interaction: the ", trace_var,
+                   " lines are not parallel.")
+          else
+            paste0("No significant interaction: the ", trace_var,
+                   " lines should be roughly parallel.")
+          if (length(facet_vars) > 0L)
+            int_caption <- paste0(
+              int_caption, " Panels split by ",
+              paste(facet_vars, collapse = " and "), ".")
+          # The cross-panel reading note is about letters, so it is NOT placed
+          # in the interaction (line) note; it is returned separately and the
+          # caption assembler groups it with the other letter text. Only set it
+          # for faceted plots whose letters are actually shown.
+          cross_facet_note <- if (length(facet_vars) > 0L &&
+                                  is.null(int_letter_banner))
+            paste0("Letters can be compared across all panels: they group ",
+                   "every cell shown, not only the cells within one panel.")
+          else NULL
+          int_caption <- paste0(
+            int_caption,
+            " The dotted line is merely a visual aid and has no real-life ",
+            "meaning, as there is no data space between nominal categories.")
+
+          # In-figure title: distinguishes the orientation (which factor is on
+          # the x-axis, which is the colour, which are facets). Plain ASCII
+          # "by" is used rather than a multiplication-sign glyph, which some
+          # graphics devices / fonts fail to render when ggsave writes the PNG.
+          int_title <- paste0(
+            "Estimated means of ", response_name, ": ",
+            x_var, " (x-axis) by ", trace_var, " (colour)")
+          if (length(facet_vars) > 0L)
+            int_title <- paste0(int_title, ", faceted by ",
+                                paste(facet_vars, collapse = " and "))
+
+          # Letter labels sit a little above each cell's upper CI.
+          y_all_int <- c(ip_df$upper, ip_df$lower,
+                         if (!is.null(raw_df)) raw_df$y_val)
+          y_rng_int <- max(y_all_int, na.rm = TRUE) -
+            min(y_all_int, na.rm = TRUE)
+          ip_df$y_letter <- ip_df$upper + 0.05 * y_rng_int
+
+          dodge <- ggplot2::position_dodge(width = 0.3)
+
+          p <- ggplot2::ggplot(
+            ip_df,
+            ggplot2::aes(x = .data[["x_grp"]], y = .data[["yvar"]],
+                         group = .data[["trace"]], colour = .data[["trace"]])
+          )
+          if (!is.null(raw_df) && nrow(raw_df) > 0L) {
+            p <- p + ggplot2::geom_jitter(
+              data = raw_df,
+              ggplot2::aes(x = .data[["x_grp"]], y = .data[["y_val"]],
+                           colour = .data[["trace"]]),
+              inherit.aes = FALSE,
+              position = ggplot2::position_jitterdodge(
+                jitter.width = 0.12, dodge.width = 0.3),
+              shape = 1, alpha = 0.35, show.legend = FALSE
+            )
+          }
+          p <- p +
+            ggplot2::geom_line(position = dodge, linewidth = 0.7,
+                               linetype = "dotted") +
+            ggplot2::geom_errorbar(
+              ggplot2::aes(ymin = .data[["lower"]], ymax = .data[["upper"]]),
+              width = 0.12, linewidth = 0.7, position = dodge
+            ) +
+            ggplot2::geom_point(position = dodge, size = 3) +
+            ggplot2::geom_text(
+              ggplot2::aes(y = .data[["y_letter"]],
+                           label = .data[["Letters"]]),
+              position = dodge, vjust = 0, colour = "black",
+              show.legend = FALSE, na.rm = TRUE
+            ) +
+            ggplot2::labs(
+              title   = int_title,
+              x       = x_var,
+              y       = y_label_doc,
+              colour  = trace_var
+            ) +
+            f_theme_pub(base_size = 14)
+
+          # Facets: one facet factor -> facet_wrap; two -> facet_grid
+          # (rows = first facet factor, cols = second).
+          if (length(facet_vars) == 1L) {
+            p <- p + ggplot2::facet_wrap(
+              ggplot2::vars(.data[[facet_vars[1]]]),
+              labeller = ggplot2::label_both)
+          } else if (length(facet_vars) >= 2L) {
+            p <- p + ggplot2::facet_grid(
+              stats::as.formula(paste(facet_vars[1], "~", facet_vars[2])),
+              labeller = ggplot2::label_both)
+          }
+
+          p <- p + ggplot2::scale_colour_manual(
+            values = f_pub_palette(length(tr_levels)))
+          # Carry the caption pieces so the caller can assemble one italic
+          # caption below the figure (see make_fig_caption).
+          attr(p, "int_caption")      <- int_caption
+          attr(p, "letter_banner")    <- int_letter_banner
+          attr(p, "cross_facet_note") <- cross_facet_note
+          attr(p, "has_letters")      <- any(!is.na(ip_df$Letters))
+          p
+        }
+
+        # Significant categorical interaction(s)? Support 2-, 3-, and 4-way
+        # interactions among categorical factors. A 2-way uses x-axis + colour
+        # (trace); 3- and 4-way add facet panels for the remaining factor(s).
+        # Beyond 4 factors the panel grid becomes unreadable, so those are
+        # skipped with a warning.
+        MAX_PLOT_FACTORS <- 4L
+        int_cat <- character(0)
+        if (length(sig_ints_pl) > 0) {
+          for (it in sig_ints_pl) {
+            parts <- strsplit(it, ":", fixed = TRUE)[[1]]
+            n_f <- length(parts)
+            if (n_f >= 2L && all(parts %in% cat_preds_pl)) {
+              if (n_f <= MAX_PLOT_FACTORS) {
+                int_cat <- c(int_cat, it)
+              } else {
+                warning("f_glm: the ", n_f, "-way interaction '", it,
+                        "' involves more than ", MAX_PLOT_FACTORS,
+                        " categorical factors. An interaction plot would ",
+                        "need ", n_f - 2L, " nested facet dimensions, which ",
+                        "is not legible, so no plot is drawn for this term. ",
+                        "The post hoc cell-means table still reports every ",
+                        "combination; inspect it (or plot a chosen lower-",
+                        "order slice) instead.",
+                        call. = FALSE, immediate. = TRUE)
+              }
+            }
+          }
+        }
+
+        if (length(int_cat) > 0) {
+          for (it in int_cat) {
+            parts <- strsplit(it, ":", fixed = TRUE)[[1]]
+            cat(paste0("\n## Interaction Plots of: ", response_name,
+                       "  (", it, ")  \n"))
+            # Orientations: for a 2-way show both (x<->trace swap). For higher
+            # order, rotate which factor sits on the x-axis (the next factor
+            # becomes the trace/colour, the remainder become facet panels).
+            # This gives one informative plot per factor without the
+            # combinatorial explosion of all permutations.
+            orientations <- if (length(parts) == 2L)
+              list(parts[c(1, 2)], parts[c(2, 1)])
+            else
+              lapply(seq_along(parts), function(i)
+                c(parts[i], parts[-i]))
+            for (pi in seq_along(orientations)) {
+              ord <- orientations[[pi]]
+              p_ip <- tryCatch(
+                make_glm_interaction_plot(ord, is_sig = TRUE),
+                error = function(e) {
+                  warning("f_glm: interaction plot for '", it,
+                          "' (orientation ", pi, ") could not be built: ",
+                          conditionMessage(e), call. = FALSE,
+                          immediate. = TRUE)
+                  NULL
+                }
+              )
+              if (!is.null(p_ip)) {
+                # Store the ggplot OBJECT for later manual adjustment.
+                key <- paste0("interaction_plot_",
+                              gsub(":", "_", it), "_", pi)
+                output_list[[response_name]][[key]] <- p_ip
+                # Render the stored object to PNG for the report. Widen the
+                # canvas when facet panels are present.
+                n_facet <- max(0L, length(ord) - 2L)
+                w_in <- if (n_facet >= 2L) 9 else if (n_facet == 1L) 8 else 7
+                h_in <- if (n_facet >= 2L) 6.5 else 5.5
+                tmp_ip <- tempfile(fileext = ".png")
+                ok_ip <- tryCatch({
+                  suppressMessages(
+                    ggplot2::ggsave(filename = tmp_ip, plot = p_ip,
+                                    width = w_in, height = h_in, units = "in",
+                                    dpi = 200)
+                  )
+                  file.exists(tmp_ip)
+                }, error = function(e) {
+                  warning("f_glm: ggsave failed for interaction plot '", it,
+                          "' (orientation ", pi, "): ", conditionMessage(e),
+                          call. = FALSE, immediate. = TRUE)
+                  FALSE
+                })
+                if (isTRUE(ok_ip))
+                  cat(paste0("![](", tmp_ip, ")"), "   \n  \n")
+                # Single italic caption, ordered: estimates/CI, then the letter
+                # note (or the "Letters omitted" notice plus the cross-panel
+                # note), then the interaction note. Only one short lead label is
+                # bold (see make_fig_caption).
+                ip_cap  <- attr(p_ip, "int_caption")
+                ip_bann <- attr(p_ip, "letter_banner")
+                cap <- make_fig_caption(
+                  banner       = ip_bann,
+                  int_note     = ip_cap,
+                  letter_extra = attr(p_ip, "cross_facet_note"),
+                  has_letters  = isTRUE(attr(p_ip, "has_letters")))
+                cat(paste0("*", gsub("\n", "  \n", cap), "*",
+                           "   \n  \n"))
+              }
+            }
+          }
+        } else if (length(cat_preds_pl) > 0) {
+          for (vn in cat_preds_pl) {
+            p_eff <- tryCatch(make_glm_means_plot(vn),
+                              error = function(e) {
+                                warning("f_glm: means plot for '", vn,
+                                        "' could not be built: ",
+                                        conditionMessage(e), call. = FALSE,
+                                        immediate. = TRUE)
+                                NULL
+                              })
+            if (!is.null(p_eff)) {
+              output_list[[response_name]][[paste0("effect_plot_", vn)]] <- p_eff
+              tmp_eff <- tempfile(fileext = ".png")
+              ok_eff <- tryCatch({
+                suppressMessages(
+                  ggplot2::ggsave(filename = tmp_eff, plot = p_eff,
+                                  width = 6, height = 5, units = "in",
+                                  dpi = 200)
+                )
+                file.exists(tmp_eff)
+              }, error = function(e) {
+                warning("f_glm: ggsave failed for means plot '", vn, "': ",
+                        conditionMessage(e), call. = FALSE,
+                        immediate. = TRUE)
+                FALSE
+              })
+              cat(paste0("\n## Estimated Means Plot of: ", response_name,
+                         "  (", vn, ")  \n"))
+              if (isTRUE(ok_eff))
+                cat(paste0("![](", tmp_eff, ")"), "   \n  \n")
+              # Single italic caption: estimates/CI, then the letter note (or
+              # the "Letters omitted" notice). Means plots carry no interaction
+              # sentence, so int_note is omitted.
+              eff_bann <- attr(p_eff, "letter_banner")
+              cap <- make_fig_caption(
+                banner      = eff_bann,
+                int_note    = NULL,
+                has_letters = isTRUE(attr(p_eff, "has_letters")))
+              cat(paste0("*", gsub("\n", "  \n", cap), "*", "   \n  \n"))
+            }
+          }
+        }
+      }
+
+      # ---- Pairwise contrast forest plots (opt-in) -----------------------
+      # Independent of effect_plot: one row per pairwise difference with its
+      # adjusted CI and a zero reference line, drawn with the shared forest
+      # helper (helper_contrast_forest.R) so the look matches f_aov() and
+      # f_lmer(). Contrasts are computed on the LINK scale (type = "link"),
+      # where differences between levels are additive and symmetric; a CI that
+      # excludes zero is a significant pairwise difference. Skipped under
+      # (quasi-)complete separation, where Wald CIs are unreliable. Main-effect
+      # contrasts are stored as contrast_plot_<term>; interaction cell
+      # contrasts as interaction_contrast_plot_<term>.
+      if (isTRUE(contrast_plots) && !isTRUE(sep_flag)) {
+        cat_preds_cf <- cat_preds_out
+        sig_ints_cf  <- sig_ints_out
+
+        int_cat_cf <- character(0)
+        if (length(sig_ints_cf) > 0) {
+          for (it in sig_ints_cf) {
+            parts <- strsplit(it, ":", fixed = TRUE)[[1]]
+            if (length(parts) >= 2L && all(parts %in% cat_preds_cf))
+              int_cat_cf <- c(int_cat_cf, it)
+          }
+        }
+
+        if (length(int_cat_cf) > 0) {
+          for (it in int_cat_cf) {
+            parts <- strsplit(it, ":", fixed = TRUE)[[1]]
+            cf_tbl <- tryCatch(
+              as.data.frame(confint(
+                pairs(emmeans::emmeans(glm_fit, specs = parts,
+                                       type = "link", level = 1 - alpha),
+                      adjust = adjust),
+                level = 1 - alpha)),
+              error = function(e) NULL)
+            p_icf <- if (!is.null(cf_tbl))
+              make_contrast_forest(
+                cf_tbl,
+                paste0("Cell-pairwise contrasts of ", response_name,
+                       " (link scale)  (", it, ")"),
+                alpha = alpha, adjust = adjust) else NULL
+            if (is.null(p_icf)) {
+              cat("\n*Contrast forest plot for `", it, "` could not be ",
+                  "built (adjusted contrast CIs unavailable); see the ",
+                  "post hoc table above.*  \n\n", sep = "")
+            } else {
+              key <- paste0("interaction_contrast_plot_",
+                            gsub(":", "_", it))
+              output_list[[response_name]][[key]] <- p_icf
+              tmp_icf <- tempfile(fileext = ".png")
+              n_rows  <- nrow(p_icf$data)
+              ok_icf <- tryCatch({
+                suppressMessages(
+                  ggplot2::ggsave(filename = tmp_icf, plot = p_icf,
+                                  width = 7.5,
+                                  height = max(3, 0.4 * n_rows + 1.5),
+                                  units = "in", dpi = 200))
+                file.exists(tmp_icf)
+              }, error = function(e) FALSE)
+              cat(paste0("\n## Contrast Forest Plot of: ", response_name,
+                         "  (", it, ")  \n"))
+              if (isTRUE(ok_icf))
+                cat(paste0("![](", tmp_icf, ")"), "   \n  \n")
+              icf_cap <- attr(p_icf, "int_caption")
+              if (!is.null(icf_cap))
+                cat(paste0("*", gsub("\n", "  \n", icf_cap), "*",
+                           "   \n  \n"))
+            }
+          }
+        } else if (length(cat_preds_cf) > 0) {
+          for (vn in cat_preds_cf) {
+            cf_tbl <- tryCatch(
+              as.data.frame(confint(
+                pairs(emmeans::emmeans(glm_fit, specs = vn,
+                                       type = "link", level = 1 - alpha),
+                      adjust = adjust),
+                level = 1 - alpha)),
+              error = function(e) NULL)
+            p_cf <- if (!is.null(cf_tbl))
+              make_contrast_forest(
+                cf_tbl,
+                paste0("Pairwise contrasts of ", response_name,
+                       " by ", vn, " (link scale)"),
+                alpha = alpha, adjust = adjust) else NULL
+            if (is.null(p_cf)) {
+              cat("\n*Contrast forest plot for `", vn, "` could not be ",
+                  "built (adjusted contrast CIs unavailable); see the ",
+                  "post hoc table above.*  \n\n", sep = "")
+            } else {
+              key <- paste0("contrast_plot_", vn)
+              output_list[[response_name]][[key]] <- p_cf
+              tmp_cf <- tempfile(fileext = ".png")
+              n_rows <- nrow(p_cf$data)
+              ok_cf <- tryCatch({
+                suppressMessages(
+                  ggplot2::ggsave(filename = tmp_cf, plot = p_cf,
+                                  width = 7,
+                                  height = max(3, 0.4 * n_rows + 1.5),
+                                  units = "in", dpi = 200))
+                file.exists(tmp_cf)
+              }, error = function(e) FALSE)
+              cat(paste0("\n## Contrast Forest Plot of: ", response_name,
+                         "  (", vn, ")  \n"))
+              if (isTRUE(ok_cf))
+                cat(paste0("![](", tmp_cf, ")"), "   \n  \n")
+              cf_cap <- attr(p_cf, "int_caption")
+              if (!is.null(cf_cap))
+                cat(paste0("*", gsub("\n", "  \n", cf_cap), "*",
+                           "   \n  \n"))
+            }
+          }
+        }
+      }
     }
 
     if (output == TRUE) {
@@ -1656,11 +2742,43 @@ print.f_glm <- function(x, ...) {
 #' @export
 plot.f_glm <- function(x, which = 1:2, ...) {
 
+  # DHARMa's diagnostic plots subdivide the device (par(mfrow)) and assume a
+  # single-panel starting layout with default margins. If this method is called
+  # while the device already carries a multi-panel layout left over from an
+  # earlier plot (common in test/check sessions and Rmd chunks), the per-panel
+  # margins exceed the panel size and base graphics aborts with "figure margins
+  # too large". Reset to a clean single-panel layout for the duration of this
+  # call and restore the caller's settings on exit.
+  #
+  # Only the parameters we actually change are saved/restored. Capturing
+  # par(no.readonly = TRUE) and restoring the whole list is unsafe: it carries
+  # device-derived values such as "pin"/"cra" that error on restore, and "new",
+  # whose restoration triggers par(new = TRUE) with no plot.
+  old_par <- graphics::par(c("mfrow", "mar", "oma"))
+  on.exit(graphics::par(old_par), add = TRUE)
+  graphics::par(mfrow = c(1, 1),
+                mar   = c(5.1, 4.1, 4.1, 2.1),
+                oma   = c(0, 0, 0, 0))
+
   for (category in names(x)) {
 
     # Skip non-response entries (e.g. "rmd" character string)
     sublist <- x[[category]]
     if (!is.list(sublist)) next
+
+    # Re-print the stored publication-ready ggplot objects (coefficient
+    # forest plot, estimated-means and interaction plots) so the interactive
+    # plot() output matches the report. These are done before the DHARMa
+    # diagnostics and independently of them, so they still appear for
+    # quasi-families where simulation-based residuals are unavailable.
+    plot_keys <- grep(paste0("^(coef_forest_plot|effect_plot_|",
+                             "interaction_plot_|contrast_plot_|",
+                             "interaction_contrast_plot_)"),
+                      names(sublist), value = TRUE)
+    for (k in plot_keys) {
+      p_obj <- sublist[[k]]
+      if (inherits(p_obj, "ggplot")) print(p_obj)
+    }
 
     sim_res <- sublist$diagnostics$residuals$sim_res
 
@@ -1671,10 +2789,12 @@ plot.f_glm <- function(x, which = 1:2, ...) {
     }
 
     # 1: QQ plot
+    graphics::par(mfrow = c(1, 1))
     plot(sim_res)
 
-    # 2: Residual tests
-    DHARMa::testResiduals(sim_res)
+    # 2: Residual tests (DHARMa sets its own multi-panel layout internally)
+    graphics::par(mfrow = c(1, 1))
+    DHARMa::testResiduals(sim_res, plot = TRUE)
   }
 }
 

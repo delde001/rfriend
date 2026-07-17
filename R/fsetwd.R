@@ -44,14 +44,25 @@ f_setwd <- function(path = NULL){
 
   # Check if a specific path is provided
   if (is.null(path)) {
-    # Getting the path of the currently running script
-    script_dir <- this.path::sys.dir()
+    # Getting the path of the currently running script. this.path::sys.dir()
+    # throws an error when called from the console or from an unsaved script,
+    # so we catch it and surface an informative message instead.
+    script_dir <- tryCatch(
+      this.path::sys.dir(),
+      error = function(e) NULL
+    )
     if (!is.null(script_dir)) {
       setwd(script_dir)  # Set working directory to the script's location
       cat("Working directory has been set to:", "\n")
       cat(getwd(), "\n")
     } else {
-      warning("Could not determine the script's directory. The working directory remains unchanged.")
+      stop(
+        "Could not determine the script's directory. f_setwd() with no ",
+        "argument must be run from a saved R script or R Notebook (not from ",
+        "the console or an unsaved file). Either save your script first, or ",
+        "call f_setwd() with an explicit path, e.g. f_setwd(\"C:/my/path\").",
+        call. = FALSE
+      )
     }
   } else {
     # Ensure that the file path is a character string before proceeding

@@ -494,8 +494,8 @@ Each group should ideally include at least five observations for reliable result
         # Create a new formula for each response
         current_formula <- as.formula(paste0(response_name, "~", predictor_name))
 
-        cat("   \n#  Analysis of: ", response_name, " by ", predictor_name,"  \n")
-        cat("   \n     \n&nbsp;  \n   \n ")
+        cat("   \n#  Analysis of: ", response_name, " by ", predictor_name,"\n   \n")
+        # cat("   \n     \n&nbsp;  \n   \n ")
 
         if(plot == TRUE){
           cat("  \n## Visual check on similarity of distributions  \n")
@@ -503,18 +503,40 @@ Each group should ideally include at least five observations for reliable result
           d <- ggplot(data, aes(x = !!sym(response_name), fill = factor(!!sym(predictor_name)))) +
             geom_density(alpha = 0.4) +
             labs(title = "Density Plot by Group", x = response_name, fill = predictor_name) +
-            theme_bw(base_size = 14)
+            scale_fill_manual(
+              values = f_pub_palette(nlevels(factor(data[[predictor_name]])))) +
+            f_theme_pub(base_size = 14)
 
           # Print d, i.e. distributions plot
           # Create a temporary file path with a .png extension
           temp_file_path_d <- tempfile(fileext = ".png")
 
           # Save the plot, specifying the device as "pdf"
-          suppressMessages(ggsave(filename = temp_file_path_d, plot = d))
+          suppressMessages(ggsave(filename = temp_file_path_d,
+                                  height = 5.5,
+                                  plot = d))
 
           # Include the saved plot in R Markdown
           cat(paste0("![](", temp_file_path_d, ")"), "   \n  \n")
-          cat("&nbsp;\n   \n")
+
+          # Explanatory caption: tells the reader what to look for in the
+          # density plot, i.e. whether the group distributions share a similar
+          # shape (the key assumption that decides if the result can be read as
+          # a difference in medians rather than only in mean ranks).
+          density_caption <- paste0(
+            "Kernel density of ", response_name, " for each level of ",
+            predictor_name, ". Look for whether the curves share a similar ",
+            "**shape and spread**: if they do, the Kruskal-Wallis and Dunn ",
+            "results can be interpreted as differences in medians. If the ",
+            "curves differ markedly in shape or spread (e.g. one skewed, ",
+            "another symmetric), the test instead reflects a difference in ",
+            "mean ranks (overall distributions) rather than medians ",
+            "specifically. A horizontal shift between otherwise similar curves ",
+            "suggests a genuine location difference between groups.\n")
+
+          cat(paste0("*", gsub("\n", "  \n", density_caption), "*",
+                     "   \n  \n"))
+          # cat("&nbsp;\n   \n")
 
         }
 
@@ -599,24 +621,54 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 rep
 - A **positive Z** value indicates that the first group in the comparison has higher ranks (on average) than the second group.
 - A **negative Z** value indicates that the second group has higher ranks (on average) than the first group.    \n   \n")
 
-          if(output_type != "rmd"){
-            # Pagebreak
-            cat("
-<div style=\"page-break-after: always;\"></div>
-\\newpage")
-          }
+#           if(output_type != "rmd"){
+#             # Pagebreak
+#             cat("
+# <div style=\"page-break-after: always;\"></div>
+# \\newpage")
+#           }
         } # end if KW significant (Dunn output)
 
         # Store dunn_test_result in ouput
         output_list[[paste0(response_name,"_",predictor_name)]][["dunn_test"]] <- dunn_test_result
 
-        # Extract p-values and convert to a compact letter display
-        dunn_pvalues <- dunn_test_result$p.adj
-        names(dunn_pvalues) <- paste0(dunn_test_result$group1,"-",dunn_test_result$group2)
 
-        # Can be that spaces are added to names in group remove these by:
-        names(dunn_pvalues) <- lapply(names(dunn_pvalues), function(x) gsub(" ", "", x))
-        cld <- multcompLetters(dunn_pvalues, threshold = alpha)
+        # ---- Compact letter display, ordered high-to-low by median ----------
+        # Build the significance matrix directly from the Dunn results. Use
+        # group1 / group2 as separate columns rather than a hyphen-parsing
+        # vec-to-matrix helper, which would break on group labels that
+        # themselves contain "-" (e.g. "low-N").
+        grp_levels <- if (is.factor(data[[predictor_name]]))
+          levels(data[[predictor_name]]) else
+            sort(unique(as.character(data[[predictor_name]])))
+
+        g1 <- as.character(dunn_test_result$group1)
+        g2 <- as.character(dunn_test_result$group2)
+
+        # TRUE = significantly different (diagonal stays FALSE: group vs itself).
+        n_lv <- length(grp_levels)
+        sig_matrix <- matrix(FALSE, n_lv, n_lv,
+                             dimnames = list(grp_levels, grp_levels))
+        sig <- dunn_test_result$p.adj < alpha
+        for (k in seq_along(g1)) {
+          sig_matrix[g1[k], g2[k]] <- sig[k]
+          sig_matrix[g2[k], g1[k]] <- sig[k]
+        }
+
+        # Order groups by descending median so letters run high-to-low
+        # (highest median -> "a"). The median is what the summary table shows
+        # and the natural centre for this rank-based test, so table and figure
+        # stay consistent. This direction matches cld_emmeans(decreasing =
+        # TRUE) used in f_aov, where the highest mean is likewise labelled "a".
+        grp_median <- tapply(data[[response_name]],
+                             data[[predictor_name]],
+                             median, na.rm = TRUE)
+        ordered_levels <- names(sort(grp_median, decreasing = TRUE))
+        sig_matrix <- sig_matrix[ordered_levels, ordered_levels, drop = FALSE]
+
+        # compact_letters accepts a logical matrix directly (no thresholding
+        # needed since we already compared against alpha above).
+        cld <- compact_letters(sig_matrix)
 
         # Create a data frame with letters for each group
         letter_df <- as.data.frame(cld$Letters)
@@ -625,7 +677,7 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 rep
 
         # Build footnote text (used after summary table)
         footnote <- paste0("
-\n-  **Note 1 (Assumptions):** Dunn's test does not assume normality, but implies a
+\n  **Note 1 (Assumptions):** Dunn's test does not assume normality, but implies a
       test for difference in medians only if distribution shapes are similar across groups.
       If shapes or spreads differ substantially (check side-by-side boxplots and density plots),
       the result reflects a difference in mean ranks rather than medians.
@@ -666,23 +718,72 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 rep
               aes(y = y_position, label = .data[["Letters"]][match(!!sym(predictor_name),  !!sym(predictor_name))])
             ) +
             labs(x = predictor_name, y = response_name) +
-            theme_bw(base_size = 14)
+            scale_fill_manual(
+              values = f_pub_palette(nlevels(factor(data2[[predictor_name]]))),
+              guide = "none") +
+            f_theme_pub(base_size = 14)
 
           # Create a temporary file path with a .png extension
           temp_file_path_p <- tempfile(fileext = ".png")
 
           # Save the plot, specifying the device as "pdf"
-          suppressMessages(ggsave(filename = temp_file_path_p, plot = p))
+          suppressMessages(ggsave(filename = temp_file_path_p,
+                                  height = 5.5,
+                                  plot = p))
 
           # Include the saved plot in R Markdown
           cat(paste0("![](", temp_file_path_p, ")"), "   \n  \n")
-          cat("&nbsp;\n   \n")
+
+          # Explanatory caption in the style of the f_aov boxplot caption:
+          # describes the raw points and the compact letter display from
+          # Dunn's post hoc test. Only meaningful when the overall KW test was
+          # significant (otherwise all groups share the "ns" label).
+          if (kruskal.test_result$p.value < alpha) {
+            box_caption <- paste0(
+              "Boxplots of ", response_name, " by ", predictor_name,
+              " (boxes show median and interquartile range, whiskers the ",
+              "range excluding outliers); blue points are (jittered) raw ",
+              "observations. Letters are from Dunn's (1964) post hoc test: ",
+              "groups sharing a letter are not significantly different ",
+              "(\u03b1 = ", alpha, "); groups with different letters are ",
+              "significantly different. Sharing a letter indicates ",
+              "insufficient evidence of a difference, not proof that the ",
+              "groups are identical. ",
+              if (adjust == "none")
+                "**WARNING**: no p-value correction was applied."
+              else
+                paste0("P-values were adjusted with ", adjust, "."),
+              "\n")
+          } else {
+            box_caption <- paste0(
+              "Boxplots of ", response_name, " by ", predictor_name,
+              " (boxes show median and interquartile range, whiskers the ",
+              "range excluding outliers); blue points are (jittered) raw ",
+              "observations. The overall Kruskal-Wallis test was not ",
+              "significant (\u03b1 = ", alpha, "), so no post hoc letters are ",
+              "shown.\n")
+          }
+
+          cat(paste0("*", gsub("\n", "  \n", box_caption), "*",
+                     "   \n  \n"))
+          # cat("&nbsp;\n   \n")
 
           output_list[[paste0(response_name,"_",predictor_name)]][["Boxplot"]] <- p
         }
 
         # Create data summary with letters table for output and store in output_list
-        summary_table <- merge(summary_table, letter_df, by = predictor_name, all.x = TRUE)
+        summary_table <- merge(summary_table,
+                               letter_df,
+                               by = predictor_name,
+                               all.x = TRUE)
+
+        # merge() re-sorts rows alphabetically by the join key, which destroys
+        # the high-to-low median order. Restore descending-median order so the
+        # table matches the letters and is consistent with f_aov / f_glm / f_lmer.
+        summary_table <- summary_table[
+          order(match(as.character(summary_table[[predictor_name]]), ordered_levels)), ,
+          drop = FALSE]
+        rownames(summary_table) <- NULL
 
         if(kruskal.test_result$p.value > alpha){
           summary_table$Letters <- "ns"
@@ -769,7 +870,7 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 rep
     # Create a temporary R Markdown file
     word_pdf_preamble <- function(){ paste0("
 ---
-title: \"Kruskal-Wallis Analysis Report\"
+title: \"Kruskal-Wallis Report\"
 date: \"`r Sys.Date()`\"
 output:
    word_document:

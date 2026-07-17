@@ -531,7 +531,7 @@ if (output_type %in% c("word", "pdf")) {
   # Create a temporary R Markdown file
   word_pdf_preamble <- function(){ paste0("
 ---
-title: \"f_BoxCox Report\"
+title: \"Box-Cox Transformation Report\"
 date: \"`r Sys.Date()`\"
 output:
    word_document:

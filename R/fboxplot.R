@@ -895,7 +895,10 @@ Boxplots are particularly valuable when comparing distributions across multiple 
         }
 
         # Calculate means for each group
-        means <- tapply(data[[response_name]], interaction(data[factor_cols]), mean)
+        means <- tapply(data[[response_name]],
+                        interaction(data[factor_cols]),
+                        function(x) mean(x, na.rm = TRUE)
+                        )
 
         # Add mean points to the plot
         points(seq_along(means), means, col = c3, pch = 10, cex = 1.5)
@@ -1064,7 +1067,10 @@ Boxplots are particularly valuable when comparing distributions across multiple 
       }
 
 
-      means <- tapply(data[[response_name]], data[[factor_name]], mean)
+      means <- tapply(data[[response_name]],
+                      data[[factor_name]],
+                      function(x) mean(x, na.rm = TRUE)
+                      )
 
       # Add mean points to the plot
       points(seq_along(means), means, col = c3, pch = 10, cex = 1.5)

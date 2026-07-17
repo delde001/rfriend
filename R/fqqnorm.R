@@ -3,36 +3,34 @@
 #' This function creates a normal Q-Q plot for a given numeric vector and adds confidence bands to visualize the variability of the quantiles.
 #'
 #' @param x A numeric vector of data values.
-#' @param main A character string specifying the title of the histogram. Default is "Histogram with Normal Curve".
-#' @param conf_level Numeric, between 0 and 1. Confidence level for the confidence bands. Default is 0.95 (95\% confidence).
+#' @param main Character string, specifying the title of the Q-Q plot. Default is "Normal Q-Q Plot with X\% Confidence Band".
+#' @param conf_level Numeric, between 0 and 1. Confidence level for the confidence band. Default is 0.95 (95\% confidence).
 #' @param cex Numeric, optional parameter for graph cex with default \code{cex = 0.6}.
 #' @param pch Numeric, optional parameter shape of points default \code{pch = 19}.
 #' @param col Numeric, optional parameter for color of point with default 'black'.
-#' @param save_png A logical value default \code{FALSE}, if \code{TRUE} a png file is saved under the name of the data of under the specified file name.
+#' @param save_png A logical value default \code{FALSE}, if \code{TRUE} a png file is saved under the name of the data or under the specified file name.
 #' @param open_png Logical. If \code{TRUE}, opens generated png files.
 #' @param save_as Character string specifying the output file path (without extension).
 #'   If a full path is provided, output is saved to that location.
 #'   If only a filename is given, the file is saved in \code{tempdir()}.
 #'   If only a directory is specified (providing an existing directory with trailing slash),
 #'   the file is named "data_name_QQplot.png" in that directory.
-#'   Defaults to \code{file.path(tempdir(), "data_name_histogram.png")}.
+#'   Defaults to \code{file.path(tempdir(), "data_name_QQplot.png")}.
 #' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.
 #' @param width Numeric, png figure width default \code{8} inch.
 #' @param height Numeric, png figure height default \code{7} inch.
-#' @param units Numeric, png figure units default inch.
+#' @param units Character string, png figure units default \code{"in"} = inch, other options are: \code{"px"} = Pixels, \code{"cm"} centimeters, \code{"mm"} millimeters.
 #' @param res Numeric, png figure resolution default \code{300} dpi.
-#' @param ylab A character string specifying the y-axsis label. Default name is  \code{"Quantiles of: data_name"}.
+#' @param ylab A character string specifying the y-axis label. Default name is \code{"Quantiles of: data_name"}.
 #' @param ... Additional graphical parameters to be passed to the \code{qqnorm} function.
 #'
 #' @details
-#' The function calculates theoretical quantiles for a normal distribution and compares them with the sample quantiles of the input data.
-#'
-#' It also computes confidence intervals for the order statistics using the Blom approximation and displays these intervals as shaded bands on the plot.
-#'
-#' The reference line is fitted based on the first and third quartiles of both the sample data and theoretical quantiles.
-#'
-#' To increase resolution you can use \code{png(...,res = 600)} or the 'RStudio' chunck setting, e.g. \code{dpi = 600}.
-#'
+#' \itemize{
+#'  \item The function calculates theoretical quantiles for a normal distribution and compares them with the sample quantiles of the input data.
+#'  \item It also computes confidence intervals for the order statistics using the Blom approximation and displays these intervals as shaded bands on the plot.
+#'  \item The reference line is fitted based on the first and third quartiles of both the sample data and theoretical quantiles.
+#'  \item To increase resolution you can use \code{png(...,res = 600)} or the 'RStudio' chunck setting, e.g. \code{dpi = 600}.
+#'}
 #' @return A Q-Q plot is created and the function returns this as a \code{recordedplot}.
 #'
 #' @author
@@ -77,7 +75,7 @@ f_qqnorm <- function(x,
   if (is.null(col)) col <- "black"
   if (is.null(cex)) cex <- 0.6
   if (is.null(pch)) pch <- 19
-  if (is.null(main)) main <- paste0("Normal Q-Q Plot with ", conf_level*100, "% Confidence Bands")
+  if (is.null(main)) main <- paste0("Normal Q-Q Plot with ", conf_level*100, "% Confidence Band  ")
   if (is.null(ylab)) ylab <- paste0("Quantiles of: ", data_name)  # Set y-axis label if not provided
 
   # Calculate theoretical quantiles

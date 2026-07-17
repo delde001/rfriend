@@ -273,11 +273,12 @@ f_bestNormalize <- function(data,
   args$x <- y_clean
 
   # Normality check on original data.
-  # safe_shapiro() returns a shaped htest for all n regimes (real
-  # result for n in [3, 5000], NA p-value with informative method
-  # label otherwise), so downstream display code and stored output
-  # are type-stable regardless of sample size.
-  andersonD_original <- nortest::ad.test(y)
+  # safe_shapiro() and safe_ad() return a shaped htest for all n regimes
+  # (Shapiro: real for n in [3, 5000]; Anderson-Darling: real for n >= 8;
+  # otherwise NA p-value with an informative method label), so downstream
+  # display code and stored output are type-stable regardless of sample
+  # size. ad.test() itself errors for n < 8, which is why safe_ad() is used.
+  andersonD_original <- safe_ad(y)
   shapiro_original <- safe_shapiro(y)
 
 
@@ -351,7 +352,7 @@ f_bestNormalize <- function(data,
 
 
   # Normality check on transformed data
-  andersonD_transformed <- nortest::ad.test(transformed)
+  andersonD_transformed <- safe_ad(transformed)
   shapiro_transformed <- safe_shapiro(transformed)
 
 
@@ -472,7 +473,7 @@ f_bestNormalize <- function(data,
           # Create a temporary R Markdown file
       word_pdf_preamble <- function(){ paste0("
 ---
-title: \"f_bestNormalize Transformation Report\"
+title: \"Best Normalize Transformation Report\"
 date: \"`r Sys.Date()`\"
 output:
    word_document:

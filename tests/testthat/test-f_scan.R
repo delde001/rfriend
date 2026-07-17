@@ -115,6 +115,7 @@ test_that("single column | no groups | defaults", {
 })
 
 test_that("single column | 1 group | defaults", {
+  skip_on_cran()
   result <- f_scan(df_standard, columns = "Salary", group_vars = "Team",
                    output_type = "default", open_generated_files = FALSE)
   expect_fscan_structure(result, "Salary", summary = TRUE, outliers = TRUE)
@@ -128,6 +129,7 @@ test_that("single column | 2 groups | defaults", {
 })
 
 test_that("multiple columns | 2 groups | defaults", {
+  skip_on_cran()
   result <- f_scan(df_standard, columns = c("Salary", "Age"),
                    group_vars = c("Team", "Department"),
                    output_type = "default", open_generated_files = FALSE)
@@ -190,6 +192,7 @@ test_that("formula | single column | 2 groups", {
 })
 
 test_that("formula | multiple columns | 2 groups", {
+  skip_on_cran()
   result <- f_scan(Salary + Age ~ Team + Department, data = df_standard,
                    output_type = "default", open_generated_files = FALSE)
   expect_fscan_structure(result, c("Salary", "Age"),
@@ -197,6 +200,7 @@ test_that("formula | multiple columns | 2 groups", {
 })
 
 test_that("formula | 3 groups (facet grid)", {
+  skip_on_cran()
   result <- f_scan(weight ~ species + treatment + batch, data = df_3groups,
                    output_type = "default", open_generated_files = FALSE)
   expect_fscan_structure(result, "weight", summary = TRUE, outliers = TRUE)
@@ -263,6 +267,7 @@ test_that("fancy_names | single column + 1 group", {
 })
 
 test_that("fancy_names | formula | multi-column + multi-group", {
+  skip_on_cran()
   result <- f_scan(Salary + Age ~ Team + Department, data = df_standard,
                    fancy_names = c(Salary     = "Pay",
                                    Age        = "Years",
@@ -328,6 +333,7 @@ test_that("console output | single column | no groups", {
 })
 
 test_that("console output | multi-column | 2 groups | digits = 2", {
+  skip_on_cran()
   expect_output(
     result <- f_scan(df_standard, columns = c("Salary", "Age"),
                      group_vars = c("Team", "Department"),
@@ -389,6 +395,7 @@ test_that("one-sided formula errors", {
 # ===========================================================================
 
 test_that("print method works with all flags", {
+  skip_on_cran()
   result <- f_scan(df_standard, columns = "Salary", group_vars = "Team",
                    output_type = "default", open_generated_files = FALSE)
 
@@ -414,6 +421,7 @@ test_that("summary method works", {
 })
 
 test_that("plot method runs without error", {
+  skip_on_cran()
   result <- f_scan(df_standard, columns = "Salary", group_vars = "Team",
                    output_type = "default", open_generated_files = FALSE)
   # plot() should produce ggplot output without error
@@ -426,6 +434,7 @@ test_that("plot method runs without error", {
 })
 
 test_that("print method works for multi-column results", {
+  skip_on_cran()
   result <- f_scan(df_standard, columns = c("Salary", "Age"),
                    group_vars = "Team",
                    output_type = "default", open_generated_files = FALSE)
@@ -438,6 +447,7 @@ test_that("print method works for multi-column results", {
 # ===========================================================================
 
 test_that("combinatorial: summary x outliers x coef x digits x groups", {
+  skip_on_cran()
   combos <- expand.grid(
     summary  = c(TRUE, FALSE),
     outliers = c(TRUE, FALSE),
@@ -514,6 +524,7 @@ test_that("formula and data.frame notation produce same structure", {
 })
 
 test_that("multi-column formula and data.frame produce same keys", {
+  skip_on_cran()
   r_df <- f_scan(df_standard, columns = c("Salary", "Age"),
                  group_vars = c("Team", "Department"),
                  output_type = "default", open_generated_files = FALSE)
@@ -654,6 +665,7 @@ test_that("named call f_scan(data = iris, columns = ...) still works", {
 # ---------------------------------------------------------------------------
 
 test_that("print.f_scan accepts an advice argument without erroring", {
+  skip_on_cran()
   res <- suppressMessages(
     f_scan(Sepal.Length ~ Species, data = iris,
            advice = TRUE, output_type = "default",
@@ -788,6 +800,7 @@ test_that("formula on bare vectors: single response, no grouping", {
 # =============================================================================
 
 test_that("bare data.frame: f_scan(mtcars) uses all numeric columns", {
+  skip_on_cran()
   res <- f_scan(mtcars, output_type = "default",
                 open_generated_files = FALSE)
   expect_s3_class(res, "f_scan")
@@ -797,6 +810,7 @@ test_that("bare data.frame: f_scan(mtcars) uses all numeric columns", {
 })
 
 test_that("bare data.frame with group_vars excludes the grouping columns", {
+  skip_on_cran()
   # `cyl` is numeric in mtcars; if it is the grouping variable, it should
   # not also be scanned as a response.
   res <- f_scan(mtcars, group_vars = "cyl",
@@ -829,6 +843,7 @@ test_that("bare data.frame with no numeric columns errors clearly", {
 # =============================================================================
 
 test_that("multi-column, no group_vars: no 'All Data' crash on second column", {
+  skip_on_cran()
   expect_no_error(
     res <- f_scan(mtcars,
                   columns = c("mpg", "hp"),
@@ -840,6 +855,7 @@ test_that("multi-column, no group_vars: no 'All Data' crash on second column", {
 })
 
 test_that("multi-column, no group_vars: every key has the expected slots", {
+  skip_on_cran()
   res <- f_scan(mtcars,
                 columns = c("mpg", "hp", "wt"),
                 output_type = "default",
@@ -868,6 +884,7 @@ test_that("formula multi-response with no RHS variables also runs", {
 # =============================================================================
 
 test_that("print.f_scan: multi-column output shows a 'Variable:' header per response", {
+  skip_on_cran()
   res <- f_scan(mtcars, columns = c("mpg", "hp"),
                 output_type = "default",
                 open_generated_files = FALSE)

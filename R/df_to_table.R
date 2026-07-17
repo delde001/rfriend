@@ -40,6 +40,14 @@ df_to_table <- function(df, label_col = NULL) {
             "If not correct, use label_col = to pick the correct column.")
   }
 
+  # Allow label_col to be given as a column NAME as well as an index.
+  if (is.character(label_col)) {
+    idx <- match(label_col, names(df))
+    if (is.na(idx))
+      stop("label_col '", label_col, "' not found in the data frame.")
+    label_col <- idx
+  }
+
   labels <- df[[label_col]]
   mat    <- as.matrix(df[, -label_col, drop = FALSE])
   rownames(mat) <- labels

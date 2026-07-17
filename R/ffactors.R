@@ -6,6 +6,15 @@
 #' @param select A character vector specifying the names of the columns to convert into factors. If \code{NULL}, the function automatically detects columns that should be factors based on their data type and unique value count. Default is \code{NULL}.
 #' @param exclude A character vector specifying the names of the columns NOT to convert into factors. If \code{NULL}, no columns are excluded. Default is \code{NULL}.
 #' @param force_factors Logical. If \code{TRUE} all columns in the data.frame will be converted to factors except for the excluded columns using \code{exclude}.
+#' @param ref Optional reference level(s) to set after conversion, controlling
+#'   which level a factor is contrasted against in models (e.g. \code{f_glm},
+#'   \code{f_lmer}). Under R's default treatment contrasts the reference is the
+#'   first level, which is alphabetical unless set deliberately. Supply either a
+#'   single string (applied to every converted factor that contains it) or a
+#'   named character vector mapping column names to reference levels, e.g.
+#'   \code{ref = c(treatment = "control", dose = "low")}. A level that is not
+#'   present in a given factor is skipped with a warning. Default \code{NULL}
+#'   (leave the reference as the first level).
 #' @param properties Logical. If \code{TRUE}, prints a detailed table about the properties of the new data frame to the console. If \code{FALSE} no property table will be printed to the console. Default is \code{FALSE}.
 #' @param unique_num_treshold  Numeric. A threshold of the amount of unique numbers a numeric column should have to keep it numeric, i.e. omit factor conversion. Default \code{8}.
 #' @param repeats_threshold  Numeric. A threshold of the minimal number of repeats a numeric column should have to convert it to a factor. Default \code{2}.
@@ -52,6 +61,16 @@
 #' df4 <- f_factors(df)
 #' str(df4)
 #'
+#' # Set the reference level of a factor (the level models contrast against).
+#' # Useful before f_glm() / f_lmer(): by default the reference is the first
+#' # (alphabetical) level. Use a named vector to target specific columns:
+#' df1c <- f_factors(df, select = c("a", "c"))
+#' levels(df1c$c)[1]   # default reference is "apple" (alphabetical)
+#' df_ref <- f_factors(df, select = c("a", "c"),
+#'                     ref = c(a = "yes", c = "kiwi"))
+#' levels(df_ref$c)[1] # reference is now "kiwi"
+#' levels(df_ref$a)[1] # reference is now "yes" (was "no")
+#'
 #' # In example above col b was converted to a factor as the number of repeats = 2
 #' # and the amount of unique numbers < 8. In order to keep b numeric we can also
 #' # adjust the unique_num_treshold and/or repeats_threshold:
@@ -73,6 +92,7 @@ f_factors <- function(data,
                       exclude = NULL,
                       properties = FALSE,
                       force_factors = FALSE,
+                      ref = NULL,
                       unique_num_treshold = 8,
                       repeats_threshold = 2,
                       ...) {
@@ -103,6 +123,45 @@ f_factors <- function(data,
 
   # Convert selected columns to factors
   data[select] <- lapply(data[select], function(col) factor(col, ...))
+
+  # Optionally set reference levels (the level a factor is contrasted against
+  # in a model). Accepts a single string applied to any converted factor that
+  # contains it, or a named vector mapping column -> reference level.
+  if (!is.null(ref)) {
+    if (is.null(names(ref))) {
+      # Unnamed: apply each supplied level to every converted factor that has it.
+      for (col_name in select) {
+        col <- data[[col_name]]
+        if (is.factor(col)) {
+          hit <- ref[ref %in% levels(col)]
+          if (length(hit) >= 1L)
+            data[[col_name]] <- stats::relevel(col, ref = hit[[1L]])
+        }
+      }
+    } else {
+      # Named: column -> reference level.
+      for (col_name in names(ref)) {
+        if (!col_name %in% names(data)) {
+          warning("f_factors(): column '", col_name,
+                  "' in 'ref' not found; skipped.", call. = FALSE)
+          next
+        }
+        col <- data[[col_name]]
+        if (!is.factor(col)) {
+          warning("f_factors(): column '", col_name,
+                  "' is not a factor; reference not set.", call. = FALSE)
+          next
+        }
+        if (!ref[[col_name]] %in% levels(col)) {
+          warning("f_factors(): level '", ref[[col_name]],
+                  "' not found in '", col_name, "'; reference not set.",
+                  call. = FALSE)
+          next
+        }
+        data[[col_name]] <- stats::relevel(col, ref = ref[[col_name]])
+      }
+    }
+  }
 
 
   if(properties == TRUE){

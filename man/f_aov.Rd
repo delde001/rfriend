@@ -9,12 +9,14 @@ f_aov(
   data = NULL,
   norm_plots = TRUE,
   interaction_plots = TRUE,
+  contrast_plots = FALSE,
   ANCOVA = FALSE,
   transformation = TRUE,
   force_transformation = NULL,
   force_aov = FALSE,
   alpha = 0.05,
   adjust = "sidak",
+  anova_type = 2,
   intro_text = TRUE,
   close_generated_files = FALSE,
   open_generated_files = interactive(),
@@ -32,6 +34,24 @@ f_aov(
 \item{norm_plots}{Logical. If \code{TRUE}, diagnostic residual plots are included in the output files. Default is \code{TRUE}.}
 
 \item{interaction_plots}{Logical. If \code{TRUE}, estimated means / interaction plots are included in the output files after the post hoc table. Default is \code{TRUE}.}
+
+\item{contrast_plots}{Logical. If \code{TRUE}, a \strong{contrast forest
+plot} is added for each categorical post hoc term: one row per pairwise
+comparison, showing the estimated difference between two levels with its
+confidence interval and a reference line at zero. A CI that excludes zero
+indicates a significant difference; because the interval is on the
+difference itself, this "excludes zero" reading is exact (it is the same
+information the compact-letter display encodes, but it also shows the
+direction and magnitude of each difference). Default \code{FALSE} because
+the number of pairwise contrasts grows quickly with the number of factor
+levels (k levels give k(k-1)/2 contrasts); turn it on when you want the
+detailed pairwise picture. Main-effect and interaction contrast plots are
+kept separate: main-effect plots are stored as
+\code{out$y1$contrast_plot_<term>} (e.g. \code{contrast_plot_treatment})
+while interaction cell-contrast plots are stored as
+\code{out$y1$interaction_contrast_plot_<term>} (e.g.
+\code{interaction_contrast_plot_a_b}). Contrast CIs use the same
+\code{adjust} method as the post hoc p-values, so figure and table agree.}
 
 \item{ANCOVA}{Logical. If \code{TRUE}, prevents automatic conversion of predictors to factors, allowing for Analysis of Covariance (ANCOVA). Default is \code{FALSE}.}
 
@@ -61,6 +81,33 @@ for multiple comparisons. Available methods include:
   \item{"fdr"}{False Discovery Rate adjustment, controls the expected proportion
               of false positives among significant results.}
 } Default is \code{"sidak"}.}
+
+\item{anova_type}{Integer, either \code{2} or \code{3}. Sums of Squares
+type for the omnibus ANOVA table computed via \code{\link[car]{Anova}}.
+\describe{
+  \item{\code{2} (Default)}{Type II. Order-invariant in unbalanced
+    designs (\code{drug * dose} and \code{dose * drug} give the same
+    main-effect p-values), respects the marginality principle (each
+    main effect is tested after all other main effects, ignoring
+    interactions containing it), and is safe with R's default
+    treatment contrasts. Recommended for most unbalanced designs and
+    consistent with the \code{emmeans}-based post hoc tests.}
+  \item{\code{3}}{Type III. Also order-invariant, but tests each
+    term after \emph{all} other terms including higher-order
+    interactions. Type III is the SPSS / SAS default. For its
+    main-effect rows to be interpretable as effects averaged across
+    the other factors, the model must be fitted with orthogonal
+    (sum / effect / Helmert / polynomial) contrasts. When
+    \code{anova_type = 3} \strong{and} the user has not supplied
+    their own \code{contrasts} via \code{...}, \code{f_aov}
+    automatically installs \code{contr.sum} / \code{contr.poly} for
+    the duration of the call (the previous \code{options("contrasts")}
+    is restored on exit). Note that under Type III, when an
+    interaction is significant the main effect rows are conditional
+    on the interaction and should be interpreted with care -- the
+    cell means table that \code{f_aov} reports automatically when an
+    interaction is significant remains the appropriate summary.}
+}}
 
 \item{intro_text}{Logical. If \code{TRUE}, includes a short explanation about ANOVA assumptions in the output file. Default is \code{TRUE}.}
 
@@ -107,22 +154,66 @@ arguments (e.g. \code{contrasts}, \code{projections},
 \code{qr}, \code{contrasts.arg}) are passed through unchanged.}
 }
 \value{
-An object of class 'f_aov' containing results from \code{aov()}, normality tests, transformations, and post hoc tests. Using the option "output_type", it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and plot methods for 'f_aov' objects.
+An object of class 'f_aov' containing the fitted model
+  (\code{aov_test}), the \strong{Type II} omnibus ANOVA table from
+  \code{\link[car]{Anova}} (\code{aov_summary}), normality and homogeneity
+  diagnostics, optional transformation results, and the \code{emmeans}
+  post hoc tests. Using the option \code{output_type}, it can also
+  generate output as R Markdown, 'Word', 'pdf', or 'Excel' files.
+  Includes \code{print} and \code{plot} methods for 'f_aov' objects.
 }
 \description{
 Performs an Analysis of Variance (ANOVA) on a given dataset with options for (Box-Cox)
-transformations, normality tests, and post hoc analysis. Several response parameters can be analysed in sequence and the generated output can be in various formats ('Word', 'pdf', 'Excel').
+transformations, normality tests, and post hoc analysis. The omnibus table
+is computed with \strong{Type II Sums of Squares} via
+\code{\link[car]{Anova}}, which is order-invariant for the main effects in
+unbalanced designs (default \code{summary(aov())} uses Type I SS, where the
+main-effect p-values depend on the order in which terms appear in the
+formula). Type II also aligns with the model-based \code{emmeans} post hoc
+tests, so the omnibus table and the pairwise comparisons cannot tell
+mismatched stories on unbalanced data. Several response parameters can be
+analysed in sequence and the generated output can be in various formats
+('Word', 'pdf', 'Excel').
 }
 \details{
 The function performs the following steps:
 \itemize{
 \item Check if all specified variables are present in the data.
 \item Ensure that the response variable is numeric.
-\item Perform Analysis of Variance (ANOVA) using the specified formula and data.
-\item If \code{shapiro = TRUE}, check for normality of residuals using the Shapiro-Wilk test.
+\item Fit the model with \code{\link[stats]{aov}} and compute the
+      omnibus ANOVA table with \strong{Type II Sums of Squares} via
+      \code{\link[car]{Anova}}. Type II is used (instead of the default
+      Type I from \code{summary(aov())}) because Type I main-effect SS
+      depend on the order of terms in the formula in unbalanced designs,
+      whereas the \code{emmeans}-based post hoc tests are model-based
+      and therefore order-invariant. Pairing Type I with \code{emmeans}
+      can produce mismatched stories between the omnibus and post hoc
+      tables. Type II keeps both order-invariant and is safe with R's
+      default treatment contrasts (unlike Type III, which would require
+      sum / effect contrasts to be interpretable for main effects).
+\item Check normality of residuals using the Shapiro-Wilk test.
 \item If residuals are not normal and \code{transformation = TRUE} apply a data transformation.
 \item If significant differences are found in ANOVA, proceed with post hoc tests using estimated marginal means from \code{emmeans()} and Sidak adjustment (or another option of \code{adjust =}.
 }
+
+\strong{Effect and interaction plots.} When \code{interaction_plots = TRUE},
+an estimated marginal means plot (estimate \eqn{\pm} 95\% CI, with jittered
+raw data and compact-letter-display labels) is added after the post hoc
+table for each categorical predictor. For a significant categorical
+interaction, interaction plots are drawn instead: a two-way interaction uses
+the x-axis plus colour (both orientations), while three- and four-way
+interactions add facet panels for the remaining factor(s), with one plot per
+choice of x-axis factor. Interactions involving five or more categorical
+factors are not plotted (a warning is issued); consult the post hoc
+cell-means table instead. When the response was transformed (Box-Cox or
+bestNormalize), the plotted estimates are back-transformed to the original
+scale (medians). The plots themselves are kept clean for publication (data,
+axes, and legend only); the descriptive label and explanatory caption are
+emitted as text above and below each figure in the report. All effect and
+interaction plots are \pkg{ggplot2} objects and are stored in the returned
+object (e.g. \code{out$y1$effect_plot_treatment},
+\code{out$y1$interaction_plot_a_b_1}) so they can be retrieved and customised
+afterwards. Matches \code{\link{f_glm}}.
 
 More response variables can be added using \code{-} or \code{+} (e.g., \code{response1 + response2 ~ predictor}) to do a sequential \code{aov()} for each response parameter captured in one output file.
 
@@ -179,9 +270,7 @@ biological rationale.
 }
 
 \examples{
-# Make a factor of Species.
-iris$Species <- factor(iris$Species)
-
+\donttest{
 # The left hand side contains two response variables,
 # so two aov's will be conducted, i.e. "Sepal.Width"
 # and "Sepal.Length" in response to the explanatory variable: "Species".
@@ -198,6 +287,7 @@ print(f_aov_out)
 
 # Plot residual plots.
 plot(f_aov_out)
+}
 
 #To print rmd output set chunck option to results = 'asis' and use cat().
 f_aov_rmd_out <- f_aov(Sepal.Width ~ Species, data = iris, output_type = "rmd")

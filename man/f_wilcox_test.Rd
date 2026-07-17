@@ -140,7 +140,16 @@ Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.}
 the vector interface. Ignored when a formula is supplied.}
 }
 \value{
-An object of class \code{'f_wilcox_test'}.
+An object of class \code{'f_wilcox_test'}, a named list with one
+  element per response variable. Each element contains the
+  \code{stats::wilcox.test()} result, the formatted console/markdown text
+  blocks, the diagnostic plot file path, and a publication-ready main effect
+  plot as a \pkg{ggplot2} object (\code{main_effect_plot}). The plot shows
+  the estimated parameter with its confidence interval against the raw data:
+  the two group medians each with a distribution-free median confidence
+  interval (two-sample), the sample pseudo-median (Hodges-Lehmann estimate)
+  with a reference line at \code{mu} (one-sample), or the pseudo-median of
+  the per-pair differences with a reference line at \code{mu} (paired).
 }
 \description{
 Performs One-sample (Wilcoxon signed rank), Two-sample independent (Wilcoxon rank sum /
@@ -184,3 +193,14 @@ In all three cases the sample median(s) are reported separately for
 descriptive purposes only.
 }
 
+\examples{
+\donttest{
+# Two-sample Wilcoxon rank-sum test
+f_wilcox_test(mpg ~ am, data = mtcars, output_type = "console")
+
+# Retrieve and customise the stored main effect plot (ggplot object)
+result <- f_wilcox_test(mpg ~ am, data = mtcars, output_type = "default")
+result[["mpg"]]$main_effect_plot
+}
+
+}

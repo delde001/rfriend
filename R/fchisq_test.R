@@ -97,7 +97,7 @@ f_chisq_test <-
     x_name <- deparse(substitute(x))
 
 
-    if (is.data.frame(x) && is.null(p)) {
+    if (is.data.frame(x) && is.null(p) && missing(y)) {
       suppressMessages(x <- df_to_table(x))
       env[[x_name]] <- x
       message(x_name, " is a data.frame, converted to table using df_to_table().\nPlease check if this table is as intended.\nIf not, consider using df_to_table(", x_name, ", label_col = ) to pick the correct column.\n")
@@ -105,7 +105,8 @@ f_chisq_test <-
       message("---")
     }
 
-    if(!is.table(x) && !is.vector(x) && is.null(p)){
+    if(!is.table(x) && !is.vector(x) && !is.factor(x) &&
+       is.null(p) && missing(y)){
       x <- as.table(as.matrix(x))
       message(x_name, " is not a table, tried to convert data to a table.\nPlease check if this table is as intended: \n")
       print(x)
@@ -122,21 +123,51 @@ f_chisq_test <-
       stop("Probabilities in 'p' must sum to 1. Got sum(p) = ", round(sum(p), 4))
     }
 
+    # Did the user request a Monte Carlo p-value? If so, the small-expected-
+    # count caveat about the chi-squared APPROXIMATION no longer applies
+    # (simulation sidesteps it), so we will neither suppress a warning nor
+    # emit the note recommending simulation (that would be circular).
+    simulate_requested <- isTRUE(list(...)[["simulate.p.value"]])
+
     # Do chisq.test()
-    # Build the call, forwarding y and p correctly
-    if (missing(y)) {
+    # Probe first (warnings suppressed) purely to read expected counts, so we
+    # can detect a violated small-expected-count assumption WITHOUT relying on
+    # the wording of base R's warning (robust to translation / version change).
+    chisq_call_expr <- if (missing(y)) {
       if (!is.null(p)) {
-        chisq.test.output <- eval(bquote(stats::chisq.test(.(as.name(x_name)), p = p, ...)), envir = env)
+        bquote(stats::chisq.test(.(as.name(x_name)), p = p, ...))
       } else {
-        chisq.test.output <- eval(bquote(stats::chisq.test(.(as.name(x_name)), ...)), envir = env)
+        bquote(stats::chisq.test(.(as.name(x_name)), ...))
       }
     } else {
       env[["y"]] <- y
-      chisq.test.output <- eval(bquote(stats::chisq.test(.(as.name(x_name)), y = y, ...)), envir = env)
+      bquote(stats::chisq.test(.(as.name(x_name)), y = y, ...))
+    }
+
+    probe <- tryCatch(suppressWarnings(eval(chisq_call_expr, envir = env)),
+                      error = function(e) NULL)
+    small_expected <- !is.null(probe) && !is.null(probe$expected) &&
+      any(probe$expected < 5)
+
+    # Real call. Suppress warnings ONLY in the branch we already know is
+    # violated; otherwise run with warnings live so anything unexpected shows.
+    chisq.test.output <- if (small_expected && !simulate_requested) {
+      suppressWarnings(eval(chisq_call_expr, envir = env))
+    } else {
+      eval(chisq_call_expr, envir = env)
     }
 
     output_list[["chisq_test_output"]] <- chisq.test.output
 
+    if (small_expected && !simulate_requested) {
+      n_small <- sum(probe$expected < 5)
+      message("Note: ", n_small, " of ", length(probe$expected),
+              " cells have an EXPECTED count below 5,\n",
+              "so the chi-squared approximation may be unreliable.\n",
+              "Consider Fisher's exact test (stats::fisher.test), \n",
+              "or a Monte Carlo p-value via:\n",
+              "   f_chisq_test(..., simulate.p.value = TRUE).")
+    }
 
     if(chisq.test.output$p.value < alpha || force_posthoc == TRUE){
       #Do post hoc

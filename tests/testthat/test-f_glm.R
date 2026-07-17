@@ -566,14 +566,22 @@ test_that("numeric predictor with <= 10 unique values triggers a warning", {
 
 test_that("factor predictor does NOT trigger a numeric predictor warning", {
   skip_on_cran()
-  # cyl IS a factor - must call f_glm directly since run_glm() suppresses warnings
-  expect_warning(
+  # cyl IS a factor - must call f_glm directly since run_glm() suppresses warnings.
+  # vs ~ cyl genuinely separates (cyl=8 cars all have vs=0), so a (correct)
+  # separation warning is expected; this test only asserts that the
+  # NUMERIC/continuous-predictor warning is absent for a factor predictor.
+  withCallingHandlers(
     suppressMessages(
       f_glm(vs ~ cyl, family = binomial, data = mtcars_cat,
             output_type = "default")
     ),
-    NA   # NA = expect no warning
+    warning = function(w) {
+      if (grepl("numeric", conditionMessage(w)))
+        stop("Unexpected numeric-predictor warning: ", conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
   )
+  succeed()
 })
 
 # =============================================================================

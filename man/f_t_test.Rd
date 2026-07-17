@@ -11,7 +11,8 @@ f_t_test(x, ...)
 \method{f_t_test}{formula}(
   formula,
   data = NULL,
-  paired = FALSE,
+  paired = NULL,
+  paired_by = NULL,
   var.equal = NULL,
   conf.level = NULL,
   mu = 0,
@@ -75,10 +76,31 @@ More response variables can be added using \code{+} (e.g., \code{y1 + y2 ~ group
 
 \item{data}{A data frame containing the variables when using the formula interface.}
 
-\item{paired}{Logical. If \code{TRUE}, performs a paired t-test.
-\strong{Note:} For the formula interface, data must be sorted so that all
-observations of group 1 appear before group 2 (AABB order). For the vector
-interface, \code{x} and \code{y} must have the same length.}
+\item{paired}{Logical or \code{NULL}. If \code{TRUE}, performs a paired
+t-test. If \code{FALSE}, an independent (or one-sample) test. If
+\code{NULL} (default) and \code{paired_by} is supplied, \code{paired} is
+automatically set to \code{TRUE} (with a message), since \code{paired_by}
+has no purpose outside a paired test. An explicit \code{paired = FALSE}
+is never overridden. \strong{Note:} For the formula interface, supply
+\code{paired_by} to identify matched pairs by subject id. If
+\code{paired_by} is omitted, the data must be sorted so that all
+observations of group 1 appear before group 2 (AABB order) \emph{and}
+the within-group order must be identical across groups, because the
+pairing is then purely positional and fragile. A warning is issued if
+the data appear interleaved (not in AABB order); a within-group
+reordering that preserves AABB blocks cannot be detected automatically,
+so supply \code{paired_by} whenever a subject id is available. For the
+vector interface, \code{x} and \code{y} must have the same length
+(pairing is positional by construction).}
+
+\item{paired_by}{Character string. For the formula interface with
+\code{paired = TRUE}, the name of a column in \code{data} that identifies
+matched pairs (subject id). When supplied, observations are matched by
+this id rather than by row position, so the data no longer needs to be
+in AABB order. Each id must appear exactly once per group, and the two
+groups must contain the same set of ids (after \code{subset} and NA
+removal). Ignored for one-sample and two-sample independent tests, and
+for the vector interface. Default \code{NULL}.}
 
 \item{var.equal}{Logical or \code{NULL}. If \code{TRUE}, forces Student's t-test
 (equal variances). If \code{FALSE} or \code{NULL} (default), Welch's t-test is
@@ -150,7 +172,15 @@ the vector interface. Ignored when a formula is supplied.}
 An object of class \code{'f_t_test'}, a named list with one element per
   response variable. Each element contains the t-test result, normality test
   results, variance diagnostic results, transformation object (if applied),
-  and back-transformed confidence interval (if applicable).
+  back-transformed confidence interval (if applicable), and a
+  publication-ready main effect plot as a \pkg{ggplot2} object
+  (\code{main_effect_plot}). The plot shows the estimated parameter with its
+  confidence interval against the raw data: group means with their mean
+  confidence intervals (two-sample), the sample mean with a reference line at
+  \code{mu} (one-sample), or the mean of the per-pair differences with a
+  reference line at \code{mu} (paired). When the response was transformed the
+  estimate and interval are back-transformed to the original scale and
+  labelled as a median.
 }
 \description{
 Performs One-sample, Two-sample (Independent), or Paired t-tests on a given dataset
@@ -171,7 +201,12 @@ f_t_test(mpg + hp ~ am, data = mtcars, output_type = "console", norm_plots = FAL
 f_t_test(mpg ~ 1, data = mtcars, mu = 20,
          output_type = "console", norm_plots = FALSE)
 
-# 4. Paired t-test (sleep dataset is already in AABB order)
+# 4. Paired t-test with explicit subject id (recommended)
+f_t_test(extra ~ group, data = sleep, paired = TRUE, paired_by = "ID",
+         output_type = "console", norm_plots = FALSE)
+
+# 4b. Paired t-test without paired_by (warns; pairing is positional and
+# only safe when data is in AABB order with matching within-group order)
 f_t_test(extra ~ group, data = sleep, paired = TRUE,
          output_type = "console", norm_plots = FALSE)
 
@@ -226,6 +261,11 @@ result[["hp"]]$shapiro_res      # Shapiro-Wilk result
 result[["hp"]]$homog_p_bartlett # Bartlett p-value (diagnostic only)
 result[["hp"]]$homog_p_levene   # Levene p-value (diagnostic only)
 result[["hp"]]$ci_backtransformed # back-transformed CI if transformed
+
+# 16. Retrieve and customise the stored main effect plot (ggplot object)
+result[["mpg"]]$main_effect_plot
+# e.g. add a custom title:
+# result[["mpg"]]$main_effect_plot + ggplot2::ggtitle("My title")
 }
 }
 \references{

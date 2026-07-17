@@ -26,11 +26,11 @@ f_qqnorm(
 \arguments{
 \item{x}{A numeric vector of data values.}
 
-\item{main}{A character string specifying the title of the histogram. Default is "Histogram with Normal Curve".}
+\item{main}{Character string, specifying the title of the Q-Q plot. Default is "Normal Q-Q Plot with X\% Confidence Band".}
 
-\item{ylab}{A character string specifying the y-axsis label. Default name is  \code{"Quantiles of: data_name"}.}
+\item{ylab}{A character string specifying the y-axis label. Default name is \code{"Quantiles of: data_name"}.}
 
-\item{conf_level}{Numeric, between 0 and 1. Confidence level for the confidence bands. Default is 0.95 (95\% confidence).}
+\item{conf_level}{Numeric, between 0 and 1. Confidence level for the confidence band. Default is 0.95 (95\% confidence).}
 
 \item{col}{Numeric, optional parameter for color of point with default 'black'.}
 
@@ -38,7 +38,7 @@ f_qqnorm(
 
 \item{cex}{Numeric, optional parameter for graph cex with default \code{cex = 0.6}.}
 
-\item{save_png}{A logical value default \code{FALSE}, if \code{TRUE} a png file is saved under the name of the data of under the specified file name.}
+\item{save_png}{A logical value default \code{FALSE}, if \code{TRUE} a png file is saved under the name of the data or under the specified file name.}
 
 \item{open_png}{Logical. If \code{TRUE}, opens generated png files.}
 
@@ -47,7 +47,7 @@ If a full path is provided, output is saved to that location.
 If only a filename is given, the file is saved in \code{tempdir()}.
 If only a directory is specified (providing an existing directory with trailing slash),
 the file is named "data_name_QQplot.png" in that directory.
-Defaults to \code{file.path(tempdir(), "data_name_histogram.png")}.}
+Defaults to \code{file.path(tempdir(), "data_name_QQplot.png")}.}
 
 \item{save_in_wdir}{Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.}
 
@@ -55,7 +55,7 @@ Defaults to \code{file.path(tempdir(), "data_name_histogram.png")}.}
 
 \item{height}{Numeric, png figure height default \code{7} inch.}
 
-\item{units}{Numeric, png figure units default inch.}
+\item{units}{Character string, png figure units default \code{"in"} = inch, other options are: \code{"px"} = Pixels, \code{"cm"} centimeters, \code{"mm"} millimeters.}
 
 \item{res}{Numeric, png figure resolution default \code{300} dpi.}
 
@@ -68,13 +68,12 @@ A Q-Q plot is created and the function returns this as a \code{recordedplot}.
 This function creates a normal Q-Q plot for a given numeric vector and adds confidence bands to visualize the variability of the quantiles.
 }
 \details{
-The function calculates theoretical quantiles for a normal distribution and compares them with the sample quantiles of the input data.
-
-It also computes confidence intervals for the order statistics using the Blom approximation and displays these intervals as shaded bands on the plot.
-
-The reference line is fitted based on the first and third quartiles of both the sample data and theoretical quantiles.
-
-To increase resolution you can use \code{png(...,res = 600)} or the 'RStudio' chunck setting, e.g. \code{dpi = 600}.
+\itemize{
+ \item The function calculates theoretical quantiles for a normal distribution and compares them with the sample quantiles of the input data.
+ \item It also computes confidence intervals for the order statistics using the Blom approximation and displays these intervals as shaded bands on the plot.
+ \item The reference line is fitted based on the first and third quartiles of both the sample data and theoretical quantiles.
+ \item To increase resolution you can use \code{png(...,res = 600)} or the 'RStudio' chunck setting, e.g. \code{dpi = 600}.
+}
 }
 \examples{
 # Generate random normal data

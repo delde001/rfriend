@@ -11,7 +11,9 @@ f_lmer(
   ddf = "Satterthwaite",
   alpha = 0.05,
   adjust = "sidak",
-  norm_plots = TRUE,
+  diagnostic_plots = TRUE,
+  effect_plot = TRUE,
+  contrast_plots = FALSE,
   post_hoc = TRUE,
   intro_text = TRUE,
   output_type = "default",
@@ -19,6 +21,7 @@ f_lmer(
   save_in_wdir = FALSE,
   close_generated_files = FALSE,
   open_generated_files = interactive(),
+  norm_plots = lifecycle::deprecated(),
   ...
 )
 }
@@ -66,9 +69,60 @@ pairwise comparisons in the post hoc step (passed to
 \code{emmeans::emmeans()}). One of \code{"sidak"} (default),
 \code{"tukey"}, \code{"bonferroni"}, \code{"fdr"}, \code{"none"}.}
 
-\item{norm_plots}{Logical. If \code{TRUE} (default), diagnostic plots
+\item{diagnostic_plots}{Logical. If \code{TRUE} (default), diagnostic plots
 (residuals vs fitted, Q-Q of level-1 residuals, Q-Q of random-effect
 BLUPs, scale-location) are included in the output.}
+
+\item{effect_plot}{Logical. If \code{TRUE} (default), an estimated
+marginal means plot (estimate \eqn{\pm} 95\% CI, with jittered raw
+data and compact-letter-display labels) is added after each
+categorical fixed-effect term's post hoc table. For a significant
+interaction between categorical factors, interaction plots are drawn
+instead, matching \code{\link{f_aov}}: a two-way interaction uses an
+x-axis factor and a colour trace and is shown in both orientations;
+three- and four-way interactions add facet panels for the remaining
+factor(s), with one plot per choice of x-axis factor. Interactions of
+order greater than four (which would need an illegible nested facet
+grid) are skipped with a note, but the interaction cell-means post
+hoc table still reports every combination. For a significant
+\strong{numeric x categorical} interaction (the covariate slope
+differs across factor levels), \code{f_lmer} additionally draws a
+slope plot - a scatter of the raw data coloured by the factor with
+one model-fitted regression line per level and a confidence band.
+This goes beyond \code{\link{f_aov}}, which holds covariates at their
+mean and does not plot slopes. Numeric x numeric interactions and
+higher-order numeric/categorical mixes have no standard 2-D plot and
+are skipped with a note pointing to the coefficient-table slopes and
+\code{emmeans::emtrends()}. All effect and interaction plots are
+\pkg{ggplot2} objects and are stored in the returned object
+(e.g. \code{out$y1$effect_plot_treatment},
+\code{out$y1$interaction_plot_a_b_1},
+\code{out$y1$interaction_plot_a_b_c_1},
+\code{out$y1$interaction_plot_dose_treatment_1} for a slope plot) so
+they can be retrieved and customised afterwards (themes, colours,
+axis labels, etc.).}
+
+\item{contrast_plots}{Logical. If \code{TRUE}, a \strong{contrast forest
+plot} is added for each categorical post hoc term: one row per pairwise
+comparison, showing the estimated difference between two levels with
+its confidence interval and a reference line at zero. A CI that
+excludes zero indicates a significant difference; because the interval
+is on the difference itself, this "excludes zero" reading is exact (it
+is the same information the compact-letter display encodes, but it also
+shows the direction and magnitude of each difference). Default
+\code{FALSE} because the number of pairwise contrasts grows quickly
+with the number of factor levels (k levels give k(k-1)/2 contrasts);
+turn it on when you want the detailed pairwise picture. No cap is
+applied - if you enable it for a many-level factor you will get a tall
+figure, which is your choice. Main-effect and interaction contrast
+plots are kept separate: main-effect plots are stored as
+\code{out$y1$contrast_plot_<term>} (e.g. \code{contrast_plot_treatment})
+and rendered with the main-effect post hoc tables, while interaction
+cell-contrast plots are stored as
+\code{out$y1$interaction_contrast_plot_<term>} (e.g.
+\code{interaction_contrast_plot_a_b}) and rendered with the
+interaction cell-means tables. Contrast CIs use the same \code{adjust}
+method as the post hoc p-values, so figure and table agree.}
 
 \item{post_hoc}{Logical. If \code{TRUE} (default), runs
 \code{emmeans::emmeans()} pairwise comparisons \strong{only when}
@@ -78,7 +132,19 @@ each significant factor fixed-effect term separately. Numeric
 covariates are skipped because their slope is already reported in
 the fixed-effects coefficient table; pairwise contrasts are not
 meaningful for a continuous predictor. If no fixed-effect term is
-significant, no post hoc is run.}
+significant, no post hoc is run. When a significant interaction
+between categorical factors is present, an additional
+\strong{cell-means} post hoc table is produced for that interaction
+(estimated mean for every factor-level combination, compared
+simultaneously, with a compact letter display and pairwise
+contrasts), matching \code{\link{f_aov}}. It is stored alongside the
+main-effect results under the interaction term name, e.g.
+\code{out$y1$post_hoc[["a:b"]]}. In addition, when a main-effect term
+takes part in a significant interaction, a caution note is printed
+directly above that term's marginal-means table (and the term's
+heading is annotated), warning that the marginal means average over
+the interacting factor and can hide or reverse the real pattern; the
+interaction cell-means table and plot(s) should be read instead.}
 
 \item{intro_text}{Logical. If \code{TRUE} (default), prepends an
 explanation of LMM assumptions and the random-effects syntax linked
@@ -111,6 +177,10 @@ files after creation. Defaults to \code{TRUE} in an interactive R session
 and \code{FALSE} otherwise (e.g. in scripts or automated pipelines).
 Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.}
 
+\item{norm_plots}{`r lifecycle::badge("deprecated")` Deprecated in
+version 4.0.0. Use \code{diagnostic_plots} instead. If supplied, its
+value is passed through to \code{diagnostic_plots} with a warning.}
+
 \item{...}{Additional arguments forwarded to \code{\link[lmerTest]{lmer}}.
 The arguments \code{subset}, \code{na.action}, and \code{weights}
 are handled specially: when supplied, they are applied via
@@ -123,10 +193,18 @@ fitted on the identical row set. Other \code{lmer()} arguments
 \value{
 An object of class \code{f_lmer}: a named list containing the
   fitted \code{lmerModLmerTest} model, the ANOVA-style fixed-effects
-  table, the variance components and ICC, the R\eqn{^2} values, the
+  table (\code{fixed_effects}; the displayed table reports NumDF, DenDF,
+  F and p only, while the full \code{lmerTest} table including the
+  non-additive Sum Sq / Mean Sq columns is kept in
+  \code{fixed_effects_full}), the variance components and ICC (plus a
+  per-grouping-factor ICC breakdown in \code{icc_by_group} when the
+  model has two or more intercept grouping factors), the R\eqn{^2}
+  values, the
   observed descriptives table (raw-data n, mean, sd, se, min, Q1,
   median, Q3, max grouped by the categorical fixed-effect predictors),
-  post hoc results (if any), diagnostic plots, and convergence
+  post hoc results (if any; per main-effect terms plus, for a
+  significant categorical interaction, a cell-means entry keyed by the
+  interaction term name), diagnostic plots, and convergence
   diagnostics. When more than one response variable is supplied on the
   left-hand side, these elements are nested one level deep under each
   response name, e.g. \code{out$y1$fixed_effects},
@@ -257,11 +335,18 @@ multi-site studies, inter-rater designs.
     \code{3-4} levels it is usually better to treat the factor as
     fixed.
 }
-If Levene's test or the Shapiro-Wilk tests on residuals or BLUPs
-indicate a violation, the report adds a \emph{Recommendations for
-Heteroscedasticity and/or non-normal residuals} section after the
-diagnostics with concrete next steps (generalised mixed model,
-transformation).
+After the diagnostics the report adds a \emph{Recommendations for
+Heteroscedasticity and/or non-normal residuals} section, but only when a
+flagged violation survives a follow-up check rather than on a raw
+significant p-value alone. A significant Levene's test triggers it only
+when the Scale-Location panel shows a corroborating variance trend across
+the fitted scale (a by-group Levene test on its own over-fires); a
+significant Shapiro-Wilk test on the level-1 residuals triggers it only
+when the rejection reflects genuine skew rather than a few outliers or
+heavy but symmetric tails (judged by the tail-trimmed Q-Q correlation and
+the residual skewness); a significant Shapiro-Wilk test on the
+random-effect BLUPs triggers it directly. The section gives concrete next
+steps (generalised mixed model, transformation).
 
 \strong{Convergence and singular fits.}\cr
 \code{f_lmer} surfaces \code{lme4} convergence warnings and the
@@ -326,6 +411,7 @@ data(sleepstudy, package = "lme4")
 f_lmer_out <- f_lmer(Reaction ~ Days + (1 | Subject),
                      data = sleepstudy)
 
+\donttest{
 # Re-print the stored result and show the diagnostic plots.
 print(f_lmer_out)
 plot(f_lmer_out)
@@ -355,7 +441,7 @@ f_lmer(Reaction ~ Phase + (1 | Subject),
 f_lmer(Reaction ~ Days + (1 | Subject),
        data = sleepstudy,
        intro_text = FALSE,
-       norm_plots = FALSE,
+       diagnostic_plots = FALSE,
        output_type = "word"
        )
 
@@ -373,10 +459,38 @@ sleepstudy$Reaction2 <- sleepstudy$Reaction + rnorm(nrow(sleepstudy), 0, 5)
 multi_out <- f_lmer(Reaction + Reaction2 ~ Days + (1 | Subject),
                     data = sleepstudy,
                     intro_text = FALSE,
-                    norm_plots = FALSE)
+                    diagnostic_plots = FALSE)
 multi_out$Reaction$fixed_effects
 multi_out$Reaction2$fixed_effects
 
+# 7) Blocks, treatment and time together: a randomized complete
+#    block design with repeated measures. The bundled plant_trial
+#    dataset has five field blocks (block), one plant per treatment
+#    per block measured at three time points (plant_id), four
+#    treatments and a time factor.
+data(plant_trial)
+
+# 'treatment' and 'time_weeks' are crossed fixed effects (we care about their
+# main effects and their interaction). 'block' and 'plant' are sources
+# of unwanted variation we want to account for, not estimate, so
+# they are random. 'plant_id' is nested in block - written compactly
+# as (1 | block/plant_id), which expands to
+# (1 | block) + (1 | block:plant_id). The random plant intercept is
+# what makes this a repeated-measures model: the three time points
+# on one plant share that plant's level.
+f_lmer(height_cm ~ treatment * time_weeks + (1 | block/plant_id),
+       data = plant_trial)
+
+# The same design fitted with Kenward-Roger denominator df (the
+# gold standard for small, balanced designs like this one), with
+# the contrast forest plots turned on and the report saved to Word.
+f_lmer(height_cm ~ treatment * time_weeks + (1 | block/plant_id),
+       data = plant_trial,
+       ddf = "Kenward-Roger",
+       contrast_plots = TRUE,
+       output_type = "word"
+       )
+}
 }
 \author{
 Sander H. van Delden  \email{plantmind@proton.me} \cr

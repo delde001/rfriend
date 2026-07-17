@@ -119,10 +119,18 @@ get_save_path <- function(save_as = NULL,
     # Ensure the filename has the extension
     filename <- basename(save_as)
     file_with_ext <- ensure_extension(filename, file.ext)
-    full_path <- file.path(dir_part, file_with_ext)
 
-    # Return normalized full path
-    return(normalizePath(full_path, winslash = "/", mustWork = FALSE))
+    # Normalize the DIRECTORY (which is guaranteed to exist here) to an
+    # absolute path, then append the file name. Normalizing the directory
+    # rather than the full path matters: on Unix, normalizePath(mustWork =
+    # FALSE) leaves a path relative when the final file does not yet exist,
+    # and a relative output path later breaks rmarkdown::render(), which
+    # changes the working directory to the input file location before
+    # resolving the output path.
+    base_dir <- normalizePath(dir_part, winslash = "/", mustWork = TRUE)
+    full_path <- file.path(base_dir, file_with_ext)
+
+    return(full_path)
 
   } else {
     # B: Only a Filename provided (e.g., "my_file" or "my_file.txt").

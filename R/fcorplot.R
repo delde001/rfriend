@@ -700,7 +700,7 @@ f_corplot <- function(data,
 
     cat(sprintf(
 "---
-title: \"Correlation Plots\"
+title: \"Correlation Report\"
 date: \"`r Sys.Date()`\"
 output:
    word_document:

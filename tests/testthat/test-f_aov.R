@@ -45,6 +45,8 @@
 #  21.  Output text correctness
 #  22.  subset / na.action / weights pass-through
 #  23.  safe_shapiro() integration
+#  24.  anova_type (Type II vs Type III Sums of Squares)
+#  25.  force_aov (saturated-model handling)
 # =============================================================================
 
 # ---------------------------------------------------------------------------
@@ -152,7 +154,10 @@ test_that("f_aov single response no transformation: transformed keys are absent 
 })
 
 test_that("f_aov single response no transformation: ANOVA F-statistic is positive", {
-  f_val <- out[["y"]][["aov_summary"]][[1]][["F value"]]
+  # aov_summary is the car::Anova() data frame directly (columns:
+  # Sum Sq, Df, F value, Pr(>F); one row per term plus Residuals with
+  # NA F / NA p). No outer list to unwrap.
+  f_val <- out[["y"]][["aov_summary"]][["F value"]]
   expect_true(all(f_val[!is.na(f_val)] > 0))
 })
 
@@ -201,6 +206,7 @@ test_that("f_aov multiple response variables: three response variables all store
 df_skew <- make_skewed_data()
 
 test_that("f_aov transformation options: transformation = TRUE triggers boxcox when residuals are non-normal", {
+  skip_on_cran()
   out <- quiet_f_aov(y ~ grp, data = df_skew, transformation = TRUE)
   transformed <- out[["y"]][["Response_Transformed"]]
   if (transformed) {
@@ -210,6 +216,7 @@ test_that("f_aov transformation options: transformation = TRUE triggers boxcox w
 })
 
 test_that("f_aov transformation options: transformation = 'boxcox' stores boxcox key", {
+  skip_on_cran()
   out <- quiet_f_aov(y ~ grp, data = df_skew, transformation = "boxcox")
   if (out[["y"]][["Response_Transformed"]]) {
     expect_true("boxcox" %in% names(out[["y"]]))
@@ -217,6 +224,7 @@ test_that("f_aov transformation options: transformation = 'boxcox' stores boxcox
 })
 
 test_that("f_aov transformation options: transformation = FALSE never transforms, no transformed keys", {
+  skip_on_cran()
   out <- quiet_f_aov(y ~ grp, data = df_skew, transformation = FALSE)
   expect_false(out[["y"]][["Response_Transformed"]])
   expect_false("transformed_aov_test" %in% names(out[["y"]]))
@@ -234,6 +242,7 @@ test_that("f_aov transformation options: transformation = 'bestnormalize' stores
 })
 
 test_that("f_aov transformation options: when transformed, transformed_shapiro_test is present", {
+  skip_on_cran()
   out <- quiet_f_aov(y ~ grp, data = df_skew, transformation = TRUE)
   if (out[["y"]][["Response_Transformed"]]) {
     expect_true("transformed_shapiro_test" %in% names(out[["y"]]))
@@ -243,12 +252,14 @@ test_that("f_aov transformation options: when transformed, transformed_shapiro_t
 })
 
 test_that("f_aov transformation options: partial string 'box' is accepted via pmatch", {
+  skip_on_cran()
   expect_no_error(
     quiet_f_aov(y ~ grp, data = df_skew, transformation = "box")
   )
 })
 
 test_that("f_aov transformation options: invalid transformation string throws an error", {
+  skip_on_cran()
   expect_error(
     quiet_f_aov(y ~ grp, data = df_skew, transformation = "logtransform"),
     regexp = "Invalid transformation"
@@ -374,7 +385,9 @@ test_that("f_aov interaction models: two-factor interaction model runs without e
 
 test_that("f_aov interaction models: aov_summary has three terms for A * B model (A, B, A:B, Residuals)", {
   out    <- quiet_f_aov(y ~ A * B, data = df2, transformation = FALSE)
-  n_rows <- nrow(out[["y"]][["aov_summary"]][[1]])
+  # aov_summary is the car::Anova() data frame directly; nrow() is the
+  # term count including the Residuals row.
+  n_rows <- nrow(out[["y"]][["aov_summary"]])
   expect_equal(n_rows, 4L)   # A, B, A:B, Residuals
 })
 
@@ -393,6 +406,7 @@ test_that("f_aov interaction models: emmeans runs without 'no variable in refere
 df <- make_normal_data()
 
 test_that("f_aov output_type rmd: rmd output stores a character string in output_list$rmd", {
+  skip_on_cran()
   out <- quiet_f_aov_typed("rmd", y ~ grp, data = df,
                            transformation = FALSE)
   expect_true("rmd" %in% names(out))        # rmd is top-level key
@@ -401,6 +415,7 @@ test_that("f_aov output_type rmd: rmd output stores a character string in output
 })
 
 test_that("f_aov output_type rmd: rmd string contains expected section markers", {
+  skip_on_cran()
   out <- quiet_f_aov_typed("rmd", y ~ grp, data = df,
                            transformation = FALSE)
   expect_match(out[["rmd"]], "Analysis of:")
@@ -678,6 +693,7 @@ make_hetero_data <- function(seed = 335) {
 }
 
 test_that("f_aov last-resort message: last_resort_triggered is FALSE when transformation resolves assumptions", {
+  skip_on_cran()
   df  <- make_normal_data()
   out <- quiet_f_aov(y ~ grp, data = df, transformation = TRUE)
   # For well-behaved normal data, transformation should not be needed,
@@ -687,6 +703,7 @@ test_that("f_aov last-resort message: last_resort_triggered is FALSE when transf
 })
 
 test_that("f_aov last-resort message: last_resort_triggered and last_resort_reason are stored when Box-Cox cannot fix assumptions", {
+  skip_on_cran()
   df  <- make_hetero_data()
   out <- quiet_f_aov_typed("rmd", y ~ grp, data = df, transformation = TRUE)
   expect_true(isTRUE(out[["y"]][["last_resort_triggered"]]))
@@ -698,6 +715,7 @@ test_that("f_aov last-resort message: last_resort_triggered and last_resort_reas
 })
 
 test_that("f_aov last-resort message: rmd output contains the last-resort warning text when triggered", {
+  skip_on_cran()
   df  <- make_hetero_data()
   # Must use output_type = 'rmd' so out[['rmd']] is populated;
   # the previous version of this test used plain quiet_f_aov() which
@@ -714,6 +732,7 @@ test_that("f_aov last-resort message: rmd output contains the last-resort warnin
 # 20. Multiple-response NOTE
 # =============================================================================
 test_that("f_aov multiple-response NOTE in rmd output: rmd output contains multiple-testing NOTE for 2+ responses", {
+  skip_on_cran()
   df      <- make_normal_data()
   df$y2   <- df$y + rnorm(nrow(df), 0, 0.3)
   out <- quiet_f_aov_typed("rmd", y + y2 ~ grp, data = df,
@@ -723,6 +742,7 @@ test_that("f_aov multiple-response NOTE in rmd output: rmd output contains multi
 })
 
 test_that("f_aov multiple-response NOTE in rmd output: rmd output does NOT contain multiple-testing NOTE for single response", {
+  skip_on_cran()
   df  <- make_normal_data()
   out <- quiet_f_aov_typed("rmd", y ~ grp, data = df,
                            transformation = FALSE)
@@ -730,6 +750,7 @@ test_that("f_aov multiple-response NOTE in rmd output: rmd output does NOT conta
 })
 
 test_that("f_aov multiple-response NOTE in rmd output: NOTE contains personalised Bonferroni alpha for k=2", {
+  skip_on_cran()
   df    <- make_normal_data()
   df$y2 <- df$y + rnorm(nrow(df))
   out   <- quiet_f_aov_typed("rmd", y + y2 ~ grp, data = df,
@@ -925,4 +946,423 @@ test_that("f_aov does not crash with n > 5000 (safe_shapiro skip branch)", {
       expect_match(sh$method, "skipped", fixed = TRUE)
     }
   }
+})
+
+# =============================================================================
+# 24. anova_type (Type II vs Type III Sums of Squares)
+# =============================================================================
+# f_aov() exposes anova_type = 2 (default, Type II) or 3 (Type III) for the
+# omnibus table computed via car::Anova(). For Type III, f_aov also
+# auto-installs orthogonal contrasts (contr.sum, contr.poly) for the
+# duration of the call when the user has not supplied their own via `...`.
+#
+# The numerical SS for main effects under Type II vs Type III often
+# coincide once f_aov has installed contr.sum (that is the whole point of
+# the auto-install), so these tests do NOT rely on numerical differences.
+# They rely on:
+#   - the structural difference between the two tables: Type III has an
+#     "(Intercept)" row, Type II does not (deterministic, independent of
+#     design balance);
+#   - the table heading attribute set by car::Anova();
+#   - the anova_type value stored in the output list;
+#   - the contrasts-restoration on exit; and
+#   - the textual markers in the rmd output.
+# All of these are independent of seed / sample size / unbalancedness.
+
+df_oneway   <- make_normal_data()
+df_twoway   <- make_two_factor_data()
+
+test_that("f_aov anova_type: default is 2 (Type II) and is stored in output_list", {
+  skip_on_cran()
+  out <- quiet_f_aov(y ~ grp, data = df_oneway, transformation = FALSE)
+  expect_equal(out[["y"]][["anova_type"]], 2)
+})
+
+test_that("f_aov anova_type: anova_type = 3 is stored in output_list", {
+  skip_on_cran()
+  out <- quiet_f_aov(y ~ grp, data = df_oneway,
+                     transformation = FALSE, anova_type = 3)
+  expect_equal(out[["y"]][["anova_type"]], 3)
+})
+
+test_that("f_aov anova_type: Type II aov_summary heading says 'Type II tests'", {
+  skip_on_cran()
+  out <- quiet_f_aov(y ~ grp, data = df_oneway, transformation = FALSE)
+  heading <- attr(out[["y"]][["aov_summary"]], "heading")
+  expect_true(any(grepl("Type II tests", heading)))
+  expect_false(any(grepl("Type III tests", heading)))
+})
+
+test_that("f_aov anova_type: Type III aov_summary heading says 'Type III tests'", {
+  skip_on_cran()
+  out <- quiet_f_aov(y ~ grp, data = df_oneway,
+                     transformation = FALSE, anova_type = 3)
+  heading <- attr(out[["y"]][["aov_summary"]], "heading")
+  expect_true(any(grepl("Type III tests", heading)))
+})
+
+test_that("f_aov anova_type: Type II aov_summary has no '(Intercept)' row", {
+  skip_on_cran()
+  # car::Anova(., type = 2) reports terms-only; the intercept does not appear.
+  out <- quiet_f_aov(y ~ A * B, data = df_twoway, transformation = FALSE)
+  expect_false("(Intercept)" %in% rownames(out[["y"]][["aov_summary"]]))
+})
+
+test_that("f_aov anova_type: Type III aov_summary has an '(Intercept)' row", {
+  skip_on_cran()
+  # car::Anova(., type = 3) tests every term including the intercept;
+  # this is the most reliable structural signature distinguishing the two
+  # tables and does not depend on design balance.
+  out <- quiet_f_aov(y ~ A * B, data = df_twoway,
+                     transformation = FALSE, anova_type = 3)
+  expect_true("(Intercept)" %in% rownames(out[["y"]][["aov_summary"]]))
+})
+
+test_that("f_aov anova_type: Type III works for one-way (no interaction) models", {
+  skip_on_cran()
+  # Regression guard: a one-way design has no interaction term, so the
+  # Type II / Type III machinery has nothing to "fix" - but the call must
+  # still succeed and produce a Type III table with an intercept row.
+  out <- quiet_f_aov(y ~ grp, data = df_oneway,
+                     transformation = FALSE, anova_type = 3)
+  expect_s3_class(out[["y"]][["aov_test"]], "aov")
+  expect_true("(Intercept)" %in% rownames(out[["y"]][["aov_summary"]]))
+})
+
+test_that("f_aov anova_type: Type III works for interaction (A*B) models", {
+  skip_on_cran()
+  out <- quiet_f_aov(y ~ A * B, data = df_twoway,
+                     transformation = FALSE, anova_type = 3)
+  rn <- rownames(out[["y"]][["aov_summary"]])
+  expect_true(all(c("A", "B", "A:B", "Residuals") %in% rn))
+})
+
+# ----- Input validation -----------------------------------------------------
+
+test_that("f_aov anova_type: anova_type = 1 errors with a clear message", {
+  skip_on_cran()
+  expect_error(
+    quiet_f_aov(y ~ grp, data = df_oneway, anova_type = 1),
+    regexp = "anova_type.*must be 2.*Type II.*or 3.*Type III"
+  )
+})
+
+test_that("f_aov anova_type: anova_type = 4 errors with a clear message", {
+  skip_on_cran()
+  expect_error(
+    quiet_f_aov(y ~ grp, data = df_oneway, anova_type = 4),
+    regexp = "anova_type.*must be 2.*or 3"
+  )
+})
+
+test_that("f_aov anova_type: anova_type = 'II' (string) errors", {
+  skip_on_cran()
+  # Bare strings are not coerced silently. Per the project's fail-loud
+  # philosophy a typo should crash, not default back to Type II.
+  expect_error(
+    quiet_f_aov(y ~ grp, data = df_oneway, anova_type = "II"),
+    regexp = "anova_type.*must be 2.*or 3"
+  )
+})
+
+test_that("f_aov anova_type: anova_type = NA errors", {
+  skip_on_cran()
+  expect_error(
+    quiet_f_aov(y ~ grp, data = df_oneway, anova_type = NA),
+    regexp = "anova_type.*must be 2.*or 3"
+  )
+})
+
+test_that("f_aov anova_type: anova_type = c(2, 3) (vector) errors", {
+  skip_on_cran()
+  # Length > 1 should be rejected; %in% would return a logical vector and
+  # isTRUE() collapses it to FALSE, hitting the stop().
+  expect_error(
+    quiet_f_aov(y ~ grp, data = df_oneway, anova_type = c(2, 3)),
+    regexp = "anova_type.*must be 2.*or 3"
+  )
+})
+
+# ----- Multi-response carries anova_type through to every response ---------
+
+test_that("f_aov anova_type: anova_type is stored on every response when multiple are fit", {
+  skip_on_cran()
+  df2 <- df_oneway
+  df2$y2 <- df2$y + rnorm(nrow(df2), 0, 0.3)
+  out <- quiet_f_aov(y + y2 ~ grp, data = df2,
+                     transformation = FALSE, anova_type = 3)
+  expect_equal(out[["y"]][["anova_type"]],  3)
+  expect_equal(out[["y2"]][["anova_type"]], 3)
+})
+
+# ----- rmd output text ------------------------------------------------------
+
+test_that("f_aov anova_type: rmd output mentions 'Type II' when anova_type = 2", {
+  skip_on_cran()
+  out <- quiet_f_aov_typed("rmd", y ~ grp, data = df_oneway,
+                           transformation = FALSE)
+  expect_match(out[["rmd"]], "Type II")
+  # The Type III banner about contr.sum must NOT appear in a Type II run.
+  expect_false(grepl("Type III", out[["rmd"]]))
+})
+
+test_that("f_aov anova_type: rmd output mentions 'Type III' when anova_type = 3", {
+  skip_on_cran()
+  out <- quiet_f_aov_typed("rmd", y ~ grp, data = df_oneway,
+                           transformation = FALSE, anova_type = 3)
+  expect_match(out[["rmd"]], "Type III")
+})
+
+test_that("f_aov anova_type: Type III rmd output explains contr.sum installation", {
+  skip_on_cran()
+  # The user-facing message in the rmd should make clear WHY contrasts
+  # were swapped; checking for the contrast names guards against a future
+  # rewrite that drops the explanation.
+  out <- quiet_f_aov_typed("rmd", y ~ A * B, data = df_twoway,
+                           transformation = FALSE, anova_type = 3)
+  expect_match(out[["rmd"]], "contr\\.sum")
+})
+
+# ----- Contrasts side-effects: install + restore on exit -------------------
+
+test_that("f_aov anova_type: anova_type = 2 does NOT modify options('contrasts')", {
+  skip_on_cran()
+  # Baseline check that the auto-install is gated on anova_type == 3.
+  # getOption('contrasts') returns an unnamed length-2 character vector
+  # (unordered, ordered), so compare positionally rather than by name.
+  old <- getOption("contrasts")
+  on.exit(options(contrasts = old), add = TRUE)
+  options(contrasts = c("contr.treatment", "contr.poly"))
+  quiet_f_aov(y ~ A * B, data = df_twoway, transformation = FALSE)
+  expect_equal(unname(getOption("contrasts"))[1], "contr.treatment")
+})
+
+test_that("f_aov anova_type: anova_type = 3 restores options('contrasts') on exit", {
+  skip_on_cran()
+  # Type III installs contr.sum for the duration of the call. After f_aov
+  # returns, the caller's original contrasts setting must be back.
+  old <- getOption("contrasts")
+  on.exit(options(contrasts = old), add = TRUE)
+  options(contrasts = c("contr.treatment", "contr.poly"))
+  contrasts_before <- getOption("contrasts")
+  quiet_f_aov(y ~ A * B, data = df_twoway,
+              transformation = FALSE, anova_type = 3)
+  expect_equal(getOption("contrasts"), contrasts_before)
+})
+
+test_that("f_aov anova_type: anova_type = 3 also restores contrasts when the call errors mid-way", {
+  skip_on_cran()
+  # save_session_state() / on.exit() restoration must run on the error
+  # path too, otherwise a user typo (e.g. a non-numeric response) would
+  # leave the global contrasts setting flipped to contr.sum.
+  old <- getOption("contrasts")
+  on.exit(options(contrasts = old), add = TRUE)
+  options(contrasts = c("contr.treatment", "contr.poly"))
+  contrasts_before <- getOption("contrasts")
+  df_bad <- df_twoway
+  df_bad$y <- as.character(df_bad$y)  # non-numeric response, triggers stop()
+  expect_error(
+    quiet_f_aov(y ~ A * B, data = df_bad,
+                transformation = FALSE, anova_type = 3),
+    regexp = "numeric"
+  )
+  expect_equal(getOption("contrasts"), contrasts_before)
+})
+
+# ----- User-supplied contrasts via ... bypass the auto-install -------------
+
+test_that("f_aov anova_type: anova_type = 3 with user-supplied contrasts emits a message", {
+  skip_on_cran()
+  # When the user passes their own `contrasts` via ..., f_aov must NOT
+  # override them but should warn the user about Type III interpretation
+  # if those contrasts happen to be treatment contrasts.
+  msgs <- character()
+  withCallingHandlers(
+    suppressWarnings(
+      utils::capture.output(
+        f_aov(y ~ A * B, data = df_twoway,
+              transformation = FALSE, anova_type = 3,
+              contrasts = list(A = "contr.helmert", B = "contr.helmert"),
+              output_type = "default", norm_plots = FALSE,
+              intro_text = FALSE, open_generated_files = FALSE),
+        file = nullfile()
+      )
+    ),
+    message = function(m) {
+      msgs <<- c(msgs, conditionMessage(m))
+      invokeRestart("muffleMessage")
+    }
+  )
+  expect_true(any(grepl("anova_type = 3.*user-supplied .*contrasts", msgs)))
+})
+
+test_that("f_aov anova_type: anova_type = 3 with user-supplied contrasts does NOT overwrite them", {
+  skip_on_cran()
+  # The auto-install path is `options(contrasts = c('contr.sum', 'contr.poly'))`
+  # globally. When the user passes their own per-term contrasts via `...`,
+  # the global option must be left alone.
+  old <- getOption("contrasts")
+  on.exit(options(contrasts = old), add = TRUE)
+  options(contrasts = c("contr.treatment", "contr.poly"))
+  contrasts_before <- getOption("contrasts")
+  suppressMessages(suppressWarnings(
+    utils::capture.output(
+      f_aov(y ~ A * B, data = df_twoway,
+            transformation = FALSE, anova_type = 3,
+            contrasts = list(A = "contr.helmert", B = "contr.helmert"),
+            output_type = "default", norm_plots = FALSE,
+            intro_text = FALSE, open_generated_files = FALSE),
+      file = nullfile()
+    )
+  ))
+  expect_equal(getOption("contrasts"), contrasts_before)
+})
+
+# ----- Combined with transformation ----------------------------------------
+
+test_that("f_aov anova_type: anova_type = 3 is also honored on the transformed model", {
+  skip_on_cran()
+  # f_aov refits the model on Box-Cox-transformed residuals when the
+  # untransformed assumptions fail; the SS-type setting must propagate.
+  df_skew <- make_skewed_data()
+  out <- quiet_f_aov(y ~ grp, data = df_skew,
+                     transformation = "boxcox", anova_type = 3)
+  if (isTRUE(out[["y"]][["Response_Transformed"]])) {
+    # The transformed table is stored under the same name pattern as the
+    # main aov_summary; the heading attribute is the most stable check.
+    expect_true("(Intercept)" %in%
+                  rownames(out[["y"]][["aov_summary"]]))
+  }
+})
+
+test_that("f_aov anova_type: rmd ANOVA table bolds p-values against the call's alpha, not a hardcoded 0.05", {
+  skip_on_cran()
+  # Regression guard: an earlier version of helper_rmd_anova_summary
+  # hardcoded the bolding threshold to 0.05, which made the omnibus
+  # table disagree with every other test in the report when the user
+  # passed alpha != 0.05. Seed 7 / one-way design / mean offsets of 0.5
+  # are tuned so the omnibus p sits between 0.01 and 0.05 (here ~ 0.038);
+  # the helper must bold it at alpha = 0.05 but leave it plain at
+  # alpha = 0.01.
+  set.seed(7)
+  d <- data.frame(
+    y   = c(rnorm(10, 10), rnorm(10, 10.5), rnorm(10, 11)),
+    grp = factor(rep(c("A", "B", "C"), each = 10))
+  )
+  out_05 <- quiet_f_aov_typed("rmd", y ~ grp, data = d,
+                              transformation = FALSE, alpha = 0.05)
+  out_01 <- quiet_f_aov_typed("rmd", y ~ grp, data = d,
+                              transformation = FALSE, alpha = 0.01)
+  p_str <- formatC(out_05[["y"]][["aov_summary"]][["Pr(>F)"]][1])
+  # Sanity check on the data setup: the p-value really is in the
+  # 0.01 < p < 0.05 band; if a future change to the test data shifts
+  # it out of that window the alpha guard becomes vacuous.
+  p_num <- out_05[["y"]][["aov_summary"]][["Pr(>F)"]][1]
+  expect_gt(p_num, 0.01)
+  expect_lt(p_num, 0.05)
+  # The actual contract:
+  expect_true(grepl(paste0("**", p_str, "**"), out_05[["rmd"]], fixed = TRUE))
+  expect_false(grepl(paste0("**", p_str, "**"), out_01[["rmd"]], fixed = TRUE))
+})
+
+test_that("f_aov anova_type: rmd ANOVA table blanks NA cells in the Residuals row", {
+  skip_on_cran()
+  # Regression guard: the Residuals row has NA in both F value and
+  # Pr(>F); printing them as the literal string "NA" is visually noisy
+  # in publication tables. The helper blanks both. Test against the
+  # exact line that pander renders for Residuals.
+  df  <- make_two_factor_data()
+  out <- quiet_f_aov_typed("rmd", y ~ A * B, data = df,
+                           transformation = FALSE)
+  # Pull the Residuals row out of the pander-rendered table. Each row
+  # is a single line; "Residuals" is at the start.
+  resid_line <- grep("Residuals", strsplit(out[["rmd"]], "\n")[[1]],
+                     value = TRUE)
+  expect_true(length(resid_line) >= 1L)
+  # Neither cell should contain the literal "NA" token.
+  # (allow occurrences of "NA" inside words like "STANARD" etc are
+  # vanishingly unlikely in a numeric row; checked with a strict regex.)
+  expect_false(any(grepl("\\bNA\\b", resid_line)))
+})
+
+# =============================================================================
+# 25. force_aov (saturated-model handling)
+# =============================================================================
+# When at least one factorial cell has n = 1, the ANOVA model is saturated
+# (zero residual df). Default behavior (force_aov = FALSE) is to skip that
+# response with a clear message and store skipped = TRUE / skipped_reason.
+# force_aov = TRUE overrides the skip for diagnostic use only; the result
+# should not be reported. These tests pin both halves of the contract.
+
+make_saturated_data <- function(seed = 1) {
+  set.seed(seed)
+  # 2x2 design with cell (a2, b2) having n = 1 -> saturates the A*B model
+  data.frame(
+    y = c(rnorm(3, 10), rnorm(3, 12), rnorm(3, 14), rnorm(1, 16)),
+    A = factor(c(rep("a1", 3), rep("a1", 3), rep("a2", 3), rep("a2", 1))),
+    B = factor(c(rep("b1", 3), rep("b2", 3), rep("b1", 3), rep("b2", 1)))
+  )
+}
+
+test_that("f_aov force_aov: saturated model is skipped by default (force_aov = FALSE)", {
+  skip_on_cran()
+  df_sat <- make_saturated_data()
+  out    <- quiet_f_aov(y ~ A * B, data = df_sat, transformation = FALSE)
+  expect_true(isTRUE(out[["y"]][["skipped"]]))
+  expect_null(out[["y"]][["aov_test"]])
+  expect_equal(out[["y"]][["min_cell_n"]], 1L)
+})
+
+test_that("f_aov force_aov: skipped response stores a skipped_reason that mentions force_aov", {
+  skip_on_cran()
+  df_sat <- make_saturated_data()
+  out    <- quiet_f_aov(y ~ A * B, data = df_sat, transformation = FALSE)
+  expect_type(out[["y"]][["skipped_reason"]], "character")
+  expect_match(out[["y"]][["skipped_reason"]], "saturated")
+  expect_match(out[["y"]][["skipped_reason"]], "force_aov")
+})
+
+test_that("f_aov force_aov: force_aov = TRUE fits the saturated model and stores force_aov_used", {
+  skip_on_cran()
+  df_sat <- make_saturated_data()
+  # force_aov = TRUE deliberately fits a saturated model; aov() emits warnings
+  # about zero residual df which are expected and not the subject of the test.
+  out <- suppressWarnings(
+    quiet_f_aov(y ~ A * B, data = df_sat,
+                transformation = FALSE, force_aov = TRUE)
+  )
+  expect_true(isTRUE(out[["y"]][["force_aov_used"]]))
+  expect_false(isTRUE(out[["y"]][["skipped"]]))
+  expect_s3_class(out[["y"]][["aov_test"]], "aov")
+})
+
+test_that("f_aov force_aov: balanced designs are unaffected by force_aov", {
+  skip_on_cran()
+  # Sanity check: force_aov is gated on min_cell_n == 1; well-balanced data
+  # must not have force_aov_used set even if the user passes TRUE.
+  df_bal <- make_two_factor_data()
+  out <- quiet_f_aov(y ~ A * B, data = df_bal,
+                     transformation = FALSE, force_aov = TRUE)
+  expect_false(isTRUE(out[["y"]][["force_aov_used"]]))
+  expect_false(isTRUE(out[["y"]][["skipped"]]))
+})
+
+test_that("f_aov force_aov: rmd output flags the skip and points to force_aov", {
+  skip_on_cran()
+  df_sat <- make_saturated_data()
+  out <- quiet_f_aov_typed("rmd", y ~ A * B, data = df_sat,
+                           transformation = FALSE)
+  expect_match(out[["rmd"]], "skipped")
+  expect_match(out[["rmd"]], "force_aov")
+})
+
+test_that("f_aov force_aov: rmd output under force_aov = TRUE warns the result is diagnostic only", {
+  skip_on_cran()
+  df_sat <- make_saturated_data()
+  out <- suppressWarnings(
+    quiet_f_aov_typed("rmd", y ~ A * B, data = df_sat,
+                      transformation = FALSE, force_aov = TRUE)
+  )
+  expect_match(out[["rmd"]], "Saturated")
+  expect_match(out[["rmd"]], "diagnostic")
 })

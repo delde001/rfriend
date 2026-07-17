@@ -9,6 +9,8 @@ f_glm(
   family = gaussian(),
   data = NULL,
   diagnostic_plots = TRUE,
+  effect_plot = TRUE,
+  contrast_plots = FALSE,
   alpha = 0.05,
   adjust = "sidak",
   type = "response",
@@ -35,6 +37,28 @@ the result of a call to a family function. (See \code{\link{family}} for details
 \item{data}{A data frame containing the variables in the model.}
 
 \item{diagnostic_plots}{Logical. If \code{TRUE}, plots are included in the output files.}
+
+\item{effect_plot}{Logical. If \code{TRUE} (default), estimated marginal
+means plots (or interaction plots, when a categorical interaction is
+significant) are added after the post hoc table. See Details for what is
+drawn and how the plots are stored.}
+
+\item{contrast_plots}{Logical. If \code{TRUE}, a \strong{contrast forest
+plot} is added for each categorical post hoc term: one row per pairwise
+comparison, showing the estimated difference between two levels with its
+confidence interval and a reference line at zero. A CI that excludes zero
+indicates a significant difference; because the interval is on the
+difference itself, this "excludes zero" reading is exact (it is the same
+information the compact-letter display encodes, but it also shows the
+direction and magnitude of each difference). Default \code{FALSE} because
+the number of pairwise contrasts grows quickly with the number of factor
+levels (k levels give k(k-1)/2 contrasts); turn it on when you want the
+detailed pairwise picture. Main-effect contrast plots are stored as
+\code{out$y1$contrast_plot_<term>} and interaction cell-contrast plots as
+\code{out$y1$interaction_contrast_plot_<term>}. Contrast CIs use the same
+\code{adjust} method as the post hoc p-values, so figure and table agree.
+The contrasts are computed on the link (model) scale, where differences
+are additive and symmetric.}
 
 \item{alpha}{Numeric. Significance level for tests. Default is \code{0.05}.}
 
@@ -122,6 +146,25 @@ The function first checks if all specified variables are present in the data and
 It fits a Generalized Linear Model (GLM) using the specified formula, family, and data. Model diagnostics are performed with DHARMa (simulation-based residual checks including a KS test, dispersion test, and outlier test). High-leverage observations are flagged using hat values.
 
 Significance of each predictor is assessed via Type II Analysis of Deviance (\code{stats::drop1()}). If significant effects are found, post hoc pairwise comparisons are performed using estimated marginal means from \code{emmeans()} with the chosen p-value adjustment method (default: Sidak). When complete separation is detected, the function falls back to likelihood ratio test (LRT) based pairwise comparisons, which are robust to separation.
+
+\strong{Effect and interaction plots.} When \code{effect_plot = TRUE}, an
+estimated marginal means plot (estimate \eqn{\pm} 95\% CI on the response
+scale, with jittered raw data and compact-letter-display labels) is added
+after the post hoc table for each categorical predictor. For a significant
+categorical interaction, interaction plots are drawn instead: a two-way
+interaction uses the x-axis plus colour (both orientations), while three-
+and four-way interactions add facet panels for the remaining factor(s),
+with one plot per choice of x-axis factor. Interactions involving five or
+more categorical factors are not plotted (a warning is issued); consult the
+post hoc cell-means table instead. Estimates follow the \code{type}
+argument, so for non-gaussian families they are back-transformed to the
+response scale. The plots themselves are kept clean for publication (data,
+axes, and legend only); the descriptive label and explanatory caption are
+emitted as text above and below each figure in the report. All effect and
+interaction plots are \pkg{ggplot2} objects and are stored in the returned
+object (e.g. \code{out$y1$effect_plot_treatment},
+\code{out$y1$interaction_plot_a_b_1}) so they can be retrieved and
+customised afterwards. Matches \code{\link{f_aov}}.
 
 More response variables can be added using \code{+} (e.g., \code{response1 + response2 ~ predictor}) to fit a sequential GLM for each response variable, captured in one output file.
 

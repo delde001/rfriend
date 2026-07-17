@@ -10,6 +10,7 @@ f_factors(
   exclude = NULL,
   properties = FALSE,
   force_factors = FALSE,
+  ref = NULL,
   unique_num_treshold = 8,
   repeats_threshold = 2,
   ...
@@ -25,6 +26,16 @@ f_factors(
 \item{properties}{Logical. If \code{TRUE}, prints a detailed table about the properties of the new data frame to the console. If \code{FALSE} no property table will be printed to the console. Default is \code{FALSE}.}
 
 \item{force_factors}{Logical. If \code{TRUE} all columns in the data.frame will be converted to factors except for the excluded columns using \code{exclude}.}
+
+\item{ref}{Optional reference level(s) to set after conversion, controlling
+which level a factor is contrasted against in models (e.g. \code{f_glm},
+\code{f_lmer}). Under R's default treatment contrasts the reference is the
+first level, which is alphabetical unless set deliberately. Supply either a
+single string (applied to every converted factor that contains it) or a
+named character vector mapping column names to reference levels, e.g.
+\code{ref = c(treatment = "control", dose = "low")}. A level that is not
+present in a given factor is skipped with a warning. Default \code{NULL}
+(leave the reference as the first level).}
 
 \item{unique_num_treshold}{Numeric. A threshold of the amount of unique numbers a numeric column should have to keep it numeric, i.e. omit factor conversion. Default \code{8}.}
 
@@ -74,6 +85,16 @@ str(df3)
 # Thus obtaining the same results as above automatically:
 df4 <- f_factors(df)
 str(df4)
+
+# Set the reference level of a factor (the level models contrast against).
+# Useful before f_glm() / f_lmer(): by default the reference is the first
+# (alphabetical) level. Use a named vector to target specific columns:
+df1c <- f_factors(df, select = c("a", "c"))
+levels(df1c$c)[1]   # default reference is "apple" (alphabetical)
+df_ref <- f_factors(df, select = c("a", "c"),
+                    ref = c(a = "yes", c = "kiwi"))
+levels(df_ref$c)[1] # reference is now "kiwi"
+levels(df_ref$a)[1] # reference is now "yes" (was "no")
 
 # In example above col b was converted to a factor as the number of repeats = 2
 # and the amount of unique numbers < 8. In order to keep b numeric we can also

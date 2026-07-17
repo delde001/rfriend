@@ -47,6 +47,9 @@ safe_shapiro <- function(x, data_name = NULL) {
 
   if (n < 3L)    return(skipped("n < 3"))
   if (n > 5000L) return(skipped("n > 5000"))
+  if (length(unique(x)) < 3L || stats::sd(x) < .Machine$double.eps^0.5) {
+    return(skipped("zero variance"))
+  }
 
   result <- stats::shapiro.test(x)
   result$data.name <- data_name
