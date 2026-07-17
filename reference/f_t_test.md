@@ -16,7 +16,8 @@ f_t_test(x, ...)
 f_t_test(
   formula,
   data = NULL,
-  paired = FALSE,
+  paired = NULL,
+  paired_by = NULL,
   var.equal = NULL,
   conf.level = NULL,
   mu = 0,
@@ -96,10 +97,32 @@ f_t_test(
 
 - paired:
 
-  Logical. If `TRUE`, performs a paired t-test. **Note:** For the
-  formula interface, data must be sorted so that all observations of
-  group 1 appear before group 2 (AABB order). For the vector interface,
-  `x` and `y` must have the same length.
+  Logical or `NULL`. If `TRUE`, performs a paired t-test. If `FALSE`, an
+  independent (or one-sample) test. If `NULL` (default) and `paired_by`
+  is supplied, `paired` is automatically set to `TRUE` (with a message),
+  since `paired_by` has no purpose outside a paired test. An explicit
+  `paired = FALSE` is never overridden. **Note:** For the formula
+  interface, supply `paired_by` to identify matched pairs by subject id.
+  If `paired_by` is omitted, the data must be sorted so that all
+  observations of group 1 appear before group 2 (AABB order) *and* the
+  within-group order must be identical across groups, because the
+  pairing is then purely positional and fragile. A warning is issued if
+  the data appear interleaved (not in AABB order); a within-group
+  reordering that preserves AABB blocks cannot be detected
+  automatically, so supply `paired_by` whenever a subject id is
+  available. For the vector interface, `x` and `y` must have the same
+  length (pairing is positional by construction).
+
+- paired_by:
+
+  Character string. For the formula interface with `paired = TRUE`, the
+  name of a column in `data` that identifies matched pairs (subject id).
+  When supplied, observations are matched by this id rather than by row
+  position, so the data no longer needs to be in AABB order. Each id
+  must appear exactly once per group, and the two groups must contain
+  the same set of ids (after `subset` and NA removal). Ignored for
+  one-sample and two-sample independent tests, and for the vector
+  interface. Default `NULL`.
 
 - var.equal:
 
@@ -204,7 +227,15 @@ f_t_test(
 An object of class `'f_t_test'`, a named list with one element per
 response variable. Each element contains the t-test result, normality
 test results, variance diagnostic results, transformation object (if
-applied), and back-transformed confidence interval (if applicable).
+applied), back-transformed confidence interval (if applicable), and a
+publication-ready main effect plot as a ggplot2 object
+(`main_effect_plot`). The plot shows the estimated parameter with its
+confidence interval against the raw data: group means with their mean
+confidence intervals (two-sample), the sample mean with a reference line
+at `mu` (one-sample), or the mean of the per-pair differences with a
+reference line at `mu` (paired). When the response was transformed the
+estimate and interval are back-transformed to the original scale and
+labelled as a median.
 
 ## References
 
@@ -324,8 +355,8 @@ f_t_test(mpg ~ 1, data = mtcars, mu = 20,
 #> 
 #> 
 
-# 4. Paired t-test (sleep dataset is already in AABB order)
-f_t_test(extra ~ group, data = sleep, paired = TRUE,
+# 4. Paired t-test with explicit subject id (recommended)
+f_t_test(extra ~ group, data = sleep, paired = TRUE, paired_by = "ID",
          output_type = "console", norm_plots = FALSE)
 #> 
 #> ==========================================================
@@ -333,7 +364,7 @@ f_t_test(extra ~ group, data = sleep, paired = TRUE,
 #> ==========================================================
 #> 
 #> SAMPLE STATISTICS:
-#>   Mean of differences (transformed scale): 0
+#>   Mean of differences (transformed scale): -1.112
 #>   --- back-transformed (original scale) ---
 #>   Back-transformed mean of differences: -1.355
 #>   Median of raw differences: -1.3
@@ -343,11 +374,43 @@ f_t_test(extra ~ group, data = sleep, paired = TRUE,
 #>   H1: True mean difference (1 - 2) is not equal to 0
 #> 
 #> TEST RESULTS (transformed scale):
-#>   t = -0.000,  df = 9.000,  p-value = 1.0000  
-#> -> Not significant, H0 is NOT rejected  (p > α = 0.05)
+#>   t = -6.086,  df = 9.000,  p-value = 0.0002  *
+#> * -> Significant, H0 is rejected  (p ≤ α = 0.05)
 #> 
 #> ESTIMATE:
-#>   95% CI (transformed scale): [ -0.715, 0.715 ]
+#>   95% CI (transformed scale): [ -1.525, -0.698 ]
+#>   95% CI (back-transformed):  [ -2.188, -0.757 ]
+#> 
+#> Note on transformation:
+#> The t-test was conducted on the arcsinh(x)-transformed scale. The back-transformed mean and the sample median of the raw data will differ when the transformation is not perfectly normalizing. For non-normal data consider f_wilcox_test() which tests the median directly without transformation assumptions.
+#> 
+#> 
+
+# 4b. Paired t-test without paired_by (warns; pairing is positional and
+# only safe when data is in AABB order with matching within-group order)
+f_t_test(extra ~ group, data = sleep, paired = TRUE,
+         output_type = "console", norm_plots = FALSE)
+#> 
+#> ==========================================================
+#> One Sample t-test (arcsinh(x) transformed) of: extra
+#> ==========================================================
+#> 
+#> SAMPLE STATISTICS:
+#>   Mean of differences (transformed scale): -1.112
+#>   --- back-transformed (original scale) ---
+#>   Back-transformed mean of differences: -1.355
+#>   Median of raw differences: -1.3
+#> 
+#> HYPOTHESES:
+#>   H0: True mean difference (1 - 2) is equal to 0
+#>   H1: True mean difference (1 - 2) is not equal to 0
+#> 
+#> TEST RESULTS (transformed scale):
+#>   t = -6.086,  df = 9.000,  p-value = 0.0002  *
+#> * -> Significant, H0 is rejected  (p ≤ α = 0.05)
+#> 
+#> ESTIMATE:
+#>   95% CI (transformed scale): [ -1.525, -0.698 ]
 #>   95% CI (back-transformed):  [ -2.188, -0.757 ]
 #> 
 #> Note on transformation:
@@ -607,9 +670,9 @@ f_t_test(hp ~ am, data = mtcars, transformation = "bestnormalize",
 #> ==========================================================
 #> 
 #> SAMPLE STATISTICS:
-#>   Mean 0 (transformed scale): 0.244
-#>   Mean 1 (transformed scale): -0.356
-#>   Difference (0 - 1): 0.6
+#>   Mean 0 (transformed scale): 12.476
+#>   Mean 1 (transformed scale): 10.81
+#>   Difference (0 - 1): 1.666
 #>   --- back-transformed (original scale) ---
 #>   Back-transformed mean 0: 155.644
 #>   Back-transformed mean 1: 116.858
@@ -625,8 +688,8 @@ f_t_test(hp ~ am, data = mtcars, transformation = "bestnormalize",
 #> -> Not significant, H0 is NOT rejected  (p > α = 0.05)
 #> 
 #> ESTIMATE:
-#>   95% CI (transformed scale): [ -0.186, 1.386 ]
-#>   95% CI (back-transformed):  [ 127.305, 244.812 ]  *interpret carefully*
+#>   95% CI (transformed scale): [ -0.516, 3.847 ]
+#>   95% CI (back-transformed):  [ 0.266, 14.803 ]  *interpret carefully*
 #> 
 #> Note on transformation:
 #> The t-test was conducted on the sqrt(x + a)-transformed scale. The back-transformed mean and the sample median of the raw data will differ when the transformation is not perfectly normalizing. For non-normal data consider f_wilcox_test() which tests the median directly without transformation assumptions.
@@ -754,5 +817,11 @@ result[["hp"]]$ci_backtransformed # back-transformed CI if transformed
 #> [1] 0.9303737 2.8214855
 #> attr(,"conf.level")
 #> [1] 0.95
+
+# 16. Retrieve and customise the stored main effect plot (ggplot object)
+result[["mpg"]]$main_effect_plot
+
+# e.g. add a custom title:
+# result[["mpg"]]$main_effect_plot + ggplot2::ggtitle("My title")
 # }
 ```

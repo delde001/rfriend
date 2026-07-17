@@ -15,6 +15,7 @@ f_factors(
   exclude = NULL,
   properties = FALSE,
   force_factors = FALSE,
+  ref = NULL,
   unique_num_treshold = 8,
   repeats_threshold = 2,
   ...
@@ -49,6 +50,18 @@ f_factors(
 
   Logical. If `TRUE` all columns in the data.frame will be converted to
   factors except for the excluded columns using `exclude`.
+
+- ref:
+
+  Optional reference level(s) to set after conversion, controlling which
+  level a factor is contrasted against in models (e.g. `f_glm`,
+  `f_lmer`). Under R's default treatment contrasts the reference is the
+  first level, which is alphabetical unless set deliberately. Supply
+  either a single string (applied to every converted factor that
+  contains it) or a named character vector mapping column names to
+  reference levels, e.g. `ref = c(treatment = "control", dose = "low")`.
+  A level that is not present in a given factor is skipped with a
+  warning. Default `NULL` (leave the reference as the first level).
 
 - unique_num_treshold:
 
@@ -151,6 +164,19 @@ str(df4)
 #>  $ b: Factor w/ 3 levels "1","2","3": 1 2 3 1 2 3 1 2 3
 #>  $ c: Factor w/ 3 levels "apple","banana",..: 1 3 2 1 3 2 1 3 2
 #>  $ d: num  1.1 1.1 3.4 4.5 5.4 6.7 7.8 8.1 9.8
+
+# Set the reference level of a factor (the level models contrast against).
+# Useful before f_glm() / f_lmer(): by default the reference is the first
+# (alphabetical) level. Use a named vector to target specific columns:
+df1c <- f_factors(df, select = c("a", "c"))
+levels(df1c$c)[1]   # default reference is "apple" (alphabetical)
+#> [1] "apple"
+df_ref <- f_factors(df, select = c("a", "c"),
+                    ref = c(a = "yes", c = "kiwi"))
+levels(df_ref$c)[1] # reference is now "kiwi"
+#> [1] "kiwi"
+levels(df_ref$a)[1] # reference is now "yes" (was "no")
+#> [1] "yes"
 
 # In example above col b was converted to a factor as the number of repeats = 2
 # and the amount of unique numbers < 8. In order to keep b numeric we can also

@@ -34,17 +34,17 @@ f_qqnorm(
 
 - main:
 
-  A character string specifying the title of the histogram. Default is
-  "Histogram with Normal Curve".
+  Character string, specifying the title of the Q-Q plot. Default is
+  "Normal Q-Q Plot with X% Confidence Band".
 
 - ylab:
 
-  A character string specifying the y-axsis label. Default name is
+  A character string specifying the y-axis label. Default name is
   `"Quantiles of: data_name"`.
 
 - conf_level:
 
-  Numeric, between 0 and 1. Confidence level for the confidence bands.
+  Numeric, between 0 and 1. Confidence level for the confidence band.
   Default is 0.95 (95% confidence).
 
 - col:
@@ -62,7 +62,7 @@ f_qqnorm(
 - save_png:
 
   A logical value default `FALSE`, if `TRUE` a png file is saved under
-  the name of the data of under the specified file name.
+  the name of the data or under the specified file name.
 
 - open_png:
 
@@ -76,7 +76,7 @@ f_qqnorm(
   [`tempdir()`](https://rdrr.io/r/base/tempfile.html). If only a
   directory is specified (providing an existing directory with trailing
   slash), the file is named "data_name_QQplot.png" in that directory.
-  Defaults to `file.path(tempdir(), "data_name_histogram.png")`.
+  Defaults to `file.path(tempdir(), "data_name_QQplot.png")`.
 
 - save_in_wdir:
 
@@ -95,7 +95,8 @@ f_qqnorm(
 
 - units:
 
-  Numeric, png figure units default inch.
+  Character string, png figure units default `"in"` = inch, other
+  options are: `"px"` = Pixels, `"cm"` centimeters, `"mm"` millimeters.
 
 - res:
 
@@ -111,18 +112,19 @@ A Q-Q plot is created and the function returns this as a `recordedplot`.
 
 ## Details
 
-The function calculates theoretical quantiles for a normal distribution
-and compares them with the sample quantiles of the input data.
+- The function calculates theoretical quantiles for a normal
+  distribution and compares them with the sample quantiles of the input
+  data.
 
-It also computes confidence intervals for the order statistics using the
-Blom approximation and displays these intervals as shaded bands on the
-plot.
+- It also computes confidence intervals for the order statistics using
+  the Blom approximation and displays these intervals as shaded bands on
+  the plot.
 
-The reference line is fitted based on the first and third quartiles of
-both the sample data and theoretical quantiles.
+- The reference line is fitted based on the first and third quartiles of
+  both the sample data and theoretical quantiles.
 
-To increase resolution you can use `png(...,res = 600)` or the 'RStudio'
-chunck setting, e.g. `dpi = 600`.
+- To increase resolution you can use `png(...,res = 600)` or the
+  'RStudio' chunck setting, e.g. `dpi = 600`.
 
 ## Author
 

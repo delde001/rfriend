@@ -264,10 +264,10 @@ f_bestNormalize(skewed_data,
                 output_type          = "pdf",
                 save_as              = "my_report"
                 )
-#> Saving output in: /tmp/RtmpG5HCTF/my_report.pdf
+#> Saving output in: /tmp/RtmplsKqN3/my_report.pdf
 #> Warning: error in running command
 #> ! sh: 1: pdflatex: not found
-#> Error: LaTeX failed to compile /tmp/RtmpG5HCTF/my_report.tex. See https://yihui.org/tinytex/r/#debugging for debugging tips. See my_report.log for more info.
+#> Error: LaTeX failed to compile /tmp/RtmplsKqN3/my_report.tex. See https://yihui.org/tinytex/r/#debugging for debugging tips. See my_report.log for more info.
 
 # Generate R Markdown output for use inside a .Rmd chunk
 # (set chunk option results = 'asis').

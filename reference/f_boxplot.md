@@ -282,7 +282,7 @@ f_boxplot(iris,
            fancy_names = new_names,
            output_type = "word"
            )
-#> Saving output in: /tmp/RtmpG5HCTF/data_BoxPlot.docx
+#> Saving output in: /tmp/RtmplsKqN3/data_BoxPlot.docx
 
 # Use a formula to plot several response parameters (response 1 + response 2 etc)
 # and generate a rmd output without boxplot_explanation.
@@ -292,21 +292,21 @@ f_boxplot(hp + disp ~ gear*cyl,
            boxplot_explanation = FALSE,
            output_type = "word"
            )
-#> Saving output in: /tmp/RtmpG5HCTF/mtcars_BoxPlot.docx
+#> Saving output in: /tmp/RtmplsKqN3/mtcars_BoxPlot.docx
 
 # Pass a bare numeric vector. Its name is used as the y-axis label
 # and as the data_name in the output filename.
 set.seed(1)
 my_vec <- rnorm(50, mean = 10)
 f_boxplot(my_vec, output_type = "png")
-#> PNG files saved in: /tmp/RtmpG5HCTF
+#> PNG files saved in: /tmp/RtmplsKqN3
 #>    
 
 # Formula with bare vectors (no data.frame): group hp by cyl.
 hp1  <- mtcars$hp
 cyl1 <- mtcars$cyl
 f_boxplot(hp1 ~ cyl1, output_type = "png")
-#> PNG files saved in: /tmp/RtmpG5HCTF
+#> PNG files saved in: /tmp/RtmplsKqN3
 #>    
 
 # Multiple unnamed numeric vectors, base R's boxplot() convention:
@@ -314,7 +314,7 @@ f_boxplot(hp1 ~ cyl1, output_type = "png")
 # original variable name. Use the formula syntax above when you
 # instead want to group one response by a factor.
 f_boxplot(hp1, cyl1, output_type = "png")
-#> PNG files saved in: /tmp/RtmpG5HCTF
+#> PNG files saved in: /tmp/RtmplsKqN3
 #>    
 
 # Capture the R Markdown output as a string and render it inline.
@@ -333,28 +333,28 @@ cat(rmd)
 #> #  Boxplots of:  Sepal.Length   
 #> ##  Boxplot of:  Sepal.Length  as function of  Species   
 #>    
-#> ![](/tmp/RtmpG5HCTF/file1d94655b6cb1.png)    
+#> ![](/tmp/RtmplsKqN3/file1da250f693ba.png)    
 #>   
 #>   
 #>   
 #> #  Boxplots of:  Sepal.Width   
 #> ##  Boxplot of:  Sepal.Width  as function of  Species   
 #>    
-#> ![](/tmp/RtmpG5HCTF/file1d9445cede05.png)    
+#> ![](/tmp/RtmplsKqN3/file1da2422f4da9.png)    
 #>   
 #>   
 #>   
 #> #  Boxplots of:  Petal.Length   
 #> ##  Boxplot of:  Petal.Length  as function of  Species   
 #>    
-#> ![](/tmp/RtmpG5HCTF/file1d9445f0bbb0.png)    
+#> ![](/tmp/RtmplsKqN3/file1da269d7793.png)    
 #>   
 #>   
 #>   
 #> #  Boxplots of:  Petal.Width   
 #> ##  Boxplot of:  Petal.Width  as function of  Species   
 #>    
-#> ![](/tmp/RtmpG5HCTF/file1d946a2069ab.png)    
+#> ![](/tmp/RtmplsKqN3/file1da2738e7838.png)    
 #>   
 
 # ...or splice it into a knitr child chunk with results = "asis":

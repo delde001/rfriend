@@ -277,7 +277,7 @@ result <- f_scan(
    output_type = "excel",
    save_as    = "mtcars_scan"
  )
-#> Saving output in: /tmp/RtmpG5HCTF/mtcars_scan.xlsx
+#> Saving output in: /tmp/RtmplsKqN3/mtcars_scan.xlsx
 
 # 4. Formula | 1 group | Strict outlier detection | Word output
 result <- f_scan(
@@ -288,7 +288,7 @@ result <- f_scan(
   output_type = "word",
   save_as     = "iris_scan"
  )
-#> Saving output in: /tmp/RtmpG5HCTF/iris_scan.docx
+#> Saving output in: /tmp/RtmplsKqN3/iris_scan.docx
 
 # 5. Formula | 2 groups | Multiple columns | Fancy names
 result <- f_scan(
@@ -417,7 +417,7 @@ result <- f_scan(
   digits       = 2,
   output_type  = "word"
 )
-#> Saving output in: /tmp/RtmpG5HCTF/plant_data_fscan_output.docx
+#> Saving output in: /tmp/RtmplsKqN3/plant_data_fscan_output.docx
 print(result)
 #> 
 #> --- Summary Statistics ---

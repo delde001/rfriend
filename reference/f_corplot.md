@@ -217,7 +217,7 @@ f_corplot(mtcars_sub,
 #> 
 #> Variable 'gear' was converted to a factor.
 #> Variable 'cyl' was converted to a factor.
-#> Saving output in: /tmp/RtmpG5HCTF/mtcars_sub_CorPlot.png and /tmp/RtmpG5HCTF/mtcars_sub_Legend.png
+#> Saving output in: /tmp/RtmplsKqN3/mtcars_sub_CorPlot.png and /tmp/RtmplsKqN3/mtcars_sub_Legend.png
 
 # With ordinal variables
 data(iris)
@@ -228,5 +228,5 @@ f_corplot(iris,
           ordinal_vars = "Petal.Width",
           output_type  = "png",
           open_generated_files = FALSE)
-#> Saving output in: /tmp/RtmpG5HCTF/iris_CorPlot.png and /tmp/RtmpG5HCTF/iris_Legend.png
+#> Saving output in: /tmp/RtmplsKqN3/iris_CorPlot.png and /tmp/RtmplsKqN3/iris_Legend.png
 ```

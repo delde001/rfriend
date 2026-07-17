@@ -360,7 +360,7 @@ summary_formula <- f_summary(hp + disp ~ cyl + gear,
                              show_Q1 = FALSE,
                              show_Q3 = FALSE,
                              export_to_excel = TRUE)
-#> Saved output in: /tmp/RtmpG5HCTF/mtcars_summary.xlsx
+#> Saved output in: /tmp/RtmplsKqN3/mtcars_summary.xlsx
 print(summary_formula)
 #> 
 #>  Variable: hp

@@ -21,7 +21,7 @@ Multivariate responses (e.g. cbind(y1, y2) ~ x) and transformed responses
 
     <a class="navbar-brand me-2" href="../index.html">rfriend</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -33,6 +33,7 @@ Multivariate responses (e.g. cbind(y1, y2) ~ x) and transformed responses
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/delde001/rfriend/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul></div>
 
 
@@ -42,7 +43,7 @@ Multivariate responses (e.g. cbind(y1, y2) ~ x) and transformed responses
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>Statistical Test Wizard</h1>
-
+      <small class="dont-index">Source: <a href="https://github.com/delde001/rfriend/blob/master/R/fstat_wizard.R" class="external-link"><code>R/fstat_wizard.R</code></a></small>
       <div class="d-none name"><code>f_stat_wizard.Rd</code></div>
     </div>
 
@@ -401,18 +402,21 @@ which automatically derives the data name from the data frame used as input.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  aov call:  Sepal.Length ~ Species </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> TRANSFORMED Summary Table:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>              Df Sum Sq Mean Sq F value Pr(&gt;F)    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Species       2  63.21  31.606   119.3 &lt;2e-16 ***</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Residuals   147  38.96   0.265                   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> TRANSFORMED Type II ANOVA Table (car::Anova):</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Anova Table (Type II tests)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Response: Sepal.Length</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>           Sum Sq  Df F value    Pr(&gt;F)    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Species   63.212   2  119.26 &lt; 2.2e-16 ***</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Residuals 38.956 147                      </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> --- BACK TRANSFORMED Post hoc Comparisons of: Sepal.Length ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     Species median (BT) lower.CL upper.CL Letter  n</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>      setosa    4.992078 4.851838 5.136978    a   50</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  versicolor    5.910783 5.740686 6.086676     b  50</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   virginica    6.553397 6.362011 6.751403      c 50</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   virginica    6.553397 6.396318 6.714908      a 50</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  versicolor    5.910783 5.771183 6.054264      b 50</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>      setosa    4.992078 4.876990 5.110285      c 50</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ___________________________</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Note: 'median (BT)' = back-transformed estimated marginal mean. Back-transforming a mean from a transformed scale returns the MEDIAN on the original scale, not the arithmetic mean. Report these as back-transformed medians. CIs are valid; SE is omitted (asymmetric on original scale).</span>
@@ -445,7 +449,7 @@ which automatically derives the data name from the data frame used as input.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

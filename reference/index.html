@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">rfriend</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -19,6 +19,7 @@
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/delde001/rfriend/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul></div>
 
 
@@ -105,10 +106,24 @@
 
         <dt>
 
+          <code><a href="f_example_data.html">f_example_data()</a></code>
+
+        </dt>
+        <dd>Access the bundled example datasets</dd>
+
+        <dt>
+
           <code><a href="f_factors.html">f_factors()</a></code>
 
         </dt>
         <dd>Convert multiple columns to Factors in a data frame</dd>
+
+        <dt>
+
+          <code><a href="f_friedman.html">f_friedman()</a></code>
+
+        </dt>
+        <dd>Perform multiple Friedman rank sum tests with a user-friendly output file, do data inspection and pairwise Wilcoxon signed-rank tests as post hoc.</dd>
 
         <dt>
 
@@ -130,6 +145,13 @@
 
         </dt>
         <dd>Perform multiple Kruskal-Wallis tests with a user-friendly output file, do data inspection and Dunn's test (of 'rstatix') as post hoc.</dd>
+
+        <dt>
+
+          <code><a href="f_lm.html">f_lm()</a></code>
+
+        </dt>
+        <dd>Perform multiple <code><a href="https://rdrr.io/r/stats/lm.html" class="external-link">lm()</a></code> functions with optional data transformation, inspection, regression plots and post hoc test.</dd>
 
         <dt>
 
@@ -259,6 +281,13 @@
 
         <dt>
 
+          <code><a href="plant_trial.html">plant_trial</a></code>
+
+        </dt>
+        <dd>Simulated plant-science field trial (teaching dataset)</dd>
+
+        <dt>
+
           <code><a href="plot.f_bestNormalize.html">plot(<i>&lt;f_bestNormalize&gt;</i>)</a></code>
 
         </dt>
@@ -270,6 +299,13 @@
 
         </dt>
         <dd>Plot an f_boxcox object</dd>
+
+        <dt>
+
+          <code><a href="plot.f_friedman.html">plot(<i>&lt;f_friedman&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Plot method for f_friedman objects</dd>
 
         <dt>
 
@@ -342,7 +378,7 @@
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

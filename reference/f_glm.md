@@ -13,6 +13,8 @@ f_glm(
   family = gaussian(),
   data = NULL,
   diagnostic_plots = TRUE,
+  effect_plot = TRUE,
+  contrast_plots = FALSE,
   alpha = 0.05,
   adjust = "sidak",
   type = "response",
@@ -52,6 +54,32 @@ f_glm(
 - diagnostic_plots:
 
   Logical. If `TRUE`, plots are included in the output files.
+
+- effect_plot:
+
+  Logical. If `TRUE` (default), estimated marginal means plots (or
+  interaction plots, when a categorical interaction is significant) are
+  added after the post hoc table. See Details for what is drawn and how
+  the plots are stored.
+
+- contrast_plots:
+
+  Logical. If `TRUE`, a **contrast forest plot** is added for each
+  categorical post hoc term: one row per pairwise comparison, showing
+  the estimated difference between two levels with its confidence
+  interval and a reference line at zero. A CI that excludes zero
+  indicates a significant difference; because the interval is on the
+  difference itself, this "excludes zero" reading is exact (it is the
+  same information the compact-letter display encodes, but it also shows
+  the direction and magnitude of each difference). Default `FALSE`
+  because the number of pairwise contrasts grows quickly with the number
+  of factor levels (k levels give k(k-1)/2 contrasts); turn it on when
+  you want the detailed pairwise picture. Main-effect contrast plots are
+  stored as `out$y1$contrast_plot_<term>` and interaction cell-contrast
+  plots as `out$y1$interaction_contrast_plot_<term>`. Contrast CIs use
+  the same `adjust` method as the post hoc p-values, so figure and table
+  agree. The contrasts are computed on the link (model) scale, where
+  differences are additive and symmetric.
 
 - alpha:
 
@@ -224,6 +252,26 @@ chosen p-value adjustment method (default: Sidak). When complete
 separation is detected, the function falls back to likelihood ratio test
 (LRT) based pairwise comparisons, which are robust to separation.
 
+**Effect and interaction plots.** When `effect_plot = TRUE`, an
+estimated marginal means plot (estimate \\\pm\\ 95% CI on the response
+scale, with jittered raw data and compact-letter-display labels) is
+added after the post hoc table for each categorical predictor. For a
+significant categorical interaction, interaction plots are drawn
+instead: a two-way interaction uses the x-axis plus colour (both
+orientations), while three- and four-way interactions add facet panels
+for the remaining factor(s), with one plot per choice of x-axis factor.
+Interactions involving five or more categorical factors are not plotted
+(a warning is issued); consult the post hoc cell-means table instead.
+Estimates follow the `type` argument, so for non-gaussian families they
+are back-transformed to the response scale. The plots themselves are
+kept clean for publication (data, axes, and legend only); the
+descriptive label and explanatory caption are emitted as text above and
+below each figure in the report. All effect and interaction plots are
+ggplot2 objects and are stored in the returned object (e.g.
+`out$y1$effect_plot_treatment`, `out$y1$interaction_plot_a_b_1`) so they
+can be retrieved and customised afterwards. Matches
+[`f_aov`](https://delde001.github.io/rfriend/reference/f_aov.md).
+
 More response variables can be added using `+` (e.g.,
 `response1 + response2 ~ predictor`) to fit a sequential GLM for each
 response variable, captured in one output file.
@@ -268,6 +316,7 @@ glm_bin <- f_glm(vs ~ cyl,
                  family = binomial,
                  data = mtcars_mod,
                  output_type = "default")
+#> Warning: f_glm: (quasi-)complete separation detected for response 'vs'. Group(s) with no outcome variation: cyl=8. Maximum-likelihood estimates diverge, so Wald standard errors and back-transformed confidence intervals are not interpretable (this is why a CI can span nearly 0-1 even when a group is entirely 0 or entirely 1). Letters fall back to likelihood-ratio tests. Consider penalised/Firth logistic regression (logistf::logistf or brglm2::brglm_fit) for finite estimates.
 print(glm_bin)
 #> ==========================================
 #>    GLM of response variable: vs 
@@ -299,9 +348,9 @@ print(glm_bin)
 #> 
 #> --- Post hoc Comparisons of: vs ---
 #>   cyl         prob           SE    asymp.LCL asymp.UCL Letter  n
-#> 1   8 3.181005e-09 9.142626e-06 2.220446e-16 1.0000000      b 14
-#> 2   6 5.714286e-01 1.870439e-01 1.771200e-01 0.8920012      a  7
-#> 3   4 9.090909e-01 8.667842e-02 4.497464e-01 0.9918928      a 11
+#> 1   4 9.090909e-01 8.667842e-02 5.614275e-01 0.9873606      b 11
+#> 2   6 5.714286e-01 1.870439e-01 2.298311e-01 0.8562675      b  7
+#> 3   8 3.181005e-09 9.142626e-06 2.220446e-16 1.0000000      a 14
 #> ___________________________
 #> 
 #> **[!] Separation detected, LRT pairwise comparisons used:**  
@@ -316,7 +365,8 @@ glm_bin_word <- f_glm(vs ~ cyl,
                  data = mtcars_mod,
                  output_type = "word"
                  )
-#> Saving output in: /tmp/RtmpG5HCTF/mtcars_mod_glm_output.docx
+#> Warning: f_glm: (quasi-)complete separation detected for response 'vs'. Group(s) with no outcome variation: cyl=8. Maximum-likelihood estimates diverge, so Wald standard errors and back-transformed confidence intervals are not interpretable (this is why a CI can span nearly 0-1 even when a group is entirely 0 or entirely 1). Letters fall back to likelihood-ratio tests. Consider penalised/Firth logistic regression (logistf::logistf or brglm2::brglm_fit) for finite estimates.
+#> Saving output in: /tmp/RtmplsKqN3/mtcars_mod_glm_output.docx
 
 # GLM Poisson example with output to rmd text
 data(warpbreaks)
@@ -335,7 +385,7 @@ cat(glm_pos$rmd)
 #> 
 #> ## Model Diagnostics of:  breaks 
 #>    
-#> ![](/tmp/RtmpG5HCTF/file1d946793f122.png)    
+#> ![](/tmp/RtmplsKqN3/file1da25e8bd97a.png)    
 #>   
 #> 
 #> ## Dispersion Diagnostics of: breaks 
@@ -407,6 +457,14 @@ cat(glm_pos$rmd)
 #> *The 'Wald p' column is provided for completeness. For significance testing use the **Type II Analysis of Deviance** table below, which is robust to separation and more reliable for multi-predictor models.*  
 #> 
 #> 
+#> ### Coefficient forest plot
+#> ![](/tmp/RtmplsKqN3/file1da22d78a567.png)    
+#>   
+#> *Each row is a coefficient (the intercept is omitted) with its 95% Wald CI, on the log-link scale. The dashed line marks zero: a coefficient at zero has no effect relative to its reference. Points to the right increase the linear predictor (log scale), points to the left decrease it. A CI that touches or crosses zero means the term is not distinguishable from its reference at α = 0.05; a CI clear of zero is a significant effect.*  
+#>   
+#> ***Reference levels:** wool = A; tension = L. Each factor row is that level compared with its reference level above.* *For a factor with k levels these are level-vs-reference contrasts, not all pairwise comparisons; see the post hoc tables below for the full pairwise picture. For significance decisions use the Type II Analysis of Deviance table, which is more reliable than Wald CIs for multi-predictor models.* *To change a reference level, relevel the factor before fitting, e.g. data\$wool <- relevel(data\$wool, ref = "A"), or with f_factors(data, select = "wool", ref = "A").*  
+#>   
+#> 
 #> ### Type II Analysis of Deviance of: breaks 
 #> 
 #> The table below tests the marginal significance of **each predictor term** via `stats::drop1()` (Type II tests). Each term is dropped from the full model in turn and tested against the model retaining all other terms; equivalent to `car::Anova(type = 2)` but using only base R. This is the GLM equivalent of the ANOVA F-table: it answers *"does this predictor improve the model?"* after accounting for all other terms. For single-predictor models this matches the coefficientz valueabove; for multi-predictor models these per-term tests are the ones to report.  
@@ -456,6 +514,7 @@ cat(glm_pos$rmd)
 #>    
 #> The table below shows the  Estimated Marginal Rates  (`emmeans` package). These are  back-transformed, model-based values on the response scale  for  breaks . Unlike raw averages, these values correct
 #>       for unbalanced designs and reflect the statistical model.
+#> 
 #> #### Publication & Reporting Tips
 #> * For main results showing significant differences, prioritize reporting these Estimated Marginal Rates  and their *Confidence Intervals (CIs)* rather than raw means.
 #>  * Figures should ideally overlay these  Estimated Marginal Rates  (and error bars) on top of the raw data points.
@@ -474,26 +533,32 @@ cat(glm_pos$rmd)
 #> wool   tension   rate     SE      asymp     asymp     Letter   n  
 #>                                   LCL       UCL                   
 #> ------ --------- -------- ------- --------- --------- -------- ---
-#> B      H         19.443   1.129   16.688    22.653    a        9  
+#> A      L         40.124   1.822   36.707    43.858    a        9  
 #> 
-#> B      M         23.681   1.278   20.545    27.294    ab       9  
+#> B      L         32.654   1.578   29.703    35.898    b        9  
 #> 
-#> A      H         23.890   1.330   20.635    27.659    bc       9  
+#> A      M         29.097   1.495   26.309    32.180    bc       9  
 #> 
-#> A      M         29.097   1.495   25.418    33.310    cd       9  
+#> A      H         23.890   1.330   21.421    26.645    cd       9  
 #> 
-#> B      L         32.654   1.578   28.756    37.081    d        9  
+#> B      M         23.681   1.278   21.303    26.323    de       9  
 #> 
-#> A      L         40.124   1.822   35.605    45.216    e        9  
+#> B      H         19.443   1.129   17.351    21.787    e        9  
 #> ------------------------------------------------------------------
 #> 
 #> Degrees of freedom: Inf  
 #> Confidence level used: 0.95  
-#> Conf-level adjustment: sidak method for 6 estimates  
-#> Intervals are back-transformed from the log scale  
-#> P value adjustment: sidak method for 15 tests  
-#> Tests are performed on the log scale  
-#> significance level used: α = 0.05  
-#> *Note: Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different. Sharing a letter indicates insufficient evidence to claim a difference; it does not prove the groups are identical.*
+#> Intervals are back-transformed from the log scale
+#> ## Estimated Means Plot of: breaks  (wool)  
+#> ![](/tmp/RtmplsKqN3/file1da21d121414.png)    
+#>   
+#> *Points are (jittered) raw data on the response scale; estimates are model estimated marginal means back-transformed through the log link to the response scale with 95% CI. Groups sharing a letter are not significantly different (α = 0.05); groups with different letters are significantly different. Sharing a letter indicates insufficient evidence of a difference, not proof that the groups are identical.*   
+#>   
+#> 
+#> ## Estimated Means Plot of: breaks  (tension)  
+#> ![](/tmp/RtmplsKqN3/file1da23ed7f2a2.png)    
+#>   
+#> *Points are (jittered) raw data on the response scale; estimates are model estimated marginal means back-transformed through the log link to the response scale with 95% CI. Groups sharing a letter are not significantly different (α = 0.05); groups with different letters are significantly different. Sharing a letter indicates insufficient evidence of a difference, not proof that the groups are identical.*   
+#>   
 # }
 ```

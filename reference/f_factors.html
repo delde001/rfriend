@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">rfriend</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -19,6 +19,7 @@
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/delde001/rfriend/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul></div>
 
 
@@ -28,7 +29,7 @@
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>Convert multiple columns to Factors in a data frame</h1>
-
+      <small class="dont-index">Source: <a href="https://github.com/delde001/rfriend/blob/master/R/ffactors.R" class="external-link"><code>R/ffactors.R</code></a></small>
       <div class="d-none name"><code>f_factors.Rd</code></div>
     </div>
 
@@ -44,6 +45,7 @@
 <span>  exclude <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  properties <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  force_factors <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  ref <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  unique_num_treshold <span class="op">=</span> <span class="fl">8</span>,</span>
 <span>  repeats_threshold <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>  <span class="va">...</span></span>
@@ -72,6 +74,18 @@
 
 <dt id="arg-force-factors">force_factors<a class="anchor" aria-label="anchor" href="#arg-force-factors"></a></dt>
 <dd><p>Logical. If <code>TRUE</code> all columns in the data.frame will be converted to factors except for the excluded columns using <code>exclude</code>.</p></dd>
+
+
+<dt id="arg-ref">ref<a class="anchor" aria-label="anchor" href="#arg-ref"></a></dt>
+<dd><p>Optional reference level(s) to set after conversion, controlling
+which level a factor is contrasted against in models (e.g. <code>f_glm</code>,
+<code>f_lmer</code>). Under R's default treatment contrasts the reference is the
+first level, which is alphabetical unless set deliberately. Supply either a
+single string (applied to every converted factor that contains it) or a
+named character vector mapping column names to reference levels, e.g.
+<code>ref = c(treatment = "control", dose = "low")</code>. A level that is not
+present in a given factor is skipped with a warning. Default <code>NULL</code>
+(leave the reference as the first level).</p></dd>
 
 
 <dt id="arg-unique-num-treshold">unique_num_treshold<a class="anchor" aria-label="anchor" href="#arg-unique-num-treshold"></a></dt>
@@ -162,6 +176,19 @@
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ c: Factor w/ 3 levels "apple","banana",..: 1 3 2 1 3 2 1 3 2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ d: num  1.1 1.1 3.4 4.5 5.4 6.7 7.8 8.1 9.8</span>
 <span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Set the reference level of a factor (the level models contrast against).</span></span></span>
+<span class="r-in"><span><span class="co"># Useful before f_glm() / f_lmer(): by default the reference is the first</span></span></span>
+<span class="r-in"><span><span class="co"># (alphabetical) level. Use a named vector to target specific columns:</span></span></span>
+<span class="r-in"><span><span class="va">df1c</span> <span class="op">&lt;-</span> <span class="fu">f_factors</span><span class="op">(</span><span class="va">df</span>, select <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"a"</span>, <span class="st">"c"</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/levels.html" class="external-link">levels</a></span><span class="op">(</span><span class="va">df1c</span><span class="op">$</span><span class="va">c</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span>   <span class="co"># default reference is "apple" (alphabetical)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "apple"</span>
+<span class="r-in"><span><span class="va">df_ref</span> <span class="op">&lt;-</span> <span class="fu">f_factors</span><span class="op">(</span><span class="va">df</span>, select <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"a"</span>, <span class="st">"c"</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                    ref <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>a <span class="op">=</span> <span class="st">"yes"</span>, c <span class="op">=</span> <span class="st">"kiwi"</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/levels.html" class="external-link">levels</a></span><span class="op">(</span><span class="va">df_ref</span><span class="op">$</span><span class="va">c</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span> <span class="co"># reference is now "kiwi"</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "kiwi"</span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/levels.html" class="external-link">levels</a></span><span class="op">(</span><span class="va">df_ref</span><span class="op">$</span><span class="va">a</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span> <span class="co"># reference is now "yes" (was "no")</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "yes"</span>
+<span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># In example above col b was converted to a factor as the number of repeats = 2</span></span></span>
 <span class="r-in"><span><span class="co"># and the amount of unique numbers &lt; 8. In order to keep b numeric we can also</span></span></span>
 <span class="r-in"><span><span class="co"># adjust the unique_num_treshold and/or repeats_threshold:</span></span></span>
@@ -194,7 +221,7 @@
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

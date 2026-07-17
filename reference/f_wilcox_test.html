@@ -13,7 +13,7 @@ Additionally, a vector interface similar to stats::wilcox.test() is supported.">
 
     <a class="navbar-brand me-2" href="../index.html">rfriend</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -25,6 +25,7 @@ Additionally, a vector interface similar to stats::wilcox.test() is supported.">
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/delde001/rfriend/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul></div>
 
 
@@ -34,7 +35,7 @@ Additionally, a vector interface similar to stats::wilcox.test() is supported.">
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>Perform multiple Wilcoxon rank sum and signed rank tests with inspection and visualization.</h1>
-
+      <small class="dont-index">Source: <a href="https://github.com/delde001/rfriend/blob/master/R/fwilcox_test.R" class="external-link"><code>R/fwilcox_test.R</code></a></small>
       <div class="d-none name"><code>f_wilcox_test.Rd</code></div>
     </div>
 
@@ -214,7 +215,16 @@ the vector interface. Ignored when a formula is supplied.</p></dd>
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>An object of class <code>'f_wilcox_test'</code>.</p>
+    <p>An object of class <code>'f_wilcox_test'</code>, a named list with one
+  element per response variable. Each element contains the
+  <code><a href="https://rdrr.io/r/stats/wilcox.test.html" class="external-link">stats::wilcox.test()</a></code> result, the formatted console/markdown text
+  blocks, the diagnostic plot file path, and a publication-ready main effect
+  plot as a <span class="pkg">ggplot2</span> object (<code>main_effect_plot</code>). The plot shows
+  the estimated parameter with its confidence interval against the raw data:
+  the two group medians each with a distribution-free median confidence
+  interval (two-sample), the sample pseudo-median (Hodges-Lehmann estimate)
+  with a reference line at <code>mu</code> (one-sample), or the pseudo-median of
+  the per-pair differences with a reference line at <code>mu</code> (paired).</p>
     </div>
     <div class="section level2">
     <h2 id="median-vs-pseudo-median">Median vs Pseudo-median<a class="anchor" aria-label="anchor" href="#median-vs-pseudo-median"></a></h2>
@@ -249,6 +259,45 @@ diverge.</p>
 descriptive purposes only.</p>
     </div>
 
+    <div class="section level2">
+    <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
+<span class="r-in"><span><span class="co"># Two-sample Wilcoxon rank-sum test</span></span></span>
+<span class="r-in"><span><span class="fu">f_wilcox_test</span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">am</span>, data <span class="op">=</span> <span class="va">mtcars</span>, output_type <span class="op">=</span> <span class="st">"console"</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Wilcoxon rank sum exact test (two.sided) of:mpg</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> SAMPLE STATISTICS:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Median 0: 17.3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Median 1: 22.8</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Raw difference (0 - 1): -5.5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> HYPOTHESES:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   H0: True location shift (0 - 1, Hodges-Lehmann) is equal to 0.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   H1: True location shift (0 - 1, Hodges-Lehmann) is not equal to 0.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> TEST RESULTS:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   W = 42, p-value = 1.159e-03*-&gt; Significant, H0 is rejected (p ≤ α = 0.05)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ESTIMATE:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Location shift (Hodges-Lehmann): -6.8</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   95% CI: [ -11.3, -2.9 ]</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Note on the CI: </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> This interval is for the location shift (Hodges-Lehmann estimator); the median of all possible pairwise differences between your two groups. If both groups have the same distributional shape, this equals the raw median difference. When shapes differ they can diverge, which is why the CI may not be centred on the difference in sample medians. Both the raw median difference and the location shift are valid descriptions of the gap between groups; they just measure it slightly differently (see `?f_wilcox_test` for details).</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  </span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Retrieve and customise the stored main effect plot (ggplot object)</span></span></span>
+<span class="r-in"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu">f_wilcox_test</span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">am</span>, data <span class="op">=</span> <span class="va">mtcars</span>, output_type <span class="op">=</span> <span class="st">"default"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">result</span><span class="op">[[</span><span class="st">"mpg"</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">main_effect_plot</span></span></span>
+<span class="r-plt img"><img src="f_wilcox_test-1.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
+<span class="r-in"><span></span></span>
+</code></pre></div>
+    </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>
 
@@ -258,7 +307,7 @@ descriptive purposes only.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

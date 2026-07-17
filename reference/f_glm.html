@@ -13,7 +13,7 @@ can be analyzed in sequence and the generated output can be in various formats
 
     <a class="navbar-brand me-2" href="../index.html">rfriend</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -25,6 +25,7 @@ can be analyzed in sequence and the generated output can be in various formats
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/delde001/rfriend/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul></div>
 
 
@@ -34,7 +35,7 @@ can be analyzed in sequence and the generated output can be in various formats
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>Perform multiple <code>glm()</code> functions with diagnostics, assumption checking, and post hoc analysis</h1>
-
+      <small class="dont-index">Source: <a href="https://github.com/delde001/rfriend/blob/master/R/fglm.R" class="external-link"><code>R/fglm.R</code></a></small>
       <div class="d-none name"><code>f_glm.Rd</code></div>
     </div>
 
@@ -52,6 +53,8 @@ can be analyzed in sequence and the generated output can be in various formats
 <span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  data <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  diagnostic_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  effect_plot <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  contrast_plots <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  alpha <span class="op">=</span> <span class="fl">0.05</span>,</span>
 <span>  adjust <span class="op">=</span> <span class="st">"sidak"</span>,</span>
 <span>  type <span class="op">=</span> <span class="st">"response"</span>,</span>
@@ -89,6 +92,32 @@ the result of a call to a family function. (See <code><a href="https://rdrr.io/r
 
 <dt id="arg-diagnostic-plots">diagnostic_plots<a class="anchor" aria-label="anchor" href="#arg-diagnostic-plots"></a></dt>
 <dd><p>Logical. If <code>TRUE</code>, plots are included in the output files.</p></dd>
+
+
+<dt id="arg-effect-plot">effect_plot<a class="anchor" aria-label="anchor" href="#arg-effect-plot"></a></dt>
+<dd><p>Logical. If <code>TRUE</code> (default), estimated marginal
+means plots (or interaction plots, when a categorical interaction is
+significant) are added after the post hoc table. See Details for what is
+drawn and how the plots are stored.</p></dd>
+
+
+<dt id="arg-contrast-plots">contrast_plots<a class="anchor" aria-label="anchor" href="#arg-contrast-plots"></a></dt>
+<dd><p>Logical. If <code>TRUE</code>, a <strong>contrast forest
+plot</strong> is added for each categorical post hoc term: one row per pairwise
+comparison, showing the estimated difference between two levels with its
+confidence interval and a reference line at zero. A CI that excludes zero
+indicates a significant difference; because the interval is on the
+difference itself, this "excludes zero" reading is exact (it is the same
+information the compact-letter display encodes, but it also shows the
+direction and magnitude of each difference). Default <code>FALSE</code> because
+the number of pairwise contrasts grows quickly with the number of factor
+levels (k levels give k(k-1)/2 contrasts); turn it on when you want the
+detailed pairwise picture. Main-effect contrast plots are stored as
+<code>out$y1$contrast_plot_&lt;term&gt;</code> and interaction cell-contrast plots as
+<code>out$y1$interaction_contrast_plot_&lt;term&gt;</code>. Contrast CIs use the same
+<code>adjust</code> method as the post hoc p-values, so figure and table agree.
+The contrasts are computed on the link (model) scale, where differences
+are additive and symmetric.</p></dd>
 
 
 <dt id="arg-alpha">alpha<a class="anchor" aria-label="anchor" href="#arg-alpha"></a></dt>
@@ -214,6 +243,24 @@ as high-leverage points. Default is <code>2</code>, a common rule of thumb.</p><
     <p>The function first checks if all specified variables are present in the data and ensures that the response variable is numeric.</p>
 <p>It fits a Generalized Linear Model (GLM) using the specified formula, family, and data. Model diagnostics are performed with DHARMa (simulation-based residual checks including a KS test, dispersion test, and outlier test). High-leverage observations are flagged using hat values.</p>
 <p>Significance of each predictor is assessed via Type II Analysis of Deviance (<code><a href="https://rdrr.io/r/stats/add1.html" class="external-link">stats::drop1()</a></code>). If significant effects are found, post hoc pairwise comparisons are performed using estimated marginal means from <code>emmeans()</code> with the chosen p-value adjustment method (default: Sidak). When complete separation is detected, the function falls back to likelihood ratio test (LRT) based pairwise comparisons, which are robust to separation.</p>
+<p><strong>Effect and interaction plots.</strong> When <code>effect_plot = TRUE</code>, an
+estimated marginal means plot (estimate \(\pm\) 95% CI on the response
+scale, with jittered raw data and compact-letter-display labels) is added
+after the post hoc table for each categorical predictor. For a significant
+categorical interaction, interaction plots are drawn instead: a two-way
+interaction uses the x-axis plus colour (both orientations), while three-
+and four-way interactions add facet panels for the remaining factor(s),
+with one plot per choice of x-axis factor. Interactions involving five or
+more categorical factors are not plotted (a warning is issued); consult the
+post hoc cell-means table instead. Estimates follow the <code>type</code>
+argument, so for non-gaussian families they are back-transformed to the
+response scale. The plots themselves are kept clean for publication (data,
+axes, and legend only); the descriptive label and explanatory caption are
+emitted as text above and below each figure in the report. All effect and
+interaction plots are <span class="pkg">ggplot2</span> objects and are stored in the returned
+object (e.g. <code>out$y1$effect_plot_treatment</code>,
+<code>out$y1$interaction_plot_a_b_1</code>) so they can be retrieved and
+customised afterwards. Matches <code><a href="f_aov.html">f_aov</a></code>.</p>
 <p>More response variables can be added using <code>+</code> (e.g., <code>response1 + response2 ~ predictor</code>) to fit a sequential GLM for each response variable, captured in one output file.</p>
 <p>Outputs can be generated in multiple formats ("pdf", "word", "excel" and "rmd") as specified by <code>output_type</code>. The function also closes any open 'Word' files to avoid conflicts when generating 'Word' documents. If <code>output_type = "rmd"</code> is used it is advised to use it in a chunk with {r, echo=FALSE, results='asis'}</p>
 <p>This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.</p><ul><li><p><b>Windows:</b> Install Pandoc and ensure the installation folder <br> (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.</p></li>
@@ -237,6 +284,7 @@ as high-leverage points. Default is <code>2</code>, a common rule of thumb.</p><
 <span class="r-in"><span>                 family <span class="op">=</span> <span class="va">binomial</span>,</span></span>
 <span class="r-in"><span>                 data <span class="op">=</span> <span class="va">mtcars_mod</span>,</span></span>
 <span class="r-in"><span>                 output_type <span class="op">=</span> <span class="st">"default"</span><span class="op">)</span></span></span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>f_glm: (quasi-)complete separation detected for response 'vs'. Group(s) with no outcome variation: cyl=8. Maximum-likelihood estimates diverge, so Wald standard errors and back-transformed confidence intervals are not interpretable (this is why a CI can span nearly 0-1 even when a group is entirely 0 or entirely 1). Letters fall back to likelihood-ratio tests. Consider penalised/Firth logistic regression (logistf::logistf or brglm2::brglm_fit) for finite estimates.</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">glm_bin</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    GLM of response variable: vs </span>
@@ -268,9 +316,9 @@ as high-leverage points. Default is <code>2</code>, a common rule of thumb.</p><
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> --- Post hoc Comparisons of: vs ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   cyl         prob           SE    asymp.LCL asymp.UCL Letter  n</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1   8 3.181005e-09 9.142626e-06 2.220446e-16 1.0000000      b 14</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2   6 5.714286e-01 1.870439e-01 1.771200e-01 0.8920012      a  7</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3   4 9.090909e-01 8.667842e-02 4.497464e-01 0.9918928      a 11</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1   4 9.090909e-01 8.667842e-02 5.614275e-01 0.9873606      b 11</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2   6 5.714286e-01 1.870439e-01 2.298311e-01 0.8562675      b  7</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3   8 3.181005e-09 9.142626e-06 2.220446e-16 1.0000000      a 14</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ___________________________</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> **[!] Separation detected, LRT pairwise comparisons used:**  </span>
@@ -285,7 +333,8 @@ as high-leverage points. Default is <code>2</code>, a common rule of thumb.</p><
 <span class="r-in"><span>                 data <span class="op">=</span> <span class="va">mtcars_mod</span>,</span></span>
 <span class="r-in"><span>                 output_type <span class="op">=</span> <span class="st">"word"</span></span></span>
 <span class="r-in"><span>                 <span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Saving output in: /tmp/RtmpG5HCTF/mtcars_mod_glm_output.docx</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>f_glm: (quasi-)complete separation detected for response 'vs'. Group(s) with no outcome variation: cyl=8. Maximum-likelihood estimates diverge, so Wald standard errors and back-transformed confidence intervals are not interpretable (this is why a CI can span nearly 0-1 even when a group is entirely 0 or entirely 1). Letters fall back to likelihood-ratio tests. Consider penalised/Firth logistic regression (logistf::logistf or brglm2::brglm_fit) for finite estimates.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Saving output in: /tmp/RtmplsKqN3/mtcars_mod_glm_output.docx</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># GLM Poisson example with output to rmd text</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="va">warpbreaks</span><span class="op">)</span></span></span>
@@ -304,7 +353,7 @@ as high-leverage points. Default is <code>2</code>, a common rule of thumb.</p><
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ## Model Diagnostics of:  breaks </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmpG5HCTF/file1d946793f122.png)    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplsKqN3/file1da25e8bd97a.png)    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ## Dispersion Diagnostics of: breaks </span>
@@ -376,6 +425,14 @@ as high-leverage points. Default is <code>2</code>, a common rule of thumb.</p><
 <span class="r-out co"><span class="r-pr">#&gt;</span> *The 'Wald p' column is provided for completeness. For significance testing use the **Type II Analysis of Deviance** table below, which is robust to separation and more reliable for multi-predictor models.*  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ### Coefficient forest plot</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplsKqN3/file1da22d78a567.png)    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> *Each row is a coefficient (the intercept is omitted) with its 95% Wald CI, on the log-link scale. The dashed line marks zero: a coefficient at zero has no effect relative to its reference. Points to the right increase the linear predictor (log scale), points to the left decrease it. A CI that touches or crosses zero means the term is not distinguishable from its reference at α = 0.05; a CI clear of zero is a significant effect.*  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ***Reference levels:** wool = A; tension = L. Each factor row is that level compared with its reference level above.* *For a factor with k levels these are level-vs-reference contrasts, not all pairwise comparisons; see the post hoc tables below for the full pairwise picture. For significance decisions use the Type II Analysis of Deviance table, which is more reliable than Wald CIs for multi-predictor models.* *To change a reference level, relevel the factor before fitting, e.g. data\$wool &lt;- relevel(data\$wool, ref = "A"), or with f_factors(data, select = "wool", ref = "A").*  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ### Type II Analysis of Deviance of: breaks </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> The table below tests the marginal significance of **each predictor term** via `stats::drop1()` (Type II tests). Each term is dropped from the full model in turn and tested against the model retaining all other terms; equivalent to `car::Anova(type = 2)` but using only base R. This is the GLM equivalent of the ANOVA F-table: it answers *"does this predictor improve the model?"* after accounting for all other terms. For single-predictor models this matches the coefficientz valueabove; for multi-predictor models these per-term tests are the ones to report.  </span>
@@ -425,6 +482,7 @@ as high-leverage points. Default is <code>2</code>, a common rule of thumb.</p><
 <span class="r-out co"><span class="r-pr">#&gt;</span>    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> The table below shows the  Estimated Marginal Rates  (`emmeans` package). These are  back-transformed, model-based values on the response scale  for  breaks . Unlike raw averages, these values correct</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       for unbalanced designs and reflect the statistical model.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> #### Publication &amp; Reporting Tips</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> * For main results showing significant differences, prioritize reporting these Estimated Marginal Rates  and their *Confidence Intervals (CIs)* rather than raw means.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  * Figures should ideally overlay these  Estimated Marginal Rates  (and error bars) on top of the raw data points.</span>
@@ -443,27 +501,33 @@ as high-leverage points. Default is <code>2</code>, a common rule of thumb.</p><
 <span class="r-out co"><span class="r-pr">#&gt;</span> wool   tension   rate     SE      asymp     asymp     Letter   n  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                                   LCL       UCL                   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ------ --------- -------- ------- --------- --------- -------- ---</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> B      H         19.443   1.129   16.688    22.653    a        9  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> A      L         40.124   1.822   36.707    43.858    a        9  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> B      M         23.681   1.278   20.545    27.294    ab       9  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> B      L         32.654   1.578   29.703    35.898    b        9  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> A      H         23.890   1.330   20.635    27.659    bc       9  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> A      M         29.097   1.495   26.309    32.180    bc       9  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> A      M         29.097   1.495   25.418    33.310    cd       9  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> A      H         23.890   1.330   21.421    26.645    cd       9  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> B      L         32.654   1.578   28.756    37.081    d        9  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> B      M         23.681   1.278   21.303    26.323    de       9  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> A      L         40.124   1.822   35.605    45.216    e        9  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> B      H         19.443   1.129   17.351    21.787    e        9  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ------------------------------------------------------------------</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Degrees of freedom: Inf  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Confidence level used: 0.95  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Conf-level adjustment: sidak method for 6 estimates  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Intervals are back-transformed from the log scale  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> P value adjustment: sidak method for 15 tests  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Tests are performed on the log scale  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> significance level used: α = 0.05  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> *Note: Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different. Sharing a letter indicates insufficient evidence to claim a difference; it does not prove the groups are identical.*</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Intervals are back-transformed from the log scale</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ## Estimated Means Plot of: breaks  (wool)  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplsKqN3/file1da21d121414.png)    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> *Points are (jittered) raw data on the response scale; estimates are model estimated marginal means back-transformed through the log link to the response scale with 95% CI. Groups sharing a letter are not significantly different (α = 0.05); groups with different letters are significantly different. Sharing a letter indicates insufficient evidence of a difference, not proof that the groups are identical.*   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ## Estimated Means Plot of: breaks  (tension)  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplsKqN3/file1da23ed7f2a2.png)    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> *Points are (jittered) raw data on the response scale; estimates are model estimated marginal means back-transformed through the log link to the response scale with 95% CI. Groups sharing a letter are not significantly different (α = 0.05); groups with different letters are significantly different. Sharing a letter indicates insufficient evidence of a difference, not proof that the groups are identical.*   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
@@ -477,7 +541,7 @@ as high-leverage points. Default is <code>2</code>, a common rule of thumb.</p><
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

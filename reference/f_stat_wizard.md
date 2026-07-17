@@ -391,18 +391,21 @@ result$run_result
 #> 
 #>  aov call:  Sepal.Length ~ Species 
 #> 
-#> TRANSFORMED Summary Table:
-#>              Df Sum Sq Mean Sq F value Pr(>F)    
-#> Species       2  63.21  31.606   119.3 <2e-16 ***
-#> Residuals   147  38.96   0.265                   
+#> TRANSFORMED Type II ANOVA Table (car::Anova):
+#> Anova Table (Type II tests)
+#> 
+#> Response: Sepal.Length
+#>           Sum Sq  Df F value    Pr(>F)    
+#> Species   63.212   2  119.26 < 2.2e-16 ***
+#> Residuals 38.956 147                      
 #> ---
 #> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 #> 
 #> --- BACK TRANSFORMED Post hoc Comparisons of: Sepal.Length ---
 #>     Species median (BT) lower.CL upper.CL Letter  n
-#>      setosa    4.992078 4.851838 5.136978    a   50
-#>  versicolor    5.910783 5.740686 6.086676     b  50
-#>   virginica    6.553397 6.362011 6.751403      c 50
+#>   virginica    6.553397 6.396318 6.714908      a 50
+#>  versicolor    5.910783 5.771183 6.054264      b 50
+#>      setosa    4.992078 4.876990 5.110285      c 50
 #> ___________________________
 #> 
 #> Note: 'median (BT)' = back-transformed estimated marginal mean. Back-transforming a mean from a transformed scale returns the MEDIAN on the original scale, not the arithmetic mean. Report these as back-transformed medians. CIs are valid; SE is omitted (asymmetric on original scale).

@@ -19,7 +19,7 @@ returned to the console or written to 'pdf', 'Word' or 'Excel'."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">rfriend</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -31,6 +31,7 @@ returned to the console or written to 'pdf', 'Word' or 'Excel'."></head><body>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/delde001/rfriend/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul></div>
 
 
@@ -40,7 +41,7 @@ returned to the console or written to 'pdf', 'Word' or 'Excel'."></head><body>
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>Fit a linear mixed model with <code>lme4::lmer()</code> including assumption checks, diagnostics, R-squared and post hoc tests.</h1>
-
+      <small class="dont-index">Source: <a href="https://github.com/delde001/rfriend/blob/master/R/flmer.R" class="external-link"><code>R/flmer.R</code></a></small>
       <div class="d-none name"><code>f_lmer.Rd</code></div>
     </div>
 
@@ -63,7 +64,9 @@ returned to the console or written to 'pdf', 'Word' or 'Excel'.</p>
 <span>  ddf <span class="op">=</span> <span class="st">"Satterthwaite"</span>,</span>
 <span>  alpha <span class="op">=</span> <span class="fl">0.05</span>,</span>
 <span>  adjust <span class="op">=</span> <span class="st">"sidak"</span>,</span>
-<span>  norm_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  diagnostic_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  effect_plot <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  contrast_plots <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  post_hoc <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  intro_text <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  output_type <span class="op">=</span> <span class="st">"default"</span>,</span>
@@ -71,6 +74,7 @@ returned to the console or written to 'pdf', 'Word' or 'Excel'.</p>
 <span>  save_in_wdir <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  close_generated_files <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  open_generated_files <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/interactive.html" class="external-link">interactive</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  norm_plots <span class="op">=</span> <span class="fu">lifecycle</span><span class="fu">::</span><span class="fu"><a href="https://lifecycle.r-lib.org/reference/deprecated.html" class="external-link">deprecated</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -138,10 +142,65 @@ pairwise comparisons in the post hoc step (passed to
 <code>"tukey"</code>, <code>"bonferroni"</code>, <code>"fdr"</code>, <code>"none"</code>.</p></dd>
 
 
-<dt id="arg-norm-plots">norm_plots<a class="anchor" aria-label="anchor" href="#arg-norm-plots"></a></dt>
+<dt id="arg-diagnostic-plots">diagnostic_plots<a class="anchor" aria-label="anchor" href="#arg-diagnostic-plots"></a></dt>
 <dd><p>Logical. If <code>TRUE</code> (default), diagnostic plots
 (residuals vs fitted, Q-Q of level-1 residuals, Q-Q of random-effect
 BLUPs, scale-location) are included in the output.</p></dd>
+
+
+<dt id="arg-effect-plot">effect_plot<a class="anchor" aria-label="anchor" href="#arg-effect-plot"></a></dt>
+<dd><p>Logical. If <code>TRUE</code> (default), an estimated
+marginal means plot (estimate \(\pm\) 95% CI, with jittered raw
+data and compact-letter-display labels) is added after each
+categorical fixed-effect term's post hoc table. For a significant
+interaction between categorical factors, interaction plots are drawn
+instead, matching <code><a href="f_aov.html">f_aov</a></code>: a two-way interaction uses an
+x-axis factor and a colour trace and is shown in both orientations;
+three- and four-way interactions add facet panels for the remaining
+factor(s), with one plot per choice of x-axis factor. Interactions of
+order greater than four (which would need an illegible nested facet
+grid) are skipped with a note, but the interaction cell-means post
+hoc table still reports every combination. For a significant
+<strong>numeric x categorical</strong> interaction (the covariate slope
+differs across factor levels), <code>f_lmer</code> additionally draws a
+slope plot - a scatter of the raw data coloured by the factor with
+one model-fitted regression line per level and a confidence band.
+This goes beyond <code><a href="f_aov.html">f_aov</a></code>, which holds covariates at their
+mean and does not plot slopes. Numeric x numeric interactions and
+higher-order numeric/categorical mixes have no standard 2-D plot and
+are skipped with a note pointing to the coefficient-table slopes and
+<code><a href="https://rvlenth.github.io/emmeans/reference/emtrends.html" class="external-link">emmeans::emtrends()</a></code>. All effect and interaction plots are
+<span class="pkg">ggplot2</span> objects and are stored in the returned object
+(e.g. <code>out$y1$effect_plot_treatment</code>,
+<code>out$y1$interaction_plot_a_b_1</code>,
+<code>out$y1$interaction_plot_a_b_c_1</code>,
+<code>out$y1$interaction_plot_dose_treatment_1</code> for a slope plot) so
+they can be retrieved and customised afterwards (themes, colours,
+axis labels, etc.).</p></dd>
+
+
+<dt id="arg-contrast-plots">contrast_plots<a class="anchor" aria-label="anchor" href="#arg-contrast-plots"></a></dt>
+<dd><p>Logical. If <code>TRUE</code>, a <strong>contrast forest
+plot</strong> is added for each categorical post hoc term: one row per pairwise
+comparison, showing the estimated difference between two levels with
+its confidence interval and a reference line at zero. A CI that
+excludes zero indicates a significant difference; because the interval
+is on the difference itself, this "excludes zero" reading is exact (it
+is the same information the compact-letter display encodes, but it also
+shows the direction and magnitude of each difference). Default
+<code>FALSE</code> because the number of pairwise contrasts grows quickly
+with the number of factor levels (k levels give k(k-1)/2 contrasts);
+turn it on when you want the detailed pairwise picture. No cap is
+applied - if you enable it for a many-level factor you will get a tall
+figure, which is your choice. Main-effect and interaction contrast
+plots are kept separate: main-effect plots are stored as
+<code>out$y1$contrast_plot_&lt;term&gt;</code> (e.g. <code>contrast_plot_treatment</code>)
+and rendered with the main-effect post hoc tables, while interaction
+cell-contrast plots are stored as
+<code>out$y1$interaction_contrast_plot_&lt;term&gt;</code> (e.g.
+<code>interaction_contrast_plot_a_b</code>) and rendered with the
+interaction cell-means tables. Contrast CIs use the same <code>adjust</code>
+method as the post hoc p-values, so figure and table agree.</p></dd>
 
 
 <dt id="arg-post-hoc">post_hoc<a class="anchor" aria-label="anchor" href="#arg-post-hoc"></a></dt>
@@ -153,7 +212,19 @@ each significant factor fixed-effect term separately. Numeric
 covariates are skipped because their slope is already reported in
 the fixed-effects coefficient table; pairwise contrasts are not
 meaningful for a continuous predictor. If no fixed-effect term is
-significant, no post hoc is run.</p></dd>
+significant, no post hoc is run. When a significant interaction
+between categorical factors is present, an additional
+<strong>cell-means</strong> post hoc table is produced for that interaction
+(estimated mean for every factor-level combination, compared
+simultaneously, with a compact letter display and pairwise
+contrasts), matching <code><a href="f_aov.html">f_aov</a></code>. It is stored alongside the
+main-effect results under the interaction term name, e.g.
+<code>out$y1$post_hoc[["a:b"]]</code>. In addition, when a main-effect term
+takes part in a significant interaction, a caution note is printed
+directly above that term's marginal-means table (and the term's
+heading is annotated), warning that the marginal means average over
+the interacting factor and can hide or reverse the real pattern; the
+interaction cell-means table and plot(s) should be read instead.</p></dd>
 
 
 <dt id="arg-intro-text">intro_text<a class="anchor" aria-label="anchor" href="#arg-intro-text"></a></dt>
@@ -197,6 +268,12 @@ and <code>FALSE</code> otherwise (e.g. in scripts or automated pipelines).
 Set to <code>TRUE</code> or <code>FALSE</code> to override this behaviour explicitly.</p></dd>
 
 
+<dt id="arg-norm-plots">norm_plots<a class="anchor" aria-label="anchor" href="#arg-norm-plots"></a></dt>
+<dd><p>`r lifecycle::badge("deprecated")` Deprecated in
+version 4.0.0. Use <code>diagnostic_plots</code> instead. If supplied, its
+value is passed through to <code>diagnostic_plots</code> with a warning.</p></dd>
+
+
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
 <dd><p>Additional arguments forwarded to <code><a href="https://rdrr.io/pkg/lmerTest/man/lmer.html" class="external-link">lmer</a></code>.
 The arguments <code>subset</code>, <code>na.action</code>, and <code>weights</code>
@@ -212,10 +289,18 @@ fitted on the identical row set. Other <code>lmer()</code> arguments
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>An object of class <code>f_lmer</code>: a named list containing the
   fitted <code>lmerModLmerTest</code> model, the ANOVA-style fixed-effects
-  table, the variance components and ICC, the R\(^2\) values, the
+  table (<code>fixed_effects</code>; the displayed table reports NumDF, DenDF,
+  F and p only, while the full <code>lmerTest</code> table including the
+  non-additive Sum Sq / Mean Sq columns is kept in
+  <code>fixed_effects_full</code>), the variance components and ICC (plus a
+  per-grouping-factor ICC breakdown in <code>icc_by_group</code> when the
+  model has two or more intercept grouping factors), the R\(^2\)
+  values, the
   observed descriptives table (raw-data n, mean, sd, se, min, Q1,
   median, Q3, max grouped by the categorical fixed-effect predictors),
-  post hoc results (if any), diagnostic plots, and convergence
+  post hoc results (if any; per main-effect terms plus, for a
+  significant categorical interaction, a cell-means entry keyed by the
+  interaction term name), diagnostic plots, and convergence
   diagnostics. When more than one response variable is supplied on the
   left-hand side, these elements are nested one level deep under each
   response name, e.g. <code>out$y1$fixed_effects</code>,
@@ -319,11 +404,18 @@ multi-site studies, inter-rater designs.</p>
 <li><p>At least <code>~5</code> levels of each grouping factor; with
     <code>3-4</code> levels it is usually better to treat the factor as
     fixed.</p></li>
-</ol><p>If Levene's test or the Shapiro-Wilk tests on residuals or BLUPs
-indicate a violation, the report adds a <em>Recommendations for
-Heteroscedasticity and/or non-normal residuals</em> section after the
-diagnostics with concrete next steps (generalised mixed model,
-transformation).</p>
+</ol><p>After the diagnostics the report adds a <em>Recommendations for
+Heteroscedasticity and/or non-normal residuals</em> section, but only when a
+flagged violation survives a follow-up check rather than on a raw
+significant p-value alone. A significant Levene's test triggers it only
+when the Scale-Location panel shows a corroborating variance trend across
+the fitted scale (a by-group Levene test on its own over-fires); a
+significant Shapiro-Wilk test on the level-1 residuals triggers it only
+when the rejection reflects genuine skew rather than a few outliers or
+heavy but symmetric tails (judged by the tail-trimmed Q-Q correlation and
+the residual skewness); a significant Shapiro-Wilk test on the
+random-effect BLUPs triggers it directly. The section gives concrete next
+steps (generalised mixed model, transformation).</p>
 <p><strong>Convergence and singular fits.</strong><br><code>f_lmer</code> surfaces <code>lme4</code> convergence warnings and the
 "boundary (singular) fit" message prominently in the output. A singular
 fit usually means the random-effects structure is too complex for the
@@ -386,6 +478,7 @@ rationale.</p>
 <span class="r-in"><span><span class="va">f_lmer_out</span> <span class="op">&lt;-</span> <span class="fu">f_lmer</span><span class="op">(</span><span class="va">Reaction</span> <span class="op">~</span> <span class="va">Days</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">Subject</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>                     data <span class="op">=</span> <span class="va">sleepstudy</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># \donttest{</span></span></span>
 <span class="r-in"><span><span class="co"># Re-print the stored result and show the diagnostic plots.</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">f_lmer_out</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
@@ -397,11 +490,11 @@ rationale.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> --- Fixed-effects table ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ------------------------------------------------------------------------------</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Term   Sum Sq       Mean Sq      NumDF   DenDF      F value    Pr(&gt;F)    Sig  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ------ ------------ ------------ ------- ---------- ---------- --------- -----</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Days   1.6270e+05   1.6270e+05   1       161.0000   169.4014   &lt; 0.001   *    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ------------------------------------------------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> -------------------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Term   NumDF   DenDF   F value    Pr(&gt;F)    Sig  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ------ ------- ------- ---------- --------- -----</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Days   1       161     169.4014   &lt; 0.001   *    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> -------------------------------------------------</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> --- Random-effects variance components ---</span>
@@ -444,6 +537,7 @@ rationale.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">f_lmer_out</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="f_lmer-1.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="f_lmer-2.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># 2) Random intercept AND random slope of Days per subject,</span></span></span>
 <span class="r-in"><span><span class="co">#    fitted with Kenward-Roger denominator df, saved to MS Word.</span></span></span>
@@ -452,7 +546,7 @@ rationale.</p>
 <span class="r-in"><span>       ddf  <span class="op">=</span> <span class="st">"Kenward-Roger"</span>,</span></span>
 <span class="r-in"><span>       output_type <span class="op">=</span> <span class="st">"word"</span></span></span>
 <span class="r-in"><span>       <span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Saving output in: /tmp/RtmpG5HCTF/sleepstudy_lmer_output.docx</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Saving output in: /tmp/RtmplsKqN3/sleepstudy_lmer_output.docx</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># 3) A factor fixed effect triggers a post hoc test.</span></span></span>
 <span class="r-in"><span><span class="co">#    Bin Days into three sleep-deprivation phases so that the</span></span></span>
@@ -473,11 +567,11 @@ rationale.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> --- Fixed-effects table ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ------------------------------------------------------------------------------</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Term    Sum Sq       Mean Sq      NumDF   DenDF      F value   Pr(&gt;F)    Sig  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ------- ------------ ------------ ------- ---------- --------- --------- -----</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Phase   1.4485e+05   7.2427e+04   2       160.0000   67.1861   &lt; 0.001   *    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ------------------------------------------------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> -------------------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Term    NumDF   DenDF   F value   Pr(&gt;F)    Sig  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ------- ------- ------- --------- --------- -----</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Phase   2       160     67.1861   &lt; 0.001   *    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> -------------------------------------------------</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> --- Observed descriptives (by fixed-effect factor levels) ---</span>
@@ -541,11 +635,11 @@ rationale.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Phase   emmean     SE       df        lower      upper      Letter  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                                       CL         CL                 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ------- ---------- -------- --------- ---------- ---------- --------</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> early   262.1698   9.7916   23.2242   236.9812   287.3584   a       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> late    335.4104   9.7916   23.2242   315.1658   355.6551   a       </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> mid     298.0845   9.5333   20.9071   273.3496   322.8195   b       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> mid     298.0845   9.5333   20.9071   278.2535   317.9156   b       </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> late    335.4104   9.7916   23.2242   310.2218   360.5990   c       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> early   262.1698   9.7916   23.2242   241.9252   282.4145   c       </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> --------------------------------------------------------------------</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Confidence level used: 0.95  </span>
@@ -561,10 +655,10 @@ rationale.</p>
 <span class="r-in"><span><span class="fu">f_lmer</span><span class="op">(</span><span class="va">Reaction</span> <span class="op">~</span> <span class="va">Days</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">Subject</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>       data <span class="op">=</span> <span class="va">sleepstudy</span>,</span></span>
 <span class="r-in"><span>       intro_text <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
-<span class="r-in"><span>       norm_plots <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
+<span class="r-in"><span>       diagnostic_plots <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
 <span class="r-in"><span>       output_type <span class="op">=</span> <span class="st">"word"</span></span></span>
 <span class="r-in"><span>       <span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Saving output in: /tmp/RtmpG5HCTF/sleepstudy_lmer_output.docx</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Saving output in: /tmp/RtmplsKqN3/sleepstudy_lmer_output.docx</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># 5) Get the raw markdown back for embedding in an R Markdown</span></span></span>
 <span class="r-in"><span><span class="co">#    document. Use it inside a chunk with results = 'asis'.</span></span></span>
@@ -670,8 +764,8 @@ rationale.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Two canonical examples:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> - **Longitudinal study:** same subjects measured at several time</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   points: `y ~ time + (1 | subject)`. If subjects also differ in *how</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   fast* they change, add a random slope:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   points: `y ~ time + (1 | subject)`. If subjects also differ in</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   *how fast* they change, add a random slope:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   `y ~ time + (1 + time | subject)`.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> - **Cross-over design:** every subject receives every treatment in</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   sequence (typically with a wash-out period in between):</span>
@@ -696,17 +790,25 @@ rationale.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    `ranef(model)`. This is *separate* from residual normality and is the</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    assumption most users forget.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 5. **Homoscedasticity:** residual variance is roughly constant across</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    fitted values and across levels of the grouping factor (in the *Residuals</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    vs Fitted* and *Scale-Location* plots, points should form a featureless</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    horizontal band; no funnel, no curve).</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    fitted values and across levels of the grouping factor: in the</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    *Residuals vs Fitted* and *Scale-Location* plots, points should form</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    a featureless horizontal band; no funnel, no curve.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6. **Enough levels of the grouping factor:** random-effect variance is</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    poorly estimated with fewer than ~5 levels. With 3-4 levels you are</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    often better off treating the factor as **fixed**.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> If Levene's test or the Shapiro-Wilk tests on residuals or BLUPs</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> indicate a violation, the report adds a *Recommendations for</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Heteroscedasticity and/or non-normal residuals* section after the</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> diagnostics with concrete next steps.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> After the diagnostics the report adds a</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> *Recommendations for Heteroscedasticity and/or non-normal residuals*</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> section, but only when a flagged violation survives a follow-up check, not</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> on a raw significant p-value alone. A significant Levene's test triggers it</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> only when the Scale-Location panel shows a corroborating variance trend</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> across the fitted scale (a by-group Levene test on its own over-fires). A</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> significant Shapiro-Wilk test on the level-1 residuals triggers it only when</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> the rejection reflects genuine skew rather than a few outliers or heavy but</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> symmetric tails (judged by the tail-trimmed Q-Q correlation together with</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> the residual skewness). A significant Shapiro-Wilk test on the</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> random-effect BLUPs triggers it directly. The section gives concrete next</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> steps (generalised mixed model, transformation).</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> # Linear Mixed Model:  Reaction </span>
@@ -717,15 +819,15 @@ rationale.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ## Sample size and grouping structure</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> - **N observations:** 180  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> - **Levels of `Subject`:** 18  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - **Levels of** `Subject`**:** 18  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ## Fixed-effects table (Type III)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ------------------------------------------------------------------------------</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Term   Sum Sq       Mean Sq      NumDF   DenDF      F value    Pr(&gt;F)    Sig  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ------ ------------ ------------ ------- ---------- ---------- --------- -----</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Days   1.6270e+05   1.6270e+05   1       161.0000   169.4014   &lt; 0.001   *    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ------------------------------------------------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> -------------------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Term   NumDF   DenDF   F value    Pr(&gt;F)    Sig  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ------ ------- ------- ---------- --------- -----</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Days   1       161     169.4014   &lt; 0.001   *    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> -------------------------------------------------</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> `*` marks terms significant at α = 0.05. DenDF computed via **Satterthwaite**.  </span>
@@ -742,6 +844,13 @@ rationale.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Days          10.4673    0.8042   161.0000   13.0154   &lt; 0.001   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> -----------------------------------------------------------------</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ### Coefficient forest plot</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplsKqN3/file1da2501665af.png)    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> *Each row is a fixed-effect coefficient (the intercept is omitted) with its 95% Wald CI. The dashed line marks zero: a coefficient at zero has no effect relative to its reference. Points to the right increase the response, points to the left decrease it. A CI that touches or crosses zero means the term is not distinguishable from its reference at α = 0.05; a CI clear of zero is a significant effect.*  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> *Continuous term (Days) has no reference level; the estimate is the change per one-unit increase (on the scale stated above), so zero means no association.*  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ## Random-effects variance components</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
@@ -794,30 +903,22 @@ rationale.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ## Diagnostic plots</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmpG5HCTF/file1d9429e1f297.png)   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplsKqN3/file1da27f1fe415.png)   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> *Top-left:* residuals should scatter randomly around zero with no funnel shape. *Top-right:* level-1 residuals should fall on the line. *Bottom-left:* the random-effect BLUPs should also be approximately normal - this is the LMM-specific assumption most users forget. *Bottom-right:* the spread of residuals should be roughly constant across fitted values.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> - Shapiro-Wilk on level-1 residuals: W = 0.9751, p = **0.0026**  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> - Shapiro-Wilk on BLUPs of `Subject`: W = 0.9461, p = **0.3666**  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> - Levene's test on residuals (grouped by `Subject`): F = 2.8029, p = **&lt; 0.001** (residuals do **NOT** have equal variance across groups)  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - Levene's test on residuals (grouped by `Subject`): F = 2.8029, p = **&lt; 0.001** (residual variance differs across the levels of this grouping factor; this is not the same as a variance trend across the fitted scale, so read the Scale-Location panel before acting on it)  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   - Scale-Location trend (Spearman corr. of sqrt(|residual|) vs fitted) = **0.0473**, i.e. essentially flat: the Scale-Location panel does not show a variance trend across the fitted scale, so the Levene flag most likely reflects a few groups with differing spread rather than model-wide heteroscedasticity.  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> *Note: Shapiro-Wilk is sensitive to large samples and may flag harmless deviations. Trust the Q-Q plot more than the p-value.*</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ## Recommendations for Heteroscedasticity and/or non-normal residuals</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> The following diagnostic test(s) flagged a violation at α = 0.05:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> - Levene's test on residuals (grouped by `Subject`) p = &lt; 0.001 indicates **heteroscedasticity**.  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> - Shapiro-Wilk on level-1 residuals p = 0.0026 indicates **non-normal residuals**.  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> LMMs are reasonably robust to mild non-normality because the random effects absorb a lot of structure that would otherwise show up as skew. If a problem remains, the **recommended** fix is usually a model with a family that matches the response. See `?f_glm` for the choice of family (Gamma / log-normal for skewed positive data, Poisson or negative binomial for counts, beta for proportions, etc.); the same families are available with random effects via `lme4::glmer()` or `glmmTMB::glmmTMB()`.  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> This keeps the response on its natural scale and the variance components interpretable. As a **last resort** you may transform the response manually with `f_boxcox()` or `f_bestNormalize()` and refit with `f_lmer(transformed_y ~ ...)`, but be aware that **variance components and ICCs computed on a transformed scale do not back-transform to the original scale**. Report them with care.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> If only Levene's test is significant (heteroscedasticity without non-normal residuals), a model that allows the residual variance to differ across groups is also an option (e.g. `glmmTMB` with the `dispformula` argument, or `nlme::lme` with `weights = varIdent()`).</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> *Note: Shapiro-Wilk on the level-1 residuals is significant (p = 0.0026), but the residual Q-Q plot is essentially straight apart from the tails (tail-trimmed quantile correlation = 0.997, skewness = 0.2577). This pattern reflects a few outliers or heavy but symmetric tails rather than systematic skew, and linear mixed models are robust to it. No transformation or change of family is recommended on this basis alone; inspect the Q-Q plot and any flagged outliers instead.*</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> **Note on numeric covariate(s):** Days. Their slopes are reported in the coefficient table above; no pairwise post hoc is performed.  </span>
@@ -829,14 +930,161 @@ rationale.</p>
 <span class="r-in"><span><span class="va">multi_out</span> <span class="op">&lt;-</span> <span class="fu">f_lmer</span><span class="op">(</span><span class="va">Reaction</span> <span class="op">+</span> <span class="va">Reaction2</span> <span class="op">~</span> <span class="va">Days</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">Subject</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>                    data <span class="op">=</span> <span class="va">sleepstudy</span>,</span></span>
 <span class="r-in"><span>                    intro_text <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
-<span class="r-in"><span>                    norm_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span>                    diagnostic_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">multi_out</span><span class="op">$</span><span class="va">Reaction</span><span class="op">$</span><span class="va">fixed_effects</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   Term   Sum Sq  Mean Sq NumDF DenDF  F value  Pr(&gt;F) Sig</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1 Days 162702.7 162702.7     1   161 169.4014 &lt; 0.001   *</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Term NumDF DenDF  F value  Pr(&gt;F) Sig</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1 Days     1   161 169.4014 &lt; 0.001   *</span>
 <span class="r-in"><span><span class="va">multi_out</span><span class="op">$</span><span class="va">Reaction2</span><span class="op">$</span><span class="va">fixed_effects</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   Term   Sum Sq  Mean Sq NumDF DenDF  F value  Pr(&gt;F) Sig</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1 Days 156019.4 156019.4     1   161 160.8568 &lt; 0.001   *</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Term NumDF DenDF  F value  Pr(&gt;F) Sig</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1 Days     1   161 167.5102 &lt; 0.001   *</span>
 <span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># 7) Blocks, treatment and time together: a randomized complete</span></span></span>
+<span class="r-in"><span><span class="co">#    block design with repeated measures. The bundled plant_trial</span></span></span>
+<span class="r-in"><span><span class="co">#    dataset has five field blocks (block), one plant per treatment</span></span></span>
+<span class="r-in"><span><span class="co">#    per block measured at three time points (plant_id), four</span></span></span>
+<span class="r-in"><span><span class="co">#    treatments and a time factor.</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="va">plant_trial</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># 'treatment' and 'time_weeks' are crossed fixed effects (we care about their</span></span></span>
+<span class="r-in"><span><span class="co"># main effects and their interaction). 'block' and 'plant' are sources</span></span></span>
+<span class="r-in"><span><span class="co"># of unwanted variation we want to account for, not estimate, so</span></span></span>
+<span class="r-in"><span><span class="co"># they are random. 'plant_id' is nested in block - written compactly</span></span></span>
+<span class="r-in"><span><span class="co"># as (1 | block/plant_id), which expands to</span></span></span>
+<span class="r-in"><span><span class="co"># (1 | block) + (1 | block:plant_id). The random plant intercept is</span></span></span>
+<span class="r-in"><span><span class="co"># what makes this a repeated-measures model: the three time points</span></span></span>
+<span class="r-in"><span><span class="co"># on one plant share that plant's level.</span></span></span>
+<span class="r-in"><span><span class="fu">f_lmer</span><span class="op">(</span><span class="va">height_cm</span> <span class="op">~</span> <span class="va">treatment</span> <span class="op">*</span> <span class="va">time_weeks</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">block</span><span class="op">/</span><span class="va">plant_id</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>       data <span class="op">=</span> <span class="va">plant_trial</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Linear Mixed Model (f_lmer)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Formula: height_cm ~ treatment * time_weeks + (1 | block/plant_id)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> --- Fixed-effects table ---</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> -------------------------------------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Term                   NumDF   DenDF     F value    Pr(&gt;F)    Sig  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ---------------------- ------- --------- ---------- --------- -----</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> treatment              3       40.1000   9.7833     &lt; 0.001   *    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> time_weeks             1       36.0000   455.3878   &lt; 0.001   *    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> treatment:time_weeks   3       36.0000   10.7393    &lt; 0.001   *    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> -------------------------------------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> --- Observed descriptives (by fixed-effect factor levels) ---</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> --------------------------------------------------------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> treatment   n    mean     sd      se      min      Q1       median   Q3       max     </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ----------- ---- -------- ------- ------- -------- -------- -------- -------- --------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> control     15   34.167   8.708   2.248   20.000   27.300   34.600   40.950   49.700  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> drought     15   26.553   4.991   1.289   15.700   23.400   27.800   29.400   34.400  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> high_N      15   45.667   8.305   2.144   34.800   38.200   45.700   50.700   59.100  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> low_N       15   39.547   7.232   1.867   26.000   34.700   39.700   44.150   50.300  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> --------------------------------------------------------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> --- Random-effects variance components ---</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> --------------------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Group            Term          Variance   Std     </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                           Dev     </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ---------------- ------------- ---------- --------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> plant_id:block   (Intercept)   6.0997     2.4698  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> block            (Intercept)   4.0679     2.0169  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Residual                       4.8556     2.2035  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> --------------------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> --- Model fit ---</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ------------------------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Var(group)   Var(resid)   ICC      R² marg   R² cond  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ------------ ------------ -------- --------- ---------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10.1676      4.8556       0.6768   0.8575    0.9539   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ------------------------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - Var(group) / Var(resid): between-group and residual variance components.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - ICC = Var(group) / [Var(group) + Var(resid)]: share of total variance</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   attributable to between-group differences (0 = grouping irrelevant; 1 =</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   within-group observations identical).</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - R² marg.: variance explained by the fixed effects alone (Nakagawa &amp;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Schielzeth).</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - R² cond.: variance explained by fixed + random effects together. The gap</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   is the variance absorbed by the random-effects structure.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> --- ICC by grouping factor ---</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ----------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Group            Variance   ICC (share  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                             of total)   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ---------------- ---------- ------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> plant_id:block   6.0997     0.4060      </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> block            4.0679     0.2708      </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Residual         4.8556     0.3232      </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ----------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> - Each grouping factor's random-intercept variance as a share of the total</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   variance (group variances + residual); the shares sum to 1, showing where</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   the clustering sits.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> --- Information criteria ---</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ----------------------------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> AIC       BIC       logLik     REML criterion   df        </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                                 residual  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> --------- --------- ---------- ---------------- ----------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 306.853   329.891   -142.427   284.853          49        </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ----------------------------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> --- Post hoc comparisons ---</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> * treatment *</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Estimated marginal means with compact letter display:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ---------------------------------------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> treatment   emmean    SE       df        lower     upper     Letter  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                          CL        CL                </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ----------- --------- -------- --------- --------- --------- --------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> high_N      45.6667   1.5353   11.7875   42.3148   49.0186   a       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> low_N       39.5467   1.5353   11.7875   36.1948   42.8986   b       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> control     34.1667   1.5353   11.7875   30.8148   37.5186   b       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> drought     26.5533   1.5353   11.7875   23.2014   29.9052   c       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ---------------------------------------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Confidence level used: 0.95  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Significance level used: α = 0.05  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> P-value and CI adjustment: sidak method for 4 estimates / 6 tests.  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> *Note: Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different. Sharing a letter indicates insufficient evidence to claim a difference; it does not prove the groups are identical.*</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># The same design fitted with Kenward-Roger denominator df (the</span></span></span>
+<span class="r-in"><span><span class="co"># gold standard for small, balanced designs like this one), with</span></span></span>
+<span class="r-in"><span><span class="co"># the contrast forest plots turned on and the report saved to Word.</span></span></span>
+<span class="r-in"><span><span class="fu">f_lmer</span><span class="op">(</span><span class="va">height_cm</span> <span class="op">~</span> <span class="va">treatment</span> <span class="op">*</span> <span class="va">time_weeks</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">block</span><span class="op">/</span><span class="va">plant_id</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>       data <span class="op">=</span> <span class="va">plant_trial</span>,</span></span>
+<span class="r-in"><span>       ddf <span class="op">=</span> <span class="st">"Kenward-Roger"</span>,</span></span>
+<span class="r-in"><span>       contrast_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
+<span class="r-in"><span>       output_type <span class="op">=</span> <span class="st">"word"</span></span></span>
+<span class="r-in"><span>       <span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Saving output in: /tmp/RtmplsKqN3/plant_trial_lmer_output.docx</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> NOTE: Results may be misleading due to involvement in interactions</span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
@@ -848,7 +1096,7 @@ rationale.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

@@ -33,8 +33,16 @@
   : Correlation Plots with Factor Detection and Multiple Correlation
   Coefficients
 
+- [`f_example_data()`](https://delde001.github.io/rfriend/reference/f_example_data.md)
+  : Access the bundled example datasets
+
 - [`f_factors()`](https://delde001.github.io/rfriend/reference/f_factors.md)
   : Convert multiple columns to Factors in a data frame
+
+- [`f_friedman()`](https://delde001.github.io/rfriend/reference/f_friedman.md)
+  : Perform multiple Friedman rank sum tests with a user-friendly output
+  file, do data inspection and pairwise Wilcoxon signed-rank tests as
+  post hoc.
 
 - [`f_glm()`](https://delde001.github.io/rfriend/reference/f_glm.md) :
 
@@ -47,6 +55,12 @@
 - [`f_kruskal_test()`](https://delde001.github.io/rfriend/reference/f_kruskal_test.md)
   : Perform multiple Kruskal-Wallis tests with a user-friendly output
   file, do data inspection and Dunn's test (of 'rstatix') as post hoc.
+
+- [`f_lm()`](https://delde001.github.io/rfriend/reference/f_lm.md) :
+
+  Perform multiple [`lm()`](https://rdrr.io/r/stats/lm.html) functions
+  with optional data transformation, inspection, regression plots and
+  post hoc test.
 
 - [`f_lmer()`](https://delde001.github.io/rfriend/reference/f_lmer.md) :
 
@@ -107,11 +121,17 @@
   : Perform multiple Wilcoxon rank sum and signed rank tests with
   inspection and visualization.
 
+- [`plant_trial`](https://delde001.github.io/rfriend/reference/plant_trial.md)
+  : Simulated plant-science field trial (teaching dataset)
+
 - [`plot(`*`<f_bestNormalize>`*`)`](https://delde001.github.io/rfriend/reference/plot.f_bestNormalize.md)
   : Plot an f_bestNormalize object
 
 - [`plot(`*`<f_boxcox>`*`)`](https://delde001.github.io/rfriend/reference/plot.f_boxcox.md)
   : Plot an f_boxcox object
+
+- [`plot(`*`<f_friedman>`*`)`](https://delde001.github.io/rfriend/reference/plot.f_friedman.md)
+  : Plot method for f_friedman objects
 
 - [`plot(`*`<f_kruskal_test>`*`)`](https://delde001.github.io/rfriend/reference/plot.f_kruskal_test.md)
   : Plot method for f_kruskal_test objects

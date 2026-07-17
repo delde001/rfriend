@@ -19,7 +19,9 @@ f_lmer(
   ddf = "Satterthwaite",
   alpha = 0.05,
   adjust = "sidak",
-  norm_plots = TRUE,
+  diagnostic_plots = TRUE,
+  effect_plot = TRUE,
+  contrast_plots = FALSE,
   post_hoc = TRUE,
   intro_text = TRUE,
   output_type = "default",
@@ -27,6 +29,7 @@ f_lmer(
   save_in_wdir = FALSE,
   close_generated_files = FALSE,
   open_generated_files = interactive(),
+  norm_plots = lifecycle::deprecated(),
   ...
 )
 ```
@@ -95,11 +98,68 @@ f_lmer(
   One of `"sidak"` (default), `"tukey"`, `"bonferroni"`, `"fdr"`,
   `"none"`.
 
-- norm_plots:
+- diagnostic_plots:
 
   Logical. If `TRUE` (default), diagnostic plots (residuals vs fitted,
   Q-Q of level-1 residuals, Q-Q of random-effect BLUPs, scale-location)
   are included in the output.
+
+- effect_plot:
+
+  Logical. If `TRUE` (default), an estimated marginal means plot
+  (estimate \\\pm\\ 95% CI, with jittered raw data and
+  compact-letter-display labels) is added after each categorical
+  fixed-effect term's post hoc table. For a significant interaction
+  between categorical factors, interaction plots are drawn instead,
+  matching
+  [`f_aov`](https://delde001.github.io/rfriend/reference/f_aov.md): a
+  two-way interaction uses an x-axis factor and a colour trace and is
+  shown in both orientations; three- and four-way interactions add facet
+  panels for the remaining factor(s), with one plot per choice of x-axis
+  factor. Interactions of order greater than four (which would need an
+  illegible nested facet grid) are skipped with a note, but the
+  interaction cell-means post hoc table still reports every combination.
+  For a significant **numeric x categorical** interaction (the covariate
+  slope differs across factor levels), `f_lmer` additionally draws a
+  slope plot - a scatter of the raw data coloured by the factor with one
+  model-fitted regression line per level and a confidence band. This
+  goes beyond
+  [`f_aov`](https://delde001.github.io/rfriend/reference/f_aov.md),
+  which holds covariates at their mean and does not plot slopes. Numeric
+  x numeric interactions and higher-order numeric/categorical mixes have
+  no standard 2-D plot and are skipped with a note pointing to the
+  coefficient-table slopes and
+  [`emmeans::emtrends()`](https://rvlenth.github.io/emmeans/reference/emtrends.html).
+  All effect and interaction plots are ggplot2 objects and are stored in
+  the returned object (e.g. `out$y1$effect_plot_treatment`,
+  `out$y1$interaction_plot_a_b_1`, `out$y1$interaction_plot_a_b_c_1`,
+  `out$y1$interaction_plot_dose_treatment_1` for a slope plot) so they
+  can be retrieved and customised afterwards (themes, colours, axis
+  labels, etc.).
+
+- contrast_plots:
+
+  Logical. If `TRUE`, a **contrast forest plot** is added for each
+  categorical post hoc term: one row per pairwise comparison, showing
+  the estimated difference between two levels with its confidence
+  interval and a reference line at zero. A CI that excludes zero
+  indicates a significant difference; because the interval is on the
+  difference itself, this "excludes zero" reading is exact (it is the
+  same information the compact-letter display encodes, but it also shows
+  the direction and magnitude of each difference). Default `FALSE`
+  because the number of pairwise contrasts grows quickly with the number
+  of factor levels (k levels give k(k-1)/2 contrasts); turn it on when
+  you want the detailed pairwise picture. No cap is applied - if you
+  enable it for a many-level factor you will get a tall figure, which is
+  your choice. Main-effect and interaction contrast plots are kept
+  separate: main-effect plots are stored as
+  `out$y1$contrast_plot_<term>` (e.g. `contrast_plot_treatment`) and
+  rendered with the main-effect post hoc tables, while interaction
+  cell-contrast plots are stored as
+  `out$y1$interaction_contrast_plot_<term>` (e.g.
+  `interaction_contrast_plot_a_b`) and rendered with the interaction
+  cell-means tables. Contrast CIs use the same `adjust` method as the
+  post hoc p-values, so figure and table agree.
 
 - post_hoc:
 
@@ -111,7 +171,20 @@ f_lmer(
   separately. Numeric covariates are skipped because their slope is
   already reported in the fixed-effects coefficient table; pairwise
   contrasts are not meaningful for a continuous predictor. If no
-  fixed-effect term is significant, no post hoc is run.
+  fixed-effect term is significant, no post hoc is run. When a
+  significant interaction between categorical factors is present, an
+  additional **cell-means** post hoc table is produced for that
+  interaction (estimated mean for every factor-level combination,
+  compared simultaneously, with a compact letter display and pairwise
+  contrasts), matching
+  [`f_aov`](https://delde001.github.io/rfriend/reference/f_aov.md). It
+  is stored alongside the main-effect results under the interaction term
+  name, e.g. `out$y1$post_hoc[["a:b"]]`. In addition, when a main-effect
+  term takes part in a significant interaction, a caution note is
+  printed directly above that term's marginal-means table (and the
+  term's heading is annotated), warning that the marginal means average
+  over the interacting factor and can hide or reverse the real pattern;
+  the interaction cell-means table and plot(s) should be read instead.
 
 - intro_text:
 
@@ -157,6 +230,12 @@ f_lmer(
   (e.g. in scripts or automated pipelines). Set to `TRUE` or `FALSE` to
   override this behaviour explicitly.
 
+- norm_plots:
+
+  \`r lifecycle::badge("deprecated")\` Deprecated in version 4.0.0. Use
+  `diagnostic_plots` instead. If supplied, its value is passed through
+  to `diagnostic_plots` with a warning.
+
 - ...:
 
   Additional arguments forwarded to
@@ -172,15 +251,22 @@ f_lmer(
 ## Value
 
 An object of class `f_lmer`: a named list containing the fitted
-`lmerModLmerTest` model, the ANOVA-style fixed-effects table, the
-variance components and ICC, the R\\^2\\ values, the observed
-descriptives table (raw-data n, mean, sd, se, min, Q1, median, Q3, max
-grouped by the categorical fixed-effect predictors), post hoc results
-(if any), diagnostic plots, and convergence diagnostics. When more than
-one response variable is supplied on the left-hand side, these elements
-are nested one level deep under each response name, e.g.
-`out$y1$fixed_effects`, `out$y2$fixed_effects`. When
-`output_type = "rmd"` the markdown string is stored in `$rmd`.
+`lmerModLmerTest` model, the ANOVA-style fixed-effects table
+(`fixed_effects`; the displayed table reports NumDF, DenDF, F and p
+only, while the full `lmerTest` table including the non-additive Sum Sq
+/ Mean Sq columns is kept in `fixed_effects_full`), the variance
+components and ICC (plus a per-grouping-factor ICC breakdown in
+`icc_by_group` when the model has two or more intercept grouping
+factors), the R\\^2\\ values, the observed descriptives table (raw-data
+n, mean, sd, se, min, Q1, median, Q3, max grouped by the categorical
+fixed-effect predictors), post hoc results (if any; per main-effect
+terms plus, for a significant categorical interaction, a cell-means
+entry keyed by the interaction term name), diagnostic plots, and
+convergence diagnostics. When more than one response variable is
+supplied on the left-hand side, these elements are nested one level deep
+under each response name, e.g. `out$y1$fixed_effects`,
+`out$y2$fixed_effects`. When `output_type = "rmd"` the markdown string
+is stored in `$rmd`.
 
 ## Details
 
@@ -306,11 +392,18 @@ multi-site studies, inter-rater designs.
 6.  At least `~5` levels of each grouping factor; with `3-4` levels it
     is usually better to treat the factor as fixed.
 
-If Levene's test or the Shapiro-Wilk tests on residuals or BLUPs
-indicate a violation, the report adds a *Recommendations for
-Heteroscedasticity and/or non-normal residuals* section after the
-diagnostics with concrete next steps (generalised mixed model,
-transformation).
+After the diagnostics the report adds a *Recommendations for
+Heteroscedasticity and/or non-normal residuals* section, but only when a
+flagged violation survives a follow-up check rather than on a raw
+significant p-value alone. A significant Levene's test triggers it only
+when the Scale-Location panel shows a corroborating variance trend
+across the fitted scale (a by-group Levene test on its own over-fires);
+a significant Shapiro-Wilk test on the level-1 residuals triggers it
+only when the rejection reflects genuine skew rather than a few outliers
+or heavy but symmetric tails (judged by the tail-trimmed Q-Q correlation
+and the residual skewness); a significant Shapiro-Wilk test on the
+random-effect BLUPs triggers it directly. The section gives concrete
+next steps (generalised mixed model, transformation).
 
 **Convergence and singular fits.**  
 `f_lmer` surfaces `lme4` convergence warnings and the "boundary
@@ -380,6 +473,7 @@ data(sleepstudy, package = "lme4")
 f_lmer_out <- f_lmer(Reaction ~ Days + (1 | Subject),
                      data = sleepstudy)
 
+# \donttest{
 # Re-print the stored result and show the diagnostic plots.
 print(f_lmer_out)
 #> 
@@ -391,11 +485,11 @@ print(f_lmer_out)
 #> 
 #> --- Fixed-effects table ---
 #> 
-#> ------------------------------------------------------------------------------
-#> Term   Sum Sq       Mean Sq      NumDF   DenDF      F value    Pr(>F)    Sig  
-#> ------ ------------ ------------ ------- ---------- ---------- --------- -----
-#> Days   1.6270e+05   1.6270e+05   1       161.0000   169.4014   < 0.001   *    
-#> ------------------------------------------------------------------------------
+#> -------------------------------------------------
+#> Term   NumDF   DenDF   F value    Pr(>F)    Sig  
+#> ------ ------- ------- ---------- --------- -----
+#> Days   1       161     169.4014   < 0.001   *    
+#> -------------------------------------------------
 #> 
 #> 
 #> --- Random-effects variance components ---
@@ -439,6 +533,7 @@ print(f_lmer_out)
 plot(f_lmer_out)
 
 
+
 # 2) Random intercept AND random slope of Days per subject,
 #    fitted with Kenward-Roger denominator df, saved to MS Word.
 f_lmer(Reaction ~ Days + (1 + Days | Subject),
@@ -446,7 +541,7 @@ f_lmer(Reaction ~ Days + (1 + Days | Subject),
        ddf  = "Kenward-Roger",
        output_type = "word"
        )
-#> Saving output in: /tmp/RtmpG5HCTF/sleepstudy_lmer_output.docx
+#> Saving output in: /tmp/RtmplsKqN3/sleepstudy_lmer_output.docx
 
 # 3) A factor fixed effect triggers a post hoc test.
 #    Bin Days into three sleep-deprivation phases so that the
@@ -467,11 +562,11 @@ f_lmer(Reaction ~ Phase + (1 | Subject),
 #> 
 #> --- Fixed-effects table ---
 #> 
-#> ------------------------------------------------------------------------------
-#> Term    Sum Sq       Mean Sq      NumDF   DenDF      F value   Pr(>F)    Sig  
-#> ------- ------------ ------------ ------- ---------- --------- --------- -----
-#> Phase   1.4485e+05   7.2427e+04   2       160.0000   67.1861   < 0.001   *    
-#> ------------------------------------------------------------------------------
+#> -------------------------------------------------
+#> Term    NumDF   DenDF   F value   Pr(>F)    Sig  
+#> ------- ------- ------- --------- --------- -----
+#> Phase   2       160     67.1861   < 0.001   *    
+#> -------------------------------------------------
 #> 
 #> 
 #> --- Observed descriptives (by fixed-effect factor levels) ---
@@ -535,11 +630,11 @@ f_lmer(Reaction ~ Phase + (1 | Subject),
 #> Phase   emmean     SE       df        lower      upper      Letter  
 #>                                       CL         CL                 
 #> ------- ---------- -------- --------- ---------- ---------- --------
-#> early   262.1698   9.7916   23.2242   236.9812   287.3584   a       
+#> late    335.4104   9.7916   23.2242   315.1658   355.6551   a       
 #> 
-#> mid     298.0845   9.5333   20.9071   273.3496   322.8195   b       
+#> mid     298.0845   9.5333   20.9071   278.2535   317.9156   b       
 #> 
-#> late    335.4104   9.7916   23.2242   310.2218   360.5990   c       
+#> early   262.1698   9.7916   23.2242   241.9252   282.4145   c       
 #> --------------------------------------------------------------------
 #> 
 #> Confidence level used: 0.95  
@@ -555,10 +650,10 @@ f_lmer(Reaction ~ Phase + (1 | Subject),
 f_lmer(Reaction ~ Days + (1 | Subject),
        data = sleepstudy,
        intro_text = FALSE,
-       norm_plots = FALSE,
+       diagnostic_plots = FALSE,
        output_type = "word"
        )
-#> Saving output in: /tmp/RtmpG5HCTF/sleepstudy_lmer_output.docx
+#> Saving output in: /tmp/RtmplsKqN3/sleepstudy_lmer_output.docx
 
 # 5) Get the raw markdown back for embedding in an R Markdown
 #    document. Use it inside a chunk with results = 'asis'.
@@ -664,8 +759,8 @@ cat(f_lmer_rmd_out$rmd)
 #> Two canonical examples:
 #> 
 #> - **Longitudinal study:** same subjects measured at several time
-#>   points: `y ~ time + (1 | subject)`. If subjects also differ in *how
-#>   fast* they change, add a random slope:
+#>   points: `y ~ time + (1 | subject)`. If subjects also differ in
+#>   *how fast* they change, add a random slope:
 #>   `y ~ time + (1 + time | subject)`.
 #> - **Cross-over design:** every subject receives every treatment in
 #>   sequence (typically with a wash-out period in between):
@@ -690,17 +785,25 @@ cat(f_lmer_rmd_out$rmd)
 #>    `ranef(model)`. This is *separate* from residual normality and is the
 #>    assumption most users forget.
 #> 5. **Homoscedasticity:** residual variance is roughly constant across
-#>    fitted values and across levels of the grouping factor (in the *Residuals
-#>    vs Fitted* and *Scale-Location* plots, points should form a featureless
-#>    horizontal band; no funnel, no curve).
+#>    fitted values and across levels of the grouping factor: in the
+#>    *Residuals vs Fitted* and *Scale-Location* plots, points should form
+#>    a featureless horizontal band; no funnel, no curve.
 #> 6. **Enough levels of the grouping factor:** random-effect variance is
 #>    poorly estimated with fewer than ~5 levels. With 3-4 levels you are
 #>    often better off treating the factor as **fixed**.
 #> 
-#> If Levene's test or the Shapiro-Wilk tests on residuals or BLUPs
-#> indicate a violation, the report adds a *Recommendations for
-#> Heteroscedasticity and/or non-normal residuals* section after the
-#> diagnostics with concrete next steps.
+#> After the diagnostics the report adds a
+#> *Recommendations for Heteroscedasticity and/or non-normal residuals*
+#> section, but only when a flagged violation survives a follow-up check, not
+#> on a raw significant p-value alone. A significant Levene's test triggers it
+#> only when the Scale-Location panel shows a corroborating variance trend
+#> across the fitted scale (a by-group Levene test on its own over-fires). A
+#> significant Shapiro-Wilk test on the level-1 residuals triggers it only when
+#> the rejection reflects genuine skew rather than a few outliers or heavy but
+#> symmetric tails (judged by the tail-trimmed Q-Q correlation together with
+#> the residual skewness). A significant Shapiro-Wilk test on the
+#> random-effect BLUPs triggers it directly. The section gives concrete next
+#> steps (generalised mixed model, transformation).
 #> 
 #> 
 #> # Linear Mixed Model:  Reaction 
@@ -711,15 +814,15 @@ cat(f_lmer_rmd_out$rmd)
 #> 
 #> ## Sample size and grouping structure
 #> - **N observations:** 180  
-#> - **Levels of `Subject`:** 18  
+#> - **Levels of** `Subject`**:** 18  
 #> 
 #> ## Fixed-effects table (Type III)
 #> 
-#> ------------------------------------------------------------------------------
-#> Term   Sum Sq       Mean Sq      NumDF   DenDF      F value    Pr(>F)    Sig  
-#> ------ ------------ ------------ ------- ---------- ---------- --------- -----
-#> Days   1.6270e+05   1.6270e+05   1       161.0000   169.4014   < 0.001   *    
-#> ------------------------------------------------------------------------------
+#> -------------------------------------------------
+#> Term   NumDF   DenDF   F value    Pr(>F)    Sig  
+#> ------ ------- ------- ---------- --------- -----
+#> Days   1       161     169.4014   < 0.001   *    
+#> -------------------------------------------------
 #> 
 #> 
 #> `*` marks terms significant at α = 0.05. DenDF computed via **Satterthwaite**.  
@@ -736,6 +839,13 @@ cat(f_lmer_rmd_out$rmd)
 #> Days          10.4673    0.8042   161.0000   13.0154   < 0.001   
 #> -----------------------------------------------------------------
 #> 
+#> 
+#> ### Coefficient forest plot
+#> ![](/tmp/RtmplsKqN3/file1da2501665af.png)    
+#>   
+#> *Each row is a fixed-effect coefficient (the intercept is omitted) with its 95% Wald CI. The dashed line marks zero: a coefficient at zero has no effect relative to its reference. Points to the right increase the response, points to the left decrease it. A CI that touches or crosses zero means the term is not distinguishable from its reference at α = 0.05; a CI clear of zero is a significant effect.*  
+#>   
+#> *Continuous term (Days) has no reference level; the estimate is the change per one-unit increase (on the scale stated above), so zero means no association.*  
 #> 
 #> ## Random-effects variance components
 #> 
@@ -788,30 +898,22 @@ cat(f_lmer_rmd_out$rmd)
 #> 
 #> 
 #> ## Diagnostic plots
-#> ![](/tmp/RtmpG5HCTF/file1d9429e1f297.png)   
+#> ![](/tmp/RtmplsKqN3/file1da27f1fe415.png)   
 #>   
 #> 
 #> *Top-left:* residuals should scatter randomly around zero with no funnel shape. *Top-right:* level-1 residuals should fall on the line. *Bottom-left:* the random-effect BLUPs should also be approximately normal - this is the LMM-specific assumption most users forget. *Bottom-right:* the spread of residuals should be roughly constant across fitted values.
 #> 
 #> - Shapiro-Wilk on level-1 residuals: W = 0.9751, p = **0.0026**  
 #> - Shapiro-Wilk on BLUPs of `Subject`: W = 0.9461, p = **0.3666**  
-#> - Levene's test on residuals (grouped by `Subject`): F = 2.8029, p = **< 0.001** (residuals do **NOT** have equal variance across groups)  
+#> - Levene's test on residuals (grouped by `Subject`): F = 2.8029, p = **< 0.001** (residual variance differs across the levels of this grouping factor; this is not the same as a variance trend across the fitted scale, so read the Scale-Location panel before acting on it)  
+#> 
+#>   - Scale-Location trend (Spearman corr. of sqrt(|residual|) vs fitted) = **0.0473**, i.e. essentially flat: the Scale-Location panel does not show a variance trend across the fitted scale, so the Levene flag most likely reflects a few groups with differing spread rather than model-wide heteroscedasticity.  
 #> 
 #> 
 #> *Note: Shapiro-Wilk is sensitive to large samples and may flag harmless deviations. Trust the Q-Q plot more than the p-value.*
 #> 
-#> ## Recommendations for Heteroscedasticity and/or non-normal residuals
 #> 
-#> The following diagnostic test(s) flagged a violation at α = 0.05:
-#> 
-#> - Levene's test on residuals (grouped by `Subject`) p = < 0.001 indicates **heteroscedasticity**.  
-#> - Shapiro-Wilk on level-1 residuals p = 0.0026 indicates **non-normal residuals**.  
-#> 
-#> LMMs are reasonably robust to mild non-normality because the random effects absorb a lot of structure that would otherwise show up as skew. If a problem remains, the **recommended** fix is usually a model with a family that matches the response. See `?f_glm` for the choice of family (Gamma / log-normal for skewed positive data, Poisson or negative binomial for counts, beta for proportions, etc.); the same families are available with random effects via `lme4::glmer()` or `glmmTMB::glmmTMB()`.  
-#> 
-#> This keeps the response on its natural scale and the variance components interpretable. As a **last resort** you may transform the response manually with `f_boxcox()` or `f_bestNormalize()` and refit with `f_lmer(transformed_y ~ ...)`, but be aware that **variance components and ICCs computed on a transformed scale do not back-transform to the original scale**. Report them with care.
-#> 
-#> If only Levene's test is significant (heteroscedasticity without non-normal residuals), a model that allows the residual variance to differ across groups is also an option (e.g. `glmmTMB` with the `dispformula` argument, or `nlme::lme` with `weights = varIdent()`).
+#> *Note: Shapiro-Wilk on the level-1 residuals is significant (p = 0.0026), but the residual Q-Q plot is essentially straight apart from the tails (tail-trimmed quantile correlation = 0.997, skewness = 0.2577). This pattern reflects a few outliers or heavy but symmetric tails rather than systematic skew, and linear mixed models are robust to it. No transformation or change of family is recommended on this basis alone; inspect the Q-Q plot and any flagged outliers instead.*
 #> 
 #> 
 #> **Note on numeric covariate(s):** Days. Their slopes are reported in the coefficient table above; no pairwise post hoc is performed.  
@@ -823,11 +925,159 @@ sleepstudy$Reaction2 <- sleepstudy$Reaction + rnorm(nrow(sleepstudy), 0, 5)
 multi_out <- f_lmer(Reaction + Reaction2 ~ Days + (1 | Subject),
                     data = sleepstudy,
                     intro_text = FALSE,
-                    norm_plots = FALSE)
+                    diagnostic_plots = FALSE)
 multi_out$Reaction$fixed_effects
-#>   Term   Sum Sq  Mean Sq NumDF DenDF  F value  Pr(>F) Sig
-#> 1 Days 162702.7 162702.7     1   161 169.4014 < 0.001   *
+#>   Term NumDF DenDF  F value  Pr(>F) Sig
+#> 1 Days     1   161 169.4014 < 0.001   *
 multi_out$Reaction2$fixed_effects
-#>   Term   Sum Sq  Mean Sq NumDF DenDF  F value  Pr(>F) Sig
-#> 1 Days 156019.4 156019.4     1   161 160.8568 < 0.001   *
+#>   Term NumDF DenDF  F value  Pr(>F) Sig
+#> 1 Days     1   161 167.5102 < 0.001   *
+
+# 7) Blocks, treatment and time together: a randomized complete
+#    block design with repeated measures. The bundled plant_trial
+#    dataset has five field blocks (block), one plant per treatment
+#    per block measured at three time points (plant_id), four
+#    treatments and a time factor.
+data(plant_trial)
+
+# 'treatment' and 'time_weeks' are crossed fixed effects (we care about their
+# main effects and their interaction). 'block' and 'plant' are sources
+# of unwanted variation we want to account for, not estimate, so
+# they are random. 'plant_id' is nested in block - written compactly
+# as (1 | block/plant_id), which expands to
+# (1 | block) + (1 | block:plant_id). The random plant intercept is
+# what makes this a repeated-measures model: the three time points
+# on one plant share that plant's level.
+f_lmer(height_cm ~ treatment * time_weeks + (1 | block/plant_id),
+       data = plant_trial)
+#> 
+#> ==========================================================
+#> Linear Mixed Model (f_lmer)
+#> ==========================================================
+#> 
+#> Formula: height_cm ~ treatment * time_weeks + (1 | block/plant_id)
+#> 
+#> --- Fixed-effects table ---
+#> 
+#> -------------------------------------------------------------------
+#> Term                   NumDF   DenDF     F value    Pr(>F)    Sig  
+#> ---------------------- ------- --------- ---------- --------- -----
+#> treatment              3       40.1000   9.7833     < 0.001   *    
+#> 
+#> time_weeks             1       36.0000   455.3878   < 0.001   *    
+#> 
+#> treatment:time_weeks   3       36.0000   10.7393    < 0.001   *    
+#> -------------------------------------------------------------------
+#> 
+#> 
+#> --- Observed descriptives (by fixed-effect factor levels) ---
+#> 
+#> --------------------------------------------------------------------------------------
+#> treatment   n    mean     sd      se      min      Q1       median   Q3       max     
+#> ----------- ---- -------- ------- ------- -------- -------- -------- -------- --------
+#> control     15   34.167   8.708   2.248   20.000   27.300   34.600   40.950   49.700  
+#> 
+#> drought     15   26.553   4.991   1.289   15.700   23.400   27.800   29.400   34.400  
+#> 
+#> high_N      15   45.667   8.305   2.144   34.800   38.200   45.700   50.700   59.100  
+#> 
+#> low_N       15   39.547   7.232   1.867   26.000   34.700   39.700   44.150   50.300  
+#> --------------------------------------------------------------------------------------
+#> 
+#> 
+#> --- Random-effects variance components ---
+#> 
+#> --------------------------------------------------
+#> Group            Term          Variance   Std     
+#>                                           Dev     
+#> ---------------- ------------- ---------- --------
+#> plant_id:block   (Intercept)   6.0997     2.4698  
+#> 
+#> block            (Intercept)   4.0679     2.0169  
+#> 
+#> Residual                       4.8556     2.2035  
+#> --------------------------------------------------
+#> 
+#> 
+#> --- Model fit ---
+#> 
+#> ------------------------------------------------------
+#> Var(group)   Var(resid)   ICC      R² marg   R² cond  
+#> ------------ ------------ -------- --------- ---------
+#> 10.1676      4.8556       0.6768   0.8575    0.9539   
+#> ------------------------------------------------------
+#> 
+#> - Var(group) / Var(resid): between-group and residual variance components.
+#> - ICC = Var(group) / [Var(group) + Var(resid)]: share of total variance
+#>   attributable to between-group differences (0 = grouping irrelevant; 1 =
+#>   within-group observations identical).
+#> - R² marg.: variance explained by the fixed effects alone (Nakagawa &
+#>   Schielzeth).
+#> - R² cond.: variance explained by fixed + random effects together. The gap
+#>   is the variance absorbed by the random-effects structure.
+#> 
+#> --- ICC by grouping factor ---
+#> 
+#> ----------------------------------------
+#> Group            Variance   ICC (share  
+#>                             of total)   
+#> ---------------- ---------- ------------
+#> plant_id:block   6.0997     0.4060      
+#> 
+#> block            4.0679     0.2708      
+#> 
+#> Residual         4.8556     0.3232      
+#> ----------------------------------------
+#> 
+#> - Each grouping factor's random-intercept variance as a share of the total
+#>   variance (group variances + residual); the shares sum to 1, showing where
+#>   the clustering sits.
+#> 
+#> --- Information criteria ---
+#> 
+#> ----------------------------------------------------------
+#> AIC       BIC       logLik     REML criterion   df        
+#>                                                 residual  
+#> --------- --------- ---------- ---------------- ----------
+#> 306.853   329.891   -142.427   284.853          49        
+#> ----------------------------------------------------------
+#> 
+#> 
+#> --- Post hoc comparisons ---
+#> 
+#> * treatment *
+#> Estimated marginal means with compact letter display:
+#> 
+#> ---------------------------------------------------------------------
+#> treatment   emmean    SE       df        lower     upper     Letter  
+#>                                          CL        CL                
+#> ----------- --------- -------- --------- --------- --------- --------
+#> high_N      45.6667   1.5353   11.7875   42.3148   49.0186   a       
+#> 
+#> low_N       39.5467   1.5353   11.7875   36.1948   42.8986   b       
+#> 
+#> control     34.1667   1.5353   11.7875   30.8148   37.5186   b       
+#> 
+#> drought     26.5533   1.5353   11.7875   23.2014   29.9052   c       
+#> ---------------------------------------------------------------------
+#> 
+#> Confidence level used: 0.95  
+#> Significance level used: α = 0.05  
+#> P-value and CI adjustment: sidak method for 4 estimates / 6 tests.  
+#> 
+#> *Note: Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different. Sharing a letter indicates insufficient evidence to claim a difference; it does not prove the groups are identical.*
+#> 
+
+# The same design fitted with Kenward-Roger denominator df (the
+# gold standard for small, balanced designs like this one), with
+# the contrast forest plots turned on and the report saved to Word.
+f_lmer(height_cm ~ treatment * time_weeks + (1 | block/plant_id),
+       data = plant_trial,
+       ddf = "Kenward-Roger",
+       contrast_plots = TRUE,
+       output_type = "word"
+       )
+#> Saving output in: /tmp/RtmplsKqN3/plant_trial_lmer_output.docx
+#> NOTE: Results may be misleading due to involvement in interactions
+# }
 ```

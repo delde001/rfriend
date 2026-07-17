@@ -185,7 +185,17 @@ f_wilcox_test(
 
 ## Value
 
-An object of class `'f_wilcox_test'`.
+An object of class `'f_wilcox_test'`, a named list with one element per
+response variable. Each element contains the
+[`stats::wilcox.test()`](https://rdrr.io/r/stats/wilcox.test.html)
+result, the formatted console/markdown text blocks, the diagnostic plot
+file path, and a publication-ready main effect plot as a ggplot2 object
+(`main_effect_plot`). The plot shows the estimated parameter with its
+confidence interval against the raw data: the two group medians each
+with a distribution-free median confidence interval (two-sample), the
+sample pseudo-median (Hodges-Lehmann estimate) with a reference line at
+`mu` (one-sample), or the pseudo-median of the per-pair differences with
+a reference line at `mu` (paired).
 
 ## Median vs Pseudo-median
 
@@ -221,3 +231,42 @@ diverge.
 
 In all three cases the sample median(s) are reported separately for
 descriptive purposes only.
+
+## Examples
+
+``` r
+# \donttest{
+# Two-sample Wilcoxon rank-sum test
+f_wilcox_test(mpg ~ am, data = mtcars, output_type = "console")
+#> 
+#> ==========================================================
+#> Wilcoxon rank sum exact test (two.sided) of:mpg
+#> ==========================================================
+#> 
+#> SAMPLE STATISTICS:
+#>   Median 0: 17.3
+#>   Median 1: 22.8
+#>   Raw difference (0 - 1): -5.5
+#> 
+#> HYPOTHESES:
+#>   H0: True location shift (0 - 1, Hodges-Lehmann) is equal to 0.
+#>   H1: True location shift (0 - 1, Hodges-Lehmann) is not equal to 0.
+#> 
+#> TEST RESULTS:
+#>   W = 42, p-value = 1.159e-03*-> Significant, H0 is rejected (p ≤ α = 0.05)
+#>   
+#> ESTIMATE:
+#>   Location shift (Hodges-Lehmann): -6.8
+#>   95% CI: [ -11.3, -2.9 ]
+#>   
+#> Note on the CI: 
+#> This interval is for the location shift (Hodges-Lehmann estimator); the median of all possible pairwise differences between your two groups. If both groups have the same distributional shape, this equals the raw median difference. When shapes differ they can diverge, which is why the CI may not be centred on the difference in sample medians. Both the raw median difference and the location shift are valid descriptions of the gap between groups; they just measure it slightly differently (see `?f_wilcox_test` for details).
+#> 
+#>  
+
+# Retrieve and customise the stored main effect plot (ggplot object)
+result <- f_wilcox_test(mpg ~ am, data = mtcars, output_type = "default")
+result[["mpg"]]$main_effect_plot
+
+# }
+```

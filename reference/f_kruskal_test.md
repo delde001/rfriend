@@ -237,7 +237,7 @@ output <- f_kruskal_test(
                output_type = "word",
                adjust = "holm"
                )
-#> Saving output in: /tmp/RtmpG5HCTF/iris_Kruskal_Wallis_output.docx
+#> Saving output in: /tmp/RtmplsKqN3/iris_Kruskal_Wallis_output.docx
 
 # Save Kruskal-Wallis test and posthoc to Excel sheets: Sepal.Width and Sepal.Length.
 f_kruskal_out <- f_kruskal_test(
@@ -247,5 +247,5 @@ f_kruskal_out <- f_kruskal_test(
                      output_type = "excel",
                      adjust = "holm"
                      )
-#> Saving output in: /tmp/RtmpG5HCTF/iris_Kruskal_Wallis_output.xlsx
+#> Saving output in: /tmp/RtmplsKqN3/iris_Kruskal_Wallis_output.xlsx
 ```

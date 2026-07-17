@@ -15,7 +15,7 @@ is supported."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">rfriend</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -27,6 +27,7 @@ is supported."></head><body>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/delde001/rfriend/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul></div>
 
 
@@ -36,7 +37,7 @@ is supported."></head><body>
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>Perform multiple t-tests with optional data transformation, inspection and visualization.</h1>
-
+      <small class="dont-index">Source: <a href="https://github.com/delde001/rfriend/blob/master/R/fttest.R" class="external-link"><code>R/fttest.R</code></a></small>
       <div class="d-none name"><code>f_t_test.Rd</code></div>
     </div>
 
@@ -56,7 +57,8 @@ is supported.</p>
 <span><span class="fu">f_t_test</span><span class="op">(</span></span>
 <span>  <span class="va">formula</span>,</span>
 <span>  data <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  paired <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  paired <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  paired_by <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  var.equal <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  conf.level <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  mu <span class="op">=</span> <span class="fl">0</span>,</span>
@@ -131,10 +133,33 @@ is currently unused.</p></dd>
 
 
 <dt id="arg-paired">paired<a class="anchor" aria-label="anchor" href="#arg-paired"></a></dt>
-<dd><p>Logical. If <code>TRUE</code>, performs a paired t-test.
-<strong>Note:</strong> For the formula interface, data must be sorted so that all
-observations of group 1 appear before group 2 (AABB order). For the vector
-interface, <code>x</code> and <code>y</code> must have the same length.</p></dd>
+<dd><p>Logical or <code>NULL</code>. If <code>TRUE</code>, performs a paired
+t-test. If <code>FALSE</code>, an independent (or one-sample) test. If
+<code>NULL</code> (default) and <code>paired_by</code> is supplied, <code>paired</code> is
+automatically set to <code>TRUE</code> (with a message), since <code>paired_by</code>
+has no purpose outside a paired test. An explicit <code>paired = FALSE</code>
+is never overridden. <strong>Note:</strong> For the formula interface, supply
+<code>paired_by</code> to identify matched pairs by subject id. If
+<code>paired_by</code> is omitted, the data must be sorted so that all
+observations of group 1 appear before group 2 (AABB order) <em>and</em>
+the within-group order must be identical across groups, because the
+pairing is then purely positional and fragile. A warning is issued if
+the data appear interleaved (not in AABB order); a within-group
+reordering that preserves AABB blocks cannot be detected automatically,
+so supply <code>paired_by</code> whenever a subject id is available. For the
+vector interface, <code>x</code> and <code>y</code> must have the same length
+(pairing is positional by construction).</p></dd>
+
+
+<dt id="arg-paired-by">paired_by<a class="anchor" aria-label="anchor" href="#arg-paired-by"></a></dt>
+<dd><p>Character string. For the formula interface with
+<code>paired = TRUE</code>, the name of a column in <code>data</code> that identifies
+matched pairs (subject id). When supplied, observations are matched by
+this id rather than by row position, so the data no longer needs to be
+in AABB order. Each id must appear exactly once per group, and the two
+groups must contain the same set of ids (after <code>subset</code> and NA
+removal). Ignored for one-sample and two-sample independent tests, and
+for the vector interface. Default <code>NULL</code>.</p></dd>
 
 
 <dt id="arg-var-equal">var.equal<a class="anchor" aria-label="anchor" href="#arg-var-equal"></a></dt>
@@ -236,7 +261,15 @@ the vector interface. Ignored when a formula is supplied.</p></dd>
     <p>An object of class <code>'f_t_test'</code>, a named list with one element per
   response variable. Each element contains the t-test result, normality test
   results, variance diagnostic results, transformation object (if applied),
-  and back-transformed confidence interval (if applicable).</p>
+  back-transformed confidence interval (if applicable), and a
+  publication-ready main effect plot as a <span class="pkg">ggplot2</span> object
+  (<code>main_effect_plot</code>). The plot shows the estimated parameter with its
+  confidence interval against the raw data: group means with their mean
+  confidence intervals (two-sample), the sample mean with a reference line at
+  <code>mu</code> (one-sample), or the mean of the per-pair differences with a
+  reference line at <code>mu</code> (paired). When the response was transformed the
+  estimate and interval are back-transformed to the original scale and
+  labelled as a median.</p>
     </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
@@ -356,8 +389,8 @@ use Welch's t-test instead of Student's t-test.
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># 4. Paired t-test (sleep dataset is already in AABB order)</span></span></span>
-<span class="r-in"><span><span class="fu">f_t_test</span><span class="op">(</span><span class="va">extra</span> <span class="op">~</span> <span class="va">group</span>, data <span class="op">=</span> <span class="va">sleep</span>, paired <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
+<span class="r-in"><span><span class="co"># 4. Paired t-test with explicit subject id (recommended)</span></span></span>
+<span class="r-in"><span><span class="fu">f_t_test</span><span class="op">(</span><span class="va">extra</span> <span class="op">~</span> <span class="va">group</span>, data <span class="op">=</span> <span class="va">sleep</span>, paired <span class="op">=</span> <span class="cn">TRUE</span>, paired_by <span class="op">=</span> <span class="st">"ID"</span>,</span></span>
 <span class="r-in"><span>         output_type <span class="op">=</span> <span class="st">"console"</span>, norm_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
@@ -365,7 +398,7 @@ use Welch's t-test instead of Student's t-test.
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> SAMPLE STATISTICS:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   Mean of differences (transformed scale): 0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Mean of differences (transformed scale): -1.112</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   --- back-transformed (original scale) ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   Back-transformed mean of differences: -1.355</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   Median of raw differences: -1.3</span>
@@ -375,11 +408,43 @@ use Welch's t-test instead of Student's t-test.
 <span class="r-out co"><span class="r-pr">#&gt;</span>   H1: True mean difference (1 - 2) is not equal to 0</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> TEST RESULTS (transformed scale):</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   t = -0.000,  df = 9.000,  p-value = 1.0000  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> -&gt; Not significant, H0 is NOT rejected  (p &gt; α = 0.05)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   t = -6.086,  df = 9.000,  p-value = 0.0002  *</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> * -&gt; Significant, H0 is rejected  (p ≤ α = 0.05)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ESTIMATE:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   95% CI (transformed scale): [ -0.715, 0.715 ]</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   95% CI (transformed scale): [ -1.525, -0.698 ]</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   95% CI (back-transformed):  [ -2.188, -0.757 ]</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Note on transformation:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> The t-test was conducted on the arcsinh(x)-transformed scale. The back-transformed mean and the sample median of the raw data will differ when the transformation is not perfectly normalizing. For non-normal data consider f_wilcox_test() which tests the median directly without transformation assumptions.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># 4b. Paired t-test without paired_by (warns; pairing is positional and</span></span></span>
+<span class="r-in"><span><span class="co"># only safe when data is in AABB order with matching within-group order)</span></span></span>
+<span class="r-in"><span><span class="fu">f_t_test</span><span class="op">(</span><span class="va">extra</span> <span class="op">~</span> <span class="va">group</span>, data <span class="op">=</span> <span class="va">sleep</span>, paired <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
+<span class="r-in"><span>         output_type <span class="op">=</span> <span class="st">"console"</span>, norm_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> One Sample t-test (arcsinh(x) transformed) of: extra</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> SAMPLE STATISTICS:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Mean of differences (transformed scale): -1.112</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   --- back-transformed (original scale) ---</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Back-transformed mean of differences: -1.355</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Median of raw differences: -1.3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> HYPOTHESES:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   H0: True mean difference (1 - 2) is equal to 0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   H1: True mean difference (1 - 2) is not equal to 0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> TEST RESULTS (transformed scale):</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   t = -6.086,  df = 9.000,  p-value = 0.0002  *</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> * -&gt; Significant, H0 is rejected  (p ≤ α = 0.05)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ESTIMATE:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   95% CI (transformed scale): [ -1.525, -0.698 ]</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   95% CI (back-transformed):  [ -2.188, -0.757 ]</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Note on transformation:</span>
@@ -639,9 +704,9 @@ use Welch's t-test instead of Student's t-test.
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> SAMPLE STATISTICS:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   Mean 0 (transformed scale): 0.244</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   Mean 1 (transformed scale): -0.356</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   Difference (0 - 1): 0.6</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Mean 0 (transformed scale): 12.476</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Mean 1 (transformed scale): 10.81</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Difference (0 - 1): 1.666</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   --- back-transformed (original scale) ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   Back-transformed mean 0: 155.644</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   Back-transformed mean 1: 116.858</span>
@@ -657,8 +722,8 @@ use Welch's t-test instead of Student's t-test.
 <span class="r-out co"><span class="r-pr">#&gt;</span> -&gt; Not significant, H0 is NOT rejected  (p &gt; α = 0.05)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ESTIMATE:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   95% CI (transformed scale): [ -0.186, 1.386 ]</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   95% CI (back-transformed):  [ 127.305, 244.812 ]  *interpret carefully*</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   95% CI (transformed scale): [ -0.516, 3.847 ]</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   95% CI (back-transformed):  [ 0.266, 14.803 ]  *interpret carefully*</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Note on transformation:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> The t-test was conducted on the sqrt(x + a)-transformed scale. The back-transformed mean and the sample median of the raw data will differ when the transformation is not perfectly normalizing. For non-normal data consider f_wilcox_test() which tests the median directly without transformation assumptions.</span>
@@ -786,6 +851,12 @@ use Welch's t-test instead of Student's t-test.
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.9303737 2.8214855</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> attr(,"conf.level")</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.95</span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># 16. Retrieve and customise the stored main effect plot (ggplot object)</span></span></span>
+<span class="r-in"><span><span class="va">result</span><span class="op">[[</span><span class="st">"mpg"</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">main_effect_plot</span></span></span>
+<span class="r-plt img"><img src="f_t_test-1.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span><span class="co"># e.g. add a custom title:</span></span></span>
+<span class="r-in"><span><span class="co"># result[["mpg"]]$main_effect_plot + ggplot2::ggtitle("My title")</span></span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>
@@ -798,7 +869,7 @@ use Welch's t-test instead of Student's t-test.
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

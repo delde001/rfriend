@@ -2,7 +2,14 @@
 
 Performs an Analysis of Variance (ANOVA) on a given dataset with options
 for (Box-Cox) transformations, normality tests, and post hoc analysis.
-Several response parameters can be analysed in sequence and the
+The omnibus table is computed with **Type II Sums of Squares** via
+[`Anova`](https://rdrr.io/pkg/car/man/Anova.html), which is
+order-invariant for the main effects in unbalanced designs (default
+`summary(aov())` uses Type I SS, where the main-effect p-values depend
+on the order in which terms appear in the formula). Type II also aligns
+with the model-based `emmeans` post hoc tests, so the omnibus table and
+the pairwise comparisons cannot tell mismatched stories on unbalanced
+data. Several response parameters can be analysed in sequence and the
 generated output can be in various formats ('Word', 'pdf', 'Excel').
 
 ## Usage
@@ -13,12 +20,14 @@ f_aov(
   data = NULL,
   norm_plots = TRUE,
   interaction_plots = TRUE,
+  contrast_plots = FALSE,
   ANCOVA = FALSE,
   transformation = TRUE,
   force_transformation = NULL,
   force_aov = FALSE,
   alpha = 0.05,
   adjust = "sidak",
+  anova_type = 2,
   intro_text = TRUE,
   close_generated_files = FALSE,
   open_generated_files = interactive(),
@@ -52,6 +61,26 @@ f_aov(
 
   Logical. If `TRUE`, estimated means / interaction plots are included
   in the output files after the post hoc table. Default is `TRUE`.
+
+- contrast_plots:
+
+  Logical. If `TRUE`, a **contrast forest plot** is added for each
+  categorical post hoc term: one row per pairwise comparison, showing
+  the estimated difference between two levels with its confidence
+  interval and a reference line at zero. A CI that excludes zero
+  indicates a significant difference; because the interval is on the
+  difference itself, this "excludes zero" reading is exact (it is the
+  same information the compact-letter display encodes, but it also shows
+  the direction and magnitude of each difference). Default `FALSE`
+  because the number of pairwise contrasts grows quickly with the number
+  of factor levels (k levels give k(k-1)/2 contrasts); turn it on when
+  you want the detailed pairwise picture. Main-effect and interaction
+  contrast plots are kept separate: main-effect plots are stored as
+  `out$y1$contrast_plot_<term>` (e.g. `contrast_plot_treatment`) while
+  interaction cell-contrast plots are stored as
+  `out$y1$interaction_contrast_plot_<term>` (e.g.
+  `interaction_contrast_plot_a_b`). Contrast CIs use the same `adjust`
+  method as the post hoc p-values, so figure and table agree.
 
 - ANCOVA:
 
@@ -119,6 +148,38 @@ f_aov(
       of false positives among significant results.
 
   Default is `"sidak"`.
+
+- anova_type:
+
+  Integer, either `2` or `3`. Sums of Squares type for the omnibus ANOVA
+  table computed via [`Anova`](https://rdrr.io/pkg/car/man/Anova.html).
+
+  `2` (Default)
+
+  :   Type II. Order-invariant in unbalanced designs (`drug * dose` and
+      `dose * drug` give the same main-effect p-values), respects the
+      marginality principle (each main effect is tested after all other
+      main effects, ignoring interactions containing it), and is safe
+      with R's default treatment contrasts. Recommended for most
+      unbalanced designs and consistent with the `emmeans`-based post
+      hoc tests.
+
+  `3`
+
+  :   Type III. Also order-invariant, but tests each term after *all*
+      other terms including higher-order interactions. Type III is the
+      SPSS / SAS default. For its main-effect rows to be interpretable
+      as effects averaged across the other factors, the model must be
+      fitted with orthogonal (sum / effect / Helmert / polynomial)
+      contrasts. When `anova_type = 3` **and** the user has not supplied
+      their own `contrasts` via `...`, `f_aov` automatically installs
+      `contr.sum` / `contr.poly` for the duration of the call (the
+      previous `options("contrasts")` is restored on exit). Note that
+      under Type III, when an interaction is significant the main effect
+      rows are conditional on the interaction and should be interpreted
+      with care – the cell means table that `f_aov` reports
+      automatically when an interaction is significant remains the
+      appropriate summary.
 
 - intro_text:
 
@@ -193,11 +254,13 @@ f_aov(
 
 ## Value
 
-An object of class 'f_aov' containing results from
-[`aov()`](https://rdrr.io/r/stats/aov.html), normality tests,
-transformations, and post hoc tests. Using the option "output_type", it
-can also generate output in the form of: R Markdown code, 'Word', 'pdf',
-or 'Excel' files. Includes print and plot methods for 'f_aov' objects.
+An object of class 'f_aov' containing the fitted model (`aov_test`), the
+**Type II** omnibus ANOVA table from
+[`Anova`](https://rdrr.io/pkg/car/man/Anova.html) (`aov_summary`),
+normality and homogeneity diagnostics, optional transformation results,
+and the `emmeans` post hoc tests. Using the option `output_type`, it can
+also generate output as R Markdown, 'Word', 'pdf', or 'Excel' files.
+Includes `print` and `plot` methods for 'f_aov' objects.
 
 ## Details
 
@@ -207,11 +270,19 @@ The function performs the following steps:
 
 - Ensure that the response variable is numeric.
 
-- Perform Analysis of Variance (ANOVA) using the specified formula and
-  data.
+- Fit the model with [`aov`](https://rdrr.io/r/stats/aov.html) and
+  compute the omnibus ANOVA table with **Type II Sums of Squares** via
+  [`Anova`](https://rdrr.io/pkg/car/man/Anova.html). Type II is used
+  (instead of the default Type I from `summary(aov())`) because Type I
+  main-effect SS depend on the order of terms in the formula in
+  unbalanced designs, whereas the `emmeans`-based post hoc tests are
+  model-based and therefore order-invariant. Pairing Type I with
+  `emmeans` can produce mismatched stories between the omnibus and post
+  hoc tables. Type II keeps both order-invariant and is safe with R's
+  default treatment contrasts (unlike Type III, which would require sum
+  / effect contrasts to be interpretable for main effects).
 
-- If `shapiro = TRUE`, check for normality of residuals using the
-  Shapiro-Wilk test.
+- Check normality of residuals using the Shapiro-Wilk test.
 
 - If residuals are not normal and `transformation = TRUE` apply a data
   transformation.
@@ -219,6 +290,26 @@ The function performs the following steps:
 - If significant differences are found in ANOVA, proceed with post hoc
   tests using estimated marginal means from `emmeans()` and Sidak
   adjustment (or another option of `adjust =`.
+
+**Effect and interaction plots.** When `interaction_plots = TRUE`, an
+estimated marginal means plot (estimate \\\pm\\ 95% CI, with jittered
+raw data and compact-letter-display labels) is added after the post hoc
+table for each categorical predictor. For a significant categorical
+interaction, interaction plots are drawn instead: a two-way interaction
+uses the x-axis plus colour (both orientations), while three- and
+four-way interactions add facet panels for the remaining factor(s), with
+one plot per choice of x-axis factor. Interactions involving five or
+more categorical factors are not plotted (a warning is issued); consult
+the post hoc cell-means table instead. When the response was transformed
+(Box-Cox or bestNormalize), the plotted estimates are back-transformed
+to the original scale (medians). The plots themselves are kept clean for
+publication (data, axes, and legend only); the descriptive label and
+explanatory caption are emitted as text above and below each figure in
+the report. All effect and interaction plots are ggplot2 objects and are
+stored in the returned object (e.g. `out$y1$effect_plot_treatment`,
+`out$y1$interaction_plot_a_b_1`) so they can be retrieved and customised
+afterwards. Matches
+[`f_glm`](https://delde001.github.io/rfriend/reference/f_glm.md).
 
 More response variables can be added using `-` or `+` (e.g.,
 `response1 + response2 ~ predictor`) to do a sequential
@@ -304,9 +395,7 @@ Sander H. van Delden <plantmind@proton.me>
 ## Examples
 
 ``` r
-# Make a factor of Species.
-iris$Species <- factor(iris$Species)
-
+# \donttest{
 # The left hand side contains two response variables,
 # so two aov's will be conducted, i.e. "Sepal.Width"
 # and "Sepal.Length" in response to the explanatory variable: "Species".
@@ -317,7 +406,7 @@ f_aov_out <- f_aov(Sepal.Width + Sepal.Length ~ Species,
                    # Do bestNormalize transformation for non-normal residual (Default is boxcox)
                    transformation = "bestnormalize"
                    )
-#> Saving output in: /tmp/RtmpG5HCTF/iris_aov_output.docx
+#> Saving output in: /tmp/RtmplsKqN3/iris_aov_output.docx
 
 # Print output to the console.
 print(f_aov_out)
@@ -329,19 +418,22 @@ print(f_aov_out)
 #> 
 #>  aov call:  Sepal.Width ~ Species 
 #> 
-#> Summary Table:
-#>              Df Sum Sq Mean Sq F value Pr(>F)    
-#> Species       2  11.35   5.672   49.16 <2e-16 ***
-#> Residuals   147  16.96   0.115                   
+#> Type II ANOVA Table (car::Anova):
+#> Anova Table (Type II tests)
+#> 
+#> Response: Sepal.Width
+#>           Sum Sq  Df F value    Pr(>F)    
+#> Species   11.345   2   49.16 < 2.2e-16 ***
+#> Residuals 16.962 147                      
 #> ---
 #> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 #> 
 #> --- Post hoc Comparisons of: Sepal.Width ---
 #> _________________________________________
 #>     Species emmean..        SE lower.CL upper.CL Letter  n
-#>  versicolor    2.770 0.0480391 2.653974 2.886026    a   50
-#>   virginica    2.974 0.0480391 2.857974 3.090026     b  50
-#>      setosa    3.428 0.0480391 3.311974 3.544026      c 50
+#>      setosa    3.428 0.0480391 3.333064 3.522936      a 50
+#>   virginica    2.974 0.0480391 2.879064 3.068936      b 50
+#>  versicolor    2.770 0.0480391 2.675064 2.864936      c 50
 #> 
 #>    
 #> ==========================================================
@@ -350,18 +442,21 @@ print(f_aov_out)
 #> 
 #>  aov call:  Sepal.Length ~ Species 
 #> 
-#> TRANSFORMED Summary Table:
-#>              Df Sum Sq Mean Sq F value Pr(>F)    
-#> Species       2  63.21  31.606   119.3 <2e-16 ***
-#> Residuals   147  38.96   0.265                   
+#> TRANSFORMED Type II ANOVA Table (car::Anova):
+#> Anova Table (Type II tests)
+#> 
+#> Response: Sepal.Length
+#>           Sum Sq  Df F value    Pr(>F)    
+#> Species   63.212   2  119.26 < 2.2e-16 ***
+#> Residuals 38.956 147                      
 #> ---
 #> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 #> 
 #> --- BACK TRANSFORMED Post hoc Comparisons of: Sepal.Length ---
 #>     Species median (BT) lower.CL upper.CL Letter  n
-#>      setosa    4.961446 4.861228 5.058657    a   50
-#>  versicolor    5.944039 5.721010 6.180035     b  50
-#>   virginica    6.593552 6.393878 6.750179      c 50
+#>   virginica    6.593552 6.422851 6.726200      a 50
+#>  versicolor    5.944039 5.752349 6.135501      b 50
+#>      setosa    4.961446 4.881046 5.040758      c 50
 #> ___________________________
 #> 
 #> Note: 'median (BT)' = back-transformed estimated marginal mean. Back-transforming a mean from a transformed scale returns the MEDIAN on the original scale, not the arithmetic mean. Report these as back-transformed medians. CIs are valid; SE is omitted (asymmetric on original scale).
@@ -376,6 +471,7 @@ plot(f_aov_out)
 
 
 
+# }
 
 #To print rmd output set chunck option to results = 'asis' and use cat().
 f_aov_rmd_out <- f_aov(Sepal.Width ~ Species, data = iris, output_type = "rmd")
@@ -397,7 +493,7 @@ cat(f_aov_rmd_out$rmd)
 #> ## 3. Homogeneity of Variances (Homoscedasticity)
 #> - The variances within each group should be approximately equal (homogeneity of variances). This ensures that the F-test statistic is reliable.
 #> - Homogeneity of variances assumption in ANOVA should be tested on the residuals, not directly on the raw data.
-#> - Levene's test can be applied to check for homogeneity of variances.It can also be graphically assessed by plotting residuals vs. fitted values and checking for patterns.
+#> - Levene's test can be applied to check for homogeneity of variances. It can also be graphically assessed by plotting residuals vs. fitted values and checking for patterns.
 #> - If violated, a data transformation or alternative tests (Welch's ANOVA, Kruskal-Wallis Test) are required.
 #> 
 #> 
@@ -411,18 +507,19 @@ cat(f_aov_rmd_out$rmd)
 #> # Analysis of:  Sepal.Width   
 #>   
 #> ## Normality and homoscedasticity of residuals of:  Sepal.Width   
-#> **Levene's test** for homogeneity of residuals: F-Statistic = 0.5902 p-value = 0.5555 .  According to 'Levene's Test' (0.5555 > 0.05) residuals **have equal variance** (homoscedasticity).  
-#> &nbsp;
+#> **Levene's test** for homogeneity of residuals: F-Statistic = 0.5902 p-value = 0.5555 .  According to 'Levene's Test' (0.5555 > 0.05) residuals do not depart from **equal variance** (homoscedasticity).&nbsp;
 #>   
 #> &nbsp;  
-#> **Shapiro-Wilk Test** for Normality of residuals: W = 0.9895 p-value = 0.323 .  According to 'Shapiro-Wilk Test' (0.323 > 0.05) residuals **ARE normally distributed**.  
+#> **Shapiro-Wilk Test** for Normality of residuals: W = 0.9895 p-value = 0.323 .  According to 'Shapiro-Wilk Test' (0.323 > 0.05) no significant departure from **normality** was detected
+#>           for the model residuals; check Q-Q plot.  
 #>   
 #> &nbsp;  
 #> Anderson-Darling normality test : A = 0.495  p = 0.2116    
-#>  According to 'Anderson-Darling test' (0.2116 > 0.05) residuals **ARE normally distributed**.  
+#>  According to 'Anderson-Darling test' (0.2116 > 0.05) no significant departure from **normality** was detected
+#>           for the model residuals; check Q-Q plot.  
 #>   
 #> Check the plots in the figure below to assess normality.  
-#> ![](/tmp/RtmpG5HCTF/file1d9464ac0cca.png)    
+#> ![](/tmp/RtmplsKqN3/file1da23aef658e.png)    
 #>   
 #> 
 #> ## Observed Descriptives Table of:  Sepal.Width ~ Species   
@@ -450,14 +547,17 @@ cat(f_aov_rmd_out$rmd)
 #>   
 #> 
 #> **Table** of aov call:  Sepal.Width ~ Species   
+#> Sums of Squares are computed with **Type II** via `car::Anova()`, which is order-invariant for the main effects in unbalanced designs and consistent with the model-based `emmeans` post hoc tests reported below.  
 #> 
-#> ------------------------------------------------------------------
-#> &nbsp;          Df    Sum Sq   Mean Sq   F value   Pr(>F)         
-#> --------------- ----- -------- --------- --------- ---------------
-#> **Species**     2     11.34    5.6725    49.16     **4.492e-17**  
+#> --------------------------------------------------------
+#> &nbsp;          Sum Sq   Df    F value   Pr(>F)         
+#> --------------- -------- ----- --------- ---------------
+#> **Species**     11.34    2     49.16     **4.492e-17**  
 #> 
-#> **Residuals**   147   16.96    0.1154    NA        NA             
-#> ------------------------------------------------------------------
+#> **Residuals**   16.96    147                            
+#> --------------------------------------------------------
+#> 
+#> Type II ANOVA (car::Anova)
 #> 
 #> &nbsp;
 #>   
@@ -470,7 +570,7 @@ cat(f_aov_rmd_out$rmd)
 #>           emmeans correct for unbalanced designs and reflect the statistical
 #>           model used for pairwise comparisons (significance testing **letters**). SE values are identical for groups with equal
 #>           sample sizes and differ only to reflect variation in group size ($n$). The $n$ column corresponds to the raw observed data of Sepal.Width. If $n$ is blank, there is no observed data and
-#>           emmeans estimated the missing data point.
+#>           emmeans estimates marginal means from the model.
 #>         
 #>   
 #> &nbsp;
@@ -481,10 +581,12 @@ cat(f_aov_rmd_out$rmd)
 #>           the Emmeans table (preferably with 95% CIs).
 #>           Figures should include all individual raw data points to show the
 #>           Model Fit (Emmeans) relative to the Observed Spread (Raw Data).
-#>         
+#>           
 #>    
 #> &nbsp;   
-#>   
+#>    
+#> &nbsp;  
+#>    
 #> 
 #> **Post Hoc Marginal Means Table** of aov call: Sepal.Width ~ Species  
 #> 
@@ -492,24 +594,23 @@ cat(f_aov_rmd_out$rmd)
 #> Species      emmean     SE      lower     upper     Letter   n   
 #>                                 CL        CL                     
 #> ------------ ---------- ------- --------- --------- -------- ----
-#> versicolor   2.770      0.048   2.654     2.886     a        50  
+#> setosa       3.428      0.048   3.333     3.523     a        50  
 #> 
-#> virginica    2.974      0.048   2.858     3.090     b        50  
+#> virginica    2.974      0.048   2.879     3.069     b        50  
 #> 
-#> setosa       3.428      0.048   3.312     3.544     c        50  
+#> versicolor   2.770      0.048   2.675     2.865     c        50  
 #> -----------------------------------------------------------------
 #> 
 #> Degrees of freedom: 147  
 #> Confidence level used: 0.95  
-#> Conf-level adjustment: sidak method for 3 estimates  
-#> P value adjustment: sidak method for 3 tests  
-#> significance level used: α = 0.05  
 #> 
 #> **Note:** Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different. Sharing a letter indicates insufficient evidence to claim a difference; it does not prove the groups are identical.
 #>         
 #> 
-#> ## Estimated Means Plot of: Sepal.Width  
-#> ![](/tmp/RtmpG5HCTF/file1d946c337cbf.png)    
+#> ## Estimated Means Plot of: Sepal.Width  (Species)  
+#> ![](/tmp/RtmplsKqN3/file1da23041b948.png)    
+#>   
+#> *Points are (jittered) raw data; estimates are model estimated marginal means with 95% CI. Groups sharing a letter are not significantly different (α = 0.05); groups with different letters are significantly different. Sharing a letter indicates insufficient evidence of a difference, not proof that the groups are identical.*   
 #>   
 
 ```

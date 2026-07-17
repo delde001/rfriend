@@ -12,10 +12,13 @@
 <url><loc>https://delde001.github.io/rfriend/reference/f_clear.html</loc></url>
 <url><loc>https://delde001.github.io/rfriend/reference/f_conditional_round.html</loc></url>
 <url><loc>https://delde001.github.io/rfriend/reference/f_corplot.html</loc></url>
+<url><loc>https://delde001.github.io/rfriend/reference/f_example_data.html</loc></url>
 <url><loc>https://delde001.github.io/rfriend/reference/f_factors.html</loc></url>
+<url><loc>https://delde001.github.io/rfriend/reference/f_friedman.html</loc></url>
 <url><loc>https://delde001.github.io/rfriend/reference/f_glm.html</loc></url>
 <url><loc>https://delde001.github.io/rfriend/reference/f_hist.html</loc></url>
 <url><loc>https://delde001.github.io/rfriend/reference/f_kruskal_test.html</loc></url>
+<url><loc>https://delde001.github.io/rfriend/reference/f_lm.html</loc></url>
 <url><loc>https://delde001.github.io/rfriend/reference/f_lmer.html</loc></url>
 <url><loc>https://delde001.github.io/rfriend/reference/f_load_packages.html</loc></url>
 <url><loc>https://delde001.github.io/rfriend/reference/f_long.html</loc></url>
@@ -35,8 +38,10 @@
 <url><loc>https://delde001.github.io/rfriend/reference/f_theme.html</loc></url>
 <url><loc>https://delde001.github.io/rfriend/reference/f_wilcox_test.html</loc></url>
 <url><loc>https://delde001.github.io/rfriend/reference/index.html</loc></url>
+<url><loc>https://delde001.github.io/rfriend/reference/plant_trial.html</loc></url>
 <url><loc>https://delde001.github.io/rfriend/reference/plot.f_bestNormalize.html</loc></url>
 <url><loc>https://delde001.github.io/rfriend/reference/plot.f_boxcox.html</loc></url>
+<url><loc>https://delde001.github.io/rfriend/reference/plot.f_friedman.html</loc></url>
 <url><loc>https://delde001.github.io/rfriend/reference/plot.f_kruskal_test.html</loc></url>
 <url><loc>https://delde001.github.io/rfriend/reference/plot.f_lmer.html</loc></url>
 <url><loc>https://delde001.github.io/rfriend/reference/plot.f_long.html</loc></url>
