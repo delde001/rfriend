@@ -20,11 +20,11 @@
 #
 # Shared fixtures and wrappers
 # ----------------------------
-#   * quiet_f_friedman()  -> helper-quiet.R (forces plot = FALSE)
+#   * quiet_f_friedman()  -> helper-quiet.R (forces diagnostic_plots = FALSE, effect_plots = FALSE)
 # The make_rcb_*() builders below are file-local on purpose: the Friedman test
 # needs an unreplicated complete block design (response ~ group | block), and
 # no shared fixture in helper-data.R has that shape. quiet_f_friedman() forces
-# plot = FALSE, so tests that need stored ggplots (plot = TRUE) call
+# diagnostic_plots = FALSE, effect_plots = FALSE, so tests that need stored ggplots (diagnostic_plots = TRUE, effect_plots = TRUE) call
 # f_friedman() directly. The graphics device is opened once in setup.R.
 #
 # CRAN strategy
@@ -185,24 +185,24 @@ test_that("f_friedman structure: alpha and adjust stored correctly", {
 # =============================================================================
 # 3. plot toggle
 # =============================================================================
-test_that("f_friedman plot = FALSE: no ggplot objects stored", {
+test_that("f_friedman diagnostic_plots = FALSE, effect_plots = FALSE: no ggplot objects stored", {
   skip_on_cran()
   df    <- make_rcb_data()
-  # quiet_f_friedman() already forces plot = FALSE.
+  # quiet_f_friedman() already forces diagnostic_plots = FALSE, effect_plots = FALSE.
   entry <- quiet_f_friedman(score ~ condition | subject, data = df)[["score"]]
   expect_null(entry$distributions)
   expect_null(entry$Boxplot)
 })
 
-test_that("f_friedman plot = TRUE: density and boxplot ggplots are stored", {
+test_that("f_friedman diagnostic_plots = TRUE, effect_plots = TRUE: density and boxplot ggplots are stored", {
   skip_on_cran()
   df <- make_rcb_data()
-  # plot = TRUE cannot go through quiet_f_friedman() (it hardcodes plot = FALSE);
+  # diagnostic_plots = TRUE, effect_plots = TRUE cannot go through quiet_f_friedman() (it hardcodes diagnostic_plots = FALSE, effect_plots = FALSE);
   # call f_friedman() directly. The suite-wide device from setup.R absorbs any
   # drawing; run_quiet_warn() suppresses the markdown and any chatter.
   entry <- run_quiet_warn(
     f_friedman(score ~ condition | subject, data = df,
-               plot = TRUE, intro_text = FALSE, open_generated_files = FALSE)
+               diagnostic_plots = TRUE, effect_plots = TRUE, intro_text = FALSE, open_generated_files = FALSE)
   )[["score"]]
   expect_s3_class(entry$distributions, "ggplot")
   expect_s3_class(entry$Boxplot, "ggplot")
@@ -375,7 +375,7 @@ test_that("f_friedman rmd: stores a character markdown string under res$rmd", {
   skip_on_cran()
   df  <- make_rcb_data()
   res <- f_friedman(score ~ condition | subject, data = df,
-                    plot = FALSE, output_type = "rmd",
+                    diagnostic_plots = FALSE, effect_plots = FALSE, output_type = "rmd",
                     open_generated_files = FALSE)
   expect_true("rmd" %in% names(res))
   expect_type(res[["rmd"]], "character")
@@ -389,10 +389,10 @@ test_that("f_friedman rmd: multiple-testing warning present for k > 1, absent fo
   df$score2 <- df$score + rnorm(nrow(df), 0, 1)
 
   res_multi <- f_friedman(score + score2 ~ condition | subject, data = df,
-                          plot = FALSE, output_type = "rmd",
+                          diagnostic_plots = FALSE, effect_plots = FALSE, output_type = "rmd",
                           open_generated_files = FALSE)
   res_one   <- f_friedman(score ~ condition | subject, data = df,
-                          plot = FALSE, output_type = "rmd",
+                          diagnostic_plots = FALSE, effect_plots = FALSE, output_type = "rmd",
                           open_generated_files = FALSE)
 
   expect_true(grepl("Multiple Testing", res_multi[["rmd"]]))
@@ -403,7 +403,7 @@ test_that("f_friedman intro_text = FALSE runs and omits the assumptions section"
   skip_on_cran()
   df  <- make_rcb_data()
   res <- f_friedman(score ~ condition | subject, data = df,
-                    plot = FALSE, intro_text = FALSE, output_type = "rmd",
+                    diagnostic_plots = FALSE, effect_plots = FALSE, intro_text = FALSE, output_type = "rmd",
                     open_generated_files = FALSE)
   expect_false(grepl("Assumptions of the Friedman Test", res[["rmd"]]))
 })
@@ -423,11 +423,20 @@ test_that("f_friedman print method runs and mentions Friedman", {
 test_that("f_friedman plot method runs without error", {
   skip_on_cran()
   df  <- make_rcb_data()
-  # Need plot = TRUE so there is something to re-print; call f_friedman directly.
+  # Need diagnostic_plots = TRUE, effect_plots = TRUE so there is something to re-print; call f_friedman directly.
   res <- run_quiet_warn(
     f_friedman(score ~ condition | subject, data = df,
-               plot = TRUE, intro_text = FALSE, open_generated_files = FALSE)
+               diagnostic_plots = TRUE, effect_plots = TRUE, intro_text = FALSE, open_generated_files = FALSE)
   )
   # The suite-wide PDF device from setup.R receives the plots.
   expect_no_error(suppressWarnings(plot(res)))
+})
+
+test_that("letters note closes the alpha parenthesis", {
+  pt <- plant_trial
+  pt$time_f <- factor(pt$time_weeks)
+  res <- quiet_f_friedman(biomass_g ~ time_f | plant_id, data = pt)
+  out <- paste(utils::capture.output(print(res)), collapse = " ")
+  expect_false(grepl("0.050.Groups", out, fixed = TRUE))
+  expect_match(out, "0.050). Groups", fixed = TRUE)
 })

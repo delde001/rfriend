@@ -204,7 +204,7 @@ test_that("with separation: LRT pairwise letters differ between groups", {
                info = "All letters identical - LRT pairwise comparison likely failed")
 
   # Should not fall back to all em-dashes (that means LRT computation failed)
-  expect_false(all(letters_col == "\u2014"),
+  expect_false(all(letters_col == "-"),
                info = "All dashes - LRT letters were not computed")
 
   # Should not be 'ns' (overall model IS significant)
@@ -231,7 +231,7 @@ test_that("sig_effects is TRUE and normal letters for am ~ cyl", {
   expect_true(result$am$sig_effects)
   letters_col <- result$am$posthoc$post_hoc_summary_table$Letter
   expect_false(all(letters_col == "ns"))
-  expect_false(all(letters_col == "\u2014"))
+  expect_false(all(letters_col == "-"))
 })
 
 # =============================================================================
@@ -890,4 +890,151 @@ test_that("na.action = na.omit is honored by glm via dots", {
           intro_text = FALSE)
   )
   expect_equal(nobs(res[[1]]$model), 76L)      # 80 - 4
+})
+
+# =============================================================================
+# CATEGORICAL BINOMIAL RESPONSE: the 'event' argument
+# =============================================================================
+# glm() silently codes the first factor level as 0 and all others as 1, so
+# the modelled outcome depends on label spelling. f_glm() requires 'event'.
+
+ev_data <- local({
+  d <- data.frame(
+    grp    = factor(rep(c("A", "B", "C"), each = 20)),
+    status = factor(rep(c("healthy", "diseased", "healthy", "diseased",
+                          "diseased", "healthy"), times = c(14, 6, 9, 11, 15, 5))),
+    stage  = factor(rep(c("seedling", "vegetative", "flowering"), 20),
+                    levels = c("seedling", "vegetative", "flowering")),
+    flag   = rep(c(TRUE, FALSE), 30)
+  )
+  d$status01 <- as.integer(d$status == "diseased")
+  d$status_chr <- as.character(d$status)
+  d
+})
+
+test_that("factor response without event stops and lists levels and an example", {
+  err <- tryCatch(f_glm(status ~ grp, data = ev_data, family = "binomial"),
+                  error = function(e) conditionMessage(e))
+  expect_match(err, "does not guess", fixed = TRUE)
+  expect_match(err, "\"diseased\" (n = 32)", fixed = TRUE)
+  expect_match(err, "event = \"healthy\")", fixed = TRUE)
+})
+
+test_that("event recodes exactly like a manual 0/1 column", {
+  a <- run_glm(status ~ grp, data = ev_data, family = "binomial", event = "diseased")
+  b <- run_glm(status01 ~ grp, data = ev_data, family = "binomial")
+  expect_equal(unname(coef(a$status$model)), unname(coef(b$status01$model)))
+  expect_identical(a$status$event_coding$event, "diseased")
+  expect_identical(a$status$event_coding$non_event, "healthy")
+  expect_identical(a$status$event_coding$n_event, sum(ev_data$status01))
+})
+
+test_that("choosing the other level flips the sign, as documented", {
+  a <- run_glm(status ~ grp, data = ev_data, family = "binomial", event = "diseased")
+  h <- run_glm(status ~ grp, data = ev_data, family = "binomial", event = "healthy")
+  expect_equal(unname(coef(a$status$model)), -unname(coef(h$status$model)))
+})
+
+test_that("character responses work the same as factors", {
+  a <- run_glm(status_chr ~ grp, data = ev_data, family = "binomial", event = "diseased")
+  b <- run_glm(status01 ~ grp, data = ev_data, family = "binomial")
+  expect_equal(unname(coef(a$status_chr$model)), unname(coef(b$status01$model)))
+})
+
+test_that("the coding is announced with a message and stated in print()", {
+  expect_message(
+    suppressWarnings(f_glm(status ~ grp, data = ev_data, family = "binomial",
+                           event = "diseased")),
+    "coded as 1 = \"diseased\"", fixed = TRUE)
+  a   <- run_glm(status ~ grp, data = ev_data, family = "binomial", event = "diseased")
+  out <- paste(utils::capture.output(print(a)), collapse = " ")
+  expect_match(out, "P(status = diseased)", fixed = TRUE)
+})
+
+test_that("misspelled event stops and lists the real levels", {
+  expect_error(run_glm(status ~ grp, data = ev_data, family = "binomial",
+                       event = "Diseased"),
+               "not an observed level.*\"diseased\".*case-sensitive")
+})
+
+test_that("three or more levels: no event stops with pooling options", {
+  err <- tryCatch(f_glm(stage ~ grp, data = ev_data, family = "binomial"),
+                  error = function(e) conditionMessage(e))
+  expect_match(err, "3 levels", fixed = TRUE)
+  expect_match(err, "nnet::multinom", fixed = TRUE)
+  expect_match(err, "MASS::polr", fixed = TRUE)
+})
+
+test_that("three or more levels: event pools the rest and says so", {
+  a <- run_glm(stage ~ grp, data = ev_data, family = "binomial",
+               event = c("vegetative", "flowering"))
+  cd <- a$stage$event_coding
+  expect_true(cd$pooled)
+  expect_identical(cd$non_event, "seedling")
+  expect_identical(cd$n_event, 40L)
+  expect_match(cd$text, "more than two levels", fixed = TRUE)
+})
+
+test_that("naming every level as the event is an error", {
+  expect_error(run_glm(status ~ grp, data = ev_data, family = "binomial",
+                       event = c("healthy", "diseased")),
+               "nothing is left to compare")
+})
+
+test_that("logical response needs no event; TRUE is the event", {
+  a <- run_glm(flag ~ grp, data = ev_data, family = "binomial")
+  expect_identical(a$flag$event_coding$event, "TRUE")
+  f <- run_glm(flag ~ grp, data = ev_data, family = "binomial", event = FALSE)
+  expect_identical(f$flag$event_coding$event, "FALSE")
+})
+
+test_that("categorical response with a non-binomial family is rejected", {
+  expect_error(run_glm(status ~ grp, data = ev_data, family = "poisson",
+                       event = "diseased"),
+               "only be used with family = \"binomial\"", fixed = TRUE)
+})
+
+test_that("event that would be ignored is an error, not silent", {
+  expect_error(run_glm(status01 ~ grp, data = ev_data, family = "binomial",
+                       event = "diseased"),
+               "would be ignored")
+  expect_error(run_glm(status01 ~ grp, data = ev_data, family = "binomial",
+                       event = c(status01 = "1")),
+               "is numeric")
+  expect_error(run_glm(status ~ grp, data = ev_data, family = "binomial",
+                       event = c(typo = "diseased")),
+               "not a response in the formula")
+})
+
+test_that("several responses take a named event per response", {
+  a <- run_glm(status + stage ~ grp, data = ev_data, family = "binomial",
+               event = list(status = "diseased", stage = "flowering"))
+  expect_identical(a$status$event_coding$event, "diseased")
+  expect_identical(a$stage$event_coding$event, "flowering")
+})
+
+test_that("NA in a categorical response stays missing", {
+  d <- ev_data
+  d$status[c(1, 30)] <- NA
+  a <- run_glm(status ~ grp, data = d, family = "binomial", event = "diseased")
+  expect_identical(a$status$event_coding$n_na, 2L)
+  expect_identical(stats::nobs(a$status$model), 58L)
+})
+
+test_that("bundled plant_trial works with event = 'yes'", {
+  a <- run_glm(infected ~ treatment, data = plant_trial, family = "binomial",
+               event = "yes")
+  expect_identical(a$infected$event_coding$label, "P(infected = yes)")
+})
+
+test_that("an intercept-only model runs and skips the post hoc step (BUGS #23)", {
+  wk6 <- subset(plant_trial, time_weeks == 6)
+  expect_no_error(g <- f_glm(chloroplast_count ~ 1, data = wk6, family = "poisson"))
+  expect_null(g$chloroplast_count$posthoc)
+  expect_equal(unname(coef(g$chloroplast_count$model)),
+               log(mean(wk6$chloroplast_count)))
+  txt <- capture.output(print(g))
+  expect_true(any(grepl("None: the model has no predictors (intercept only).", txt, fixed = TRUE)))
+  b <- suppressMessages(f_glm(infected ~ 1, data = wk6, family = "binomial", event = "yes"))
+  expect_equal(unname(coef(b$infected$model)), qlogis(5 / 20))
 })

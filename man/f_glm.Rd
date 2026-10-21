@@ -8,8 +8,9 @@ f_glm(
   formula,
   family = gaussian(),
   data = NULL,
+  event = NULL,
   diagnostic_plots = TRUE,
-  effect_plot = TRUE,
+  effect_plots = TRUE,
   contrast_plots = FALSE,
   alpha = 0.05,
   adjust = "sidak",
@@ -22,6 +23,7 @@ f_glm(
   close_generated_files = FALSE,
   open_generated_files = interactive(),
   influence_threshold = 2,
+  effect_plot = lifecycle::deprecated(),
   ...
 )
 }
@@ -36,9 +38,19 @@ the result of a call to a family function. (See \code{\link{family}} for details
 
 \item{data}{A data frame containing the variables in the model.}
 
+\item{event}{Only for \code{family = binomial} (or \code{quasibinomial})
+with a categorical response (factor, character or logical). The level,
+or levels, of the response that count as the event, coded 1. All other
+levels are coded 0. For example, \code{event = "yes"} for a response with
+levels \code{"no"} and \code{"yes"} models P(response = "yes"). Default
+\code{NULL}: a factor or character response then stops with a message
+listing its levels, because rfriend does not guess which outcome you
+mean. A logical response needs no \code{event} (\code{TRUE} is the
+event). See Details, "Categorical binomial responses".}
+
 \item{diagnostic_plots}{Logical. If \code{TRUE}, plots are included in the output files.}
 
-\item{effect_plot}{Logical. If \code{TRUE} (default), estimated marginal
+\item{effect_plots}{Logical. If \code{TRUE} (default), estimated marginal
 means plots (or interaction plots, when a categorical interaction is
 significant) are added after the post hoc table. See Details for what is
 drawn and how the plots are stored.}
@@ -119,6 +131,9 @@ Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.}
 with hat values exceeding \code{influence_threshold * mean(hat values)} are flagged
 as high-leverage points. Default is \code{2}, a common rule of thumb.}
 
+\item{effect_plot}{\strong{Deprecated} in 3.2.1. Use \code{effect_plots} instead. If
+supplied, its value is passed to \code{effect_plots} with a warning.}
+
 \item{...}{Additional arguments passed to \code{glm()}.}
 }
 \value{
@@ -130,6 +145,11 @@ An object of class 'f_glm' (a named list, one entry per response variable) conta
     \item{diagnostics}{DHARMa residual checks and hat-value based leverage diagnostics.}
     \item{posthoc}{Estimated marginal means, pairwise comparisons, CLD letters, and summary table.}
     \item{sep_flag}{Logical indicating whether complete separation was detected.}
+    \item{event_coding}{For a categorical binomial response: a list with the
+      \code{event} and \code{non_event} levels, their counts, the number of
+      missing values, whether levels were \code{pooled}, the probability
+      \code{label} and a one-sentence \code{text}. \code{NULL} for numeric
+      responses.}
     \item{lrt_pct_explained}{McFadden's Pseudo-R\eqn{^2}.}
   }
   Using the option \code{output_type}, it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and plot methods for 'f_glm' objects.
@@ -141,13 +161,43 @@ can be analyzed in sequence and the generated output can be in various formats
 ('Word', 'pdf', 'Excel').
 }
 \details{
-The function first checks if all specified variables are present in the data and ensures that the response variable is numeric.
+The function first checks if all specified variables are present in the data and ensures that the response variable is numeric, or a categorical response with an explicit \code{event} for binomial families (see below).
+
+\strong{Categorical binomial responses and \code{event}.} A binomial GLM
+models the probability of one outcome, the event (coded 1), against
+everything else (coded 0). Base \code{glm()} silently treats the
+\emph{first} factor level as 0 and all other levels as 1. Factor levels
+sort alphabetically by default, so \code{"diseased"}/\code{"healthy"}
+would model P(healthy), while \code{"no"}/\code{"yes"} models P(yes): the
+sign of every coefficient depends on how the labels happen to sort.
+\code{f_glm()} therefore never guesses. A factor or character response
+requires \code{event}; the chosen coding is printed when the model is
+fitted, shown under the model summary in the report and in
+\code{print()}, used as the y-axis label of the estimated-means plots,
+and stored in \code{out$<response>$event_coding}.
+\itemize{
+  \item \emph{Two levels:} \code{event} names one of them.
+  \item \emph{Three or more levels} (any number is allowed): a binomial
+    model still compares only two outcomes. \code{event} names one or more
+    levels as the event, e.g. \code{event = c("flowering", "fruiting")}, and
+    all remaining levels are pooled as 0. The report says which levels were
+    pooled. If the categories must stay separate, use a multinomial model
+    (\code{nnet::multinom()}) or, for ordered categories, an ordinal model
+    (\code{MASS::polr()}) instead.
+  \item \emph{Several responses} (\code{y1 + y2 ~ x}): an unnamed
+    \code{event} applies to every categorical response; use a named vector
+    or list for different events, e.g.
+    \code{event = c(infected = "yes", lodged = "lodged")}.
+  \item Numeric 0/1 responses are used as they are (1 = event); giving
+    \code{event} for a numeric response is an error. Missing values stay
+    \code{NA}.
+}
 
 It fits a Generalized Linear Model (GLM) using the specified formula, family, and data. Model diagnostics are performed with DHARMa (simulation-based residual checks including a KS test, dispersion test, and outlier test). High-leverage observations are flagged using hat values.
 
 Significance of each predictor is assessed via Type II Analysis of Deviance (\code{stats::drop1()}). If significant effects are found, post hoc pairwise comparisons are performed using estimated marginal means from \code{emmeans()} with the chosen p-value adjustment method (default: Sidak). When complete separation is detected, the function falls back to likelihood ratio test (LRT) based pairwise comparisons, which are robust to separation.
 
-\strong{Effect and interaction plots.} When \code{effect_plot = TRUE}, an
+\strong{Effect and interaction plots.} When \code{effect_plots = TRUE}, an
 estimated marginal means plot (estimate \eqn{\pm} 95\% CI on the response
 scale, with jittered raw data and compact-letter-display labels) is added
 after the post hoc table for each categorical predictor. For a significant
@@ -170,7 +220,7 @@ More response variables can be added using \code{+} (e.g., \code{response1 + res
 
 Outputs can be generated in multiple formats ("pdf", "word", "excel" and "rmd") as specified by \code{output_type}. The function also closes any open 'Word' files to avoid conflicts when generating 'Word' documents. If \code{output_type = "rmd"} is used it is advised to use it in a chunk with \{r, echo=FALSE, results='asis'\}
 
-This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
+This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or higher), a universal document converter.
 \itemize{
 \item \bold{Windows:} Install Pandoc and ensure the installation folder \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
 \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.
@@ -197,6 +247,13 @@ glm_bin_word <- f_glm(vs ~ cyl,
                  data = mtcars_mod,
                  output_type = "word"
                  )
+
+# Factor response: name the event explicitly (models P(infected = "yes"))
+glm_inf <- f_glm(infected ~ treatment,
+                 family = binomial,
+                 data = plant_trial,
+                 event = "yes")
+glm_inf$infected$event_coding$text
 
 # GLM Poisson example with output to rmd text
 data(warpbreaks)

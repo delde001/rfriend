@@ -84,7 +84,7 @@ If n < 100, \code{loo = TRUE}, \code{allow_orderNorm = FALSE} and \code{r} doesn
 If 100 <= n < 200, \code{loo = FALSE}, \code{allow_orderNorm = TRUE} and \code{r = 50}.
 If n >= 200, \code{loo = FALSE}, \code{allow_orderNorm = TRUE}, \code{r = 10}. These setting can be overwritten by user options.
 
-This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
+This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or higher), a universal document converter.
 \itemize{
 \item \bold{Windows:} Install Pandoc and ensure the installation folder \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
 \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.

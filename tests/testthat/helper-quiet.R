@@ -63,7 +63,7 @@ run_quiet_warn <- function(expr) {
 # instead of:
 #
 #     suppressMessages(capture.output(out <- f_aov(y ~ grp, data = df,
-#         output_type = "default", norm_plots = FALSE, intro_text = FALSE,
+#         output_type = "default", diagnostic_plots = FALSE, intro_text = FALSE,
 #         open_generated_files = FALSE), file = nullfile()))
 #
 # Implementation note: each wrapper captures its own `...` and forwards
@@ -76,7 +76,7 @@ quiet_f_aov <- function(...) {
   suppressMessages(
     utils::capture.output(
       result <- f_aov(..., output_type = "default",
-                      norm_plots = FALSE, intro_text = FALSE,
+                      diagnostic_plots = FALSE, intro_text = FALSE,
                       open_generated_files = FALSE),
       file = nullfile()
     )
@@ -88,7 +88,7 @@ quiet_f_lmer <- function(...) {
   suppressMessages(suppressWarnings(
     utils::capture.output(
       result <- f_lmer(..., output_type = "default",
-                       norm_plots = FALSE, intro_text = FALSE,
+                       diagnostic_plots = FALSE, intro_text = FALSE,
                        open_generated_files = FALSE),
       file = nullfile()
     )
@@ -100,7 +100,7 @@ quiet_f_glm <- function(...) {
   suppressMessages(
     utils::capture.output(
       result <- f_glm(..., output_type = "default",
-                      norm_plots = FALSE, intro_text = FALSE,
+                      diagnostic_plots = FALSE, intro_text = FALSE,
                       open_generated_files = FALSE),
       file = nullfile()
     )
@@ -145,7 +145,7 @@ quiet_f_lm <- function(...) {
   suppressMessages(
     utils::capture.output(
       result <- f_lm(..., output_type = "default",
-                     norm_plots = FALSE, effect_plots = FALSE,
+                     diagnostic_plots = FALSE, effect_plots = FALSE,
                      intro_text = FALSE, open_generated_files = FALSE),
       file = nullfile()
     )
@@ -157,7 +157,8 @@ quiet_f_friedman <- function(...) {
   suppressMessages(suppressWarnings(
     utils::capture.output(
       result <- f_friedman(..., output_type = "default",
-                           plot = FALSE, intro_text = FALSE,
+                           diagnostic_plots = FALSE, effect_plots = FALSE,
+                           intro_text = FALSE,
                            open_generated_files = FALSE),
       file = nullfile()
     )

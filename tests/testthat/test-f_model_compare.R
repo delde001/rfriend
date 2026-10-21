@@ -739,3 +739,102 @@ test_that("glm: Nagelkerke R\u00b2 agrees with update() method", {
 
   expect_equal(new_r2, old_r2, tolerance = 1e-6)
 })
+
+test_that("multi-stratum Error() aov models stop with a clear message", {
+  npk_a1 <- aov(yield ~ N + Error(block), data = npk)
+  npk_a2 <- aov(yield ~ N + P + Error(block), data = npk)
+  expect_error(f_model_compare(npk_a1, npk_a2),
+               regexp = "Multi-stratum aov models")
+  # The internal data.frame() row-mismatch error must not surface any more.
+  msg <- tryCatch(f_model_compare(npk_a1, npk_a2),
+                  error = function(e) conditionMessage(e))
+  expect_false(grepl("differing number of rows", msg, fixed = TRUE))
+})
+
+# ---- rfriend results, GLM test type, REML refit (BUGS #22) -----------------
+
+test_that("results of f_lm(), f_aov() and f_glm() are accepted as models", {
+  wk6 <- subset(plant_trial, time_weeks == 6)
+  base <- f_model_compare(lm(height_cm ~ treatment, data = wk6),
+                          lm(height_cm ~ treatment + chloroplast_count, data = wk6))
+  f1 <- f_lm(height_cm ~ treatment, data = wk6)
+  f2 <- f_lm(height_cm ~ treatment + chloroplast_count, data = wk6)
+  r  <- f_model_compare(f1, f2)
+  expect_equal(r$metrics_table, base$metrics_table)
+  expect_equal(r$model1_name, "f1")
+  expect_equal(r$model1_class, "lm")
+
+  a1 <- f_aov(height_cm ~ treatment, data = wk6)
+  a2 <- f_aov(height_cm ~ block + treatment, data = wk6)
+  ra <- f_model_compare(a1, a2)
+  expect_true(ra$nested)
+  expect_equal(ra$model1_class, "aov")
+
+  g1 <- suppressMessages(f_glm(chloroplast_count ~ treatment, data = wk6, family = "poisson"))
+  g2 <- suppressMessages(f_glm(chloroplast_count ~ treatment + block, data = wk6, family = "poisson"))
+  rg <- f_model_compare(g1, g2)
+  expect_equal(rg$model1_class, "glm")
+})
+
+test_that("an rfriend result with several responses stops with a clear message", {
+  wk6 <- subset(plant_trial, time_weeks == 6)
+  mm <- f_lm(height_cm + biomass_g ~ treatment, data = wk6)
+  f2 <- f_lm(height_cm ~ treatment + chloroplast_count, data = wk6)
+  expect_error(f_model_compare(mm, f2),
+               "2 responses (height_cm, biomass_g). Compare one response at a time",
+               fixed = TRUE)
+})
+
+test_that("a transformed rfriend result stops: models on different scales", {
+  wk6 <- subset(plant_trial, time_weeks == 6)
+  b1 <- f_lm(biomass_g ~ treatment, data = wk6, force_transformation = "biomass_g")
+  b2 <- f_lm(biomass_g ~ treatment + block, data = wk6)
+  expect_true(b1$biomass_g$Response_Transformed)
+  expect_error(f_model_compare(b1, b2), "was transformed by f_lm()", fixed = TRUE)
+})
+
+test_that("Poisson GLMs are compared with a chi-square test, not an F test", {
+  wk6 <- subset(plant_trial, time_weeks == 6)
+  m1 <- glm(chloroplast_count ~ treatment, data = wk6, family = poisson)
+  m2 <- glm(chloroplast_count ~ treatment + block, data = wk6, family = poisson)
+  expect_no_warning(r <- f_model_compare(m1, m2))
+  expect_true("Pr(>Chi)" %in% names(r$anova_comparison))
+  expected <- anova(m1, m2, test = "Chisq")[2, "Pr(>Chi)"]
+  expect_equal(r$metrics_table$Difference[r$metrics_table$Metric == "ANOVA p-value"],
+               expected)
+})
+
+test_that("gaussian GLMs keep the F test", {
+  wk6 <- subset(plant_trial, time_weeks == 6)
+  m1 <- glm(height_cm ~ treatment, data = wk6)
+  m2 <- glm(height_cm ~ treatment + block, data = wk6)
+  r <- f_model_compare(m1, m2)
+  expect_true("Pr(>F)" %in% names(r$anova_comparison))
+})
+
+test_that("REML mixed models are refitted with ML, also when stored by f_lmer()", {
+  skip_if_not_installed("lme4")
+  pt <- plant_trial
+  pt$time_f <- factor(pt$time_weeks)
+  ml1 <- lme4::lmer(height_cm ~ treatment + time_f + (1 | block/plant_id),
+                    data = pt, REML = FALSE)
+  ml2 <- lme4::lmer(height_cm ~ treatment * time_f + (1 | block/plant_id),
+                    data = pt, REML = FALSE)
+  ref <- suppressWarnings(f_model_compare(ml1, ml2))
+
+  reml1 <- lme4::lmer(height_cm ~ treatment + time_f + (1 | block/plant_id), data = pt)
+  reml2 <- lme4::lmer(height_cm ~ treatment * time_f + (1 | block/plant_id), data = pt)
+  expect_message(r1 <- suppressWarnings(f_model_compare(reml1, reml2)),
+                 "refitted with ML")
+  expect_equal(r1$metrics_table$Model1[1:3], ref$metrics_table$Model1[1:3])
+
+  l1 <- suppressMessages(f_lmer(height_cm ~ treatment + time_f + (1 | block/plant_id), data = pt))
+  l2 <- suppressMessages(f_lmer(height_cm ~ treatment * time_f + (1 | block/plant_id), data = pt))
+  r2 <- suppressWarnings(suppressMessages(f_model_compare(l1, l2)))
+  expect_equal(r2$metrics_table$Model1[1:3], ref$metrics_table$Model1[1:3])
+  p_ref <- ref$metrics_table$Difference[ref$metrics_table$Metric == "ANOVA p-value"]
+  p_r2  <- r2$metrics_table$Difference[r2$metrics_table$Metric == "ANOVA p-value"]
+  # refitML() and a direct ML fit converge to the same optimum up to
+  # optimizer precision
+  expect_equal(p_r2, p_ref, tolerance = 1e-5)
+})

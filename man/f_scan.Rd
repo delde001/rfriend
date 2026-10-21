@@ -113,7 +113,7 @@ Creates a 3-panel diagnostic dashboard to check data distribution and assumption
 }
 
 
-This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
+This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or higher), a universal document converter.
 \itemize{
 \item \bold{Windows:} Install Pandoc and ensure the installation folder.
 \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.

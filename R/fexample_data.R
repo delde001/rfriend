@@ -13,9 +13,12 @@
 #'   \code{"plant_trial_raw.csv"}). If \code{NULL} (the default) the function
 #'   returns the names of all available example files.
 #' @param dest Optional path. If supplied, the example file is copied there and
-#'   the path of the copy is returned (invisibly). \code{dest} may be a
-#'   directory (the original file name is kept) or a full target file path. The
-#'   working directory is never changed.
+#'   the path of the copy is returned (invisibly). \code{dest} is a folder when
+#'   it is an existing folder, ends with \code{"/"}, or has no file extension
+#'   (such as \code{"data"}): the folder is created if needed (with a message)
+#'   and the original file name is kept. Otherwise \code{dest} is the full
+#'   target file path (such as \code{"data/my_copy.csv"}); its folder must
+#'   exist. The working directory is never changed.
 #' @param overwrite Logical; passed to \code{\link[base]{file.copy}} when
 #'   \code{dest} is supplied. Default \code{FALSE}.
 #'
@@ -46,6 +49,9 @@
 #' \dontrun{
 #' # Copy a file into the current working directory to import it "from disk"
 #' f_example_data("plant_trial_raw.xlsx", dest = getwd())
+#'
+#' # Copy it into a subfolder "data" (created if it does not exist yet)
+#' f_example_data("plant_trial_raw.csv", dest = "data")
 #'
 #' # Open an example file in its default application
 #' f_open_file(f_example_data("plant_trial_raw.xlsx"))
@@ -83,9 +89,34 @@ f_example_data <- function(file = NULL, dest = NULL, overwrite = FALSE) {
     return(path)
   }
 
-  # Copy mode. If dest is an existing directory, keep the original file name;
-  # otherwise treat dest as the full target path.
-  target <- if (dir.exists(dest)) file.path(dest, basename(path)) else dest
+  if (!is.character(dest) || length(dest) != 1L || is.na(dest) || !nzchar(dest)) {
+    stop("'dest' must be a single folder or file path.")
+  }
+
+  # Copy mode. dest is a folder when it exists as one, ends with a slash, or
+  # has no file extension ("data"): create it if needed and keep the original
+  # file name. Otherwise dest is the full target file path, and its folder
+  # must exist (a missing folder would otherwise give a vague copy error).
+  is_folder <- dir.exists(dest) || grepl("[/\\\\]$", dest) ||
+    !grepl("\\.[A-Za-z0-9]+$", basename(dest))
+  if (is_folder) {
+    folder <- sub("[/\\\\]+$", "", dest)
+    if (!nzchar(folder)) folder <- dest
+    if (!dir.exists(folder)) {
+      if (!dir.create(folder, recursive = TRUE)) {
+        stop("Could not create the folder '", folder, "'. Is the location writable?")
+      }
+      message("Created folder '", folder, "'.")
+    }
+    target <- file.path(folder, basename(path))
+  } else {
+    folder <- dirname(dest)
+    if (!dir.exists(folder)) {
+      stop("The folder '", folder, "' does not exist. Create it first with ",
+           "dir.create(\"", folder, "\"), or give only a folder as 'dest'.")
+    }
+    target <- dest
+  }
 
   ok <- file.copy(path, target, overwrite = overwrite)
   if (!ok) {

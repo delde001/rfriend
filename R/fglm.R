@@ -12,11 +12,22 @@
 #'   This can be a character string naming a family function, a family function or
 #'   the result of a call to a family function. (See \code{\link{family}} for details of family functions.)
 #' @param data A data frame containing the variables in the model.
+#' @param event Only for \code{family = binomial} (or \code{quasibinomial})
+#'   with a categorical response (factor, character or logical). The level,
+#'   or levels, of the response that count as the event, coded 1. All other
+#'   levels are coded 0. For example, \code{event = "yes"} for a response with
+#'   levels \code{"no"} and \code{"yes"} models P(response = "yes"). Default
+#'   \code{NULL}: a factor or character response then stops with a message
+#'   listing its levels, because rfriend does not guess which outcome you
+#'   mean. A logical response needs no \code{event} (\code{TRUE} is the
+#'   event). See Details, "Categorical binomial responses".
 #' @param diagnostic_plots Logical. If \code{TRUE}, plots are included in the output files.
-#' @param effect_plot Logical. If \code{TRUE} (default), estimated marginal
+#' @param effect_plots Logical. If \code{TRUE} (default), estimated marginal
 #'   means plots (or interaction plots, when a categorical interaction is
 #'   significant) are added after the post hoc table. See Details for what is
 #'   drawn and how the plots are stored.
+#' @param effect_plot \strong{Deprecated} in 3.2.1. Use \code{effect_plots} instead. If
+#'   supplied, its value is passed to \code{effect_plots} with a warning.
 #' @param contrast_plots Logical. If \code{TRUE}, a \strong{contrast forest
 #'   plot} is added for each categorical post hoc term: one row per pairwise
 #'   comparison, showing the estimated difference between two levels with its
@@ -84,13 +95,43 @@
 #' @param ... Additional arguments passed to \code{glm()}.
 #'
 #' @details
-#' The function first checks if all specified variables are present in the data and ensures that the response variable is numeric.
+#' The function first checks if all specified variables are present in the data and ensures that the response variable is numeric, or a categorical response with an explicit \code{event} for binomial families (see below).
+#'
+#' \strong{Categorical binomial responses and \code{event}.} A binomial GLM
+#' models the probability of one outcome, the event (coded 1), against
+#' everything else (coded 0). Base \code{glm()} silently treats the
+#' \emph{first} factor level as 0 and all other levels as 1. Factor levels
+#' sort alphabetically by default, so \code{"diseased"}/\code{"healthy"}
+#' would model P(healthy), while \code{"no"}/\code{"yes"} models P(yes): the
+#' sign of every coefficient depends on how the labels happen to sort.
+#' \code{f_glm()} therefore never guesses. A factor or character response
+#' requires \code{event}; the chosen coding is printed when the model is
+#' fitted, shown under the model summary in the report and in
+#' \code{print()}, used as the y-axis label of the estimated-means plots,
+#' and stored in \code{out$<response>$event_coding}.
+#' \itemize{
+#'   \item \emph{Two levels:} \code{event} names one of them.
+#'   \item \emph{Three or more levels} (any number is allowed): a binomial
+#'     model still compares only two outcomes. \code{event} names one or more
+#'     levels as the event, e.g. \code{event = c("flowering", "fruiting")}, and
+#'     all remaining levels are pooled as 0. The report says which levels were
+#'     pooled. If the categories must stay separate, use a multinomial model
+#'     (\code{nnet::multinom()}) or, for ordered categories, an ordinal model
+#'     (\code{MASS::polr()}) instead.
+#'   \item \emph{Several responses} (\code{y1 + y2 ~ x}): an unnamed
+#'     \code{event} applies to every categorical response; use a named vector
+#'     or list for different events, e.g.
+#'     \code{event = c(infected = "yes", lodged = "lodged")}.
+#'   \item Numeric 0/1 responses are used as they are (1 = event); giving
+#'     \code{event} for a numeric response is an error. Missing values stay
+#'     \code{NA}.
+#' }
 #'
 #' It fits a Generalized Linear Model (GLM) using the specified formula, family, and data. Model diagnostics are performed with DHARMa (simulation-based residual checks including a KS test, dispersion test, and outlier test). High-leverage observations are flagged using hat values.
 #'
 #' Significance of each predictor is assessed via Type II Analysis of Deviance (\code{stats::drop1()}). If significant effects are found, post hoc pairwise comparisons are performed using estimated marginal means from \code{emmeans()} with the chosen p-value adjustment method (default: Sidak). When complete separation is detected, the function falls back to likelihood ratio test (LRT) based pairwise comparisons, which are robust to separation.
 #'
-#' \strong{Effect and interaction plots.} When \code{effect_plot = TRUE}, an
+#' \strong{Effect and interaction plots.} When \code{effect_plots = TRUE}, an
 #' estimated marginal means plot (estimate \eqn{\pm} 95\% CI on the response
 #' scale, with jittered raw data and compact-letter-display labels) is added
 #' after the post hoc table for each categorical predictor. For a significant
@@ -113,7 +154,7 @@
 #'
 #' Outputs can be generated in multiple formats ("pdf", "word", "excel" and "rmd") as specified by \code{output_type}. The function also closes any open 'Word' files to avoid conflicts when generating 'Word' documents. If \code{output_type = "rmd"} is used it is advised to use it in a chunk with \{r, echo=FALSE, results='asis'\}
 #'
-#' This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
+#' This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or higher), a universal document converter.
 #'\itemize{
 #' \item \bold{Windows:} Install Pandoc and ensure the installation folder \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
 #' \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.
@@ -133,6 +174,11 @@
 #'     \item{diagnostics}{DHARMa residual checks and hat-value based leverage diagnostics.}
 #'     \item{posthoc}{Estimated marginal means, pairwise comparisons, CLD letters, and summary table.}
 #'     \item{sep_flag}{Logical indicating whether complete separation was detected.}
+#'     \item{event_coding}{For a categorical binomial response: a list with the
+#'       \code{event} and \code{non_event} levels, their counts, the number of
+#'       missing values, whether levels were \code{pooled}, the probability
+#'       \code{label} and a one-sentence \code{text}. \code{NULL} for numeric
+#'       responses.}
 #'     \item{lrt_pct_explained}{McFadden's Pseudo-R\eqn{^2}.}
 #'   }
 #'   Using the option \code{output_type}, it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and plot methods for 'f_glm' objects.
@@ -156,6 +202,13 @@
 #'                  output_type = "word"
 #'                  )
 #'
+#' # Factor response: name the event explicitly (models P(infected = "yes"))
+#' glm_inf <- f_glm(infected ~ treatment,
+#'                  family = binomial,
+#'                  data = plant_trial,
+#'                  event = "yes")
+#' glm_inf$infected$event_coding$text
+#'
 #' # GLM Poisson example with output to rmd text
 #' data(warpbreaks)
 #'
@@ -175,8 +228,9 @@ f_glm <- function(
     formula,                       # glm function formula
     family = gaussian(),           # family for the GLM
     data = NULL,                   # data.frame used for glm
+    event = NULL,                  # level(s) coded 1 for a categorical binomial response
     diagnostic_plots = TRUE,       # Show diagnostic plots in output files
-    effect_plot = TRUE,            # Show estimated-means / interaction plots
+    effect_plots = TRUE,            # Show estimated-means / interaction plots
     contrast_plots = FALSE,        # Show pairwise contrast forest plots
     alpha = 0.05,                  # Significance level for tests
     adjust = "sidak",              # Method used to adjust p-values
@@ -189,11 +243,26 @@ f_glm <- function(
     close_generated_files = FALSE, # Close open files
     open_generated_files = interactive(),   # Open files after creation
     influence_threshold = 2,       # Leverage threshold
+    effect_plot = lifecycle::deprecated(),
     ...) {
 
   ########## Reset initial settings on exit #################################
   .session_state <- save_session_state()  # Helper function: helper_session_state
   on.exit(restore_session_state(.session_state), add = TRUE) # Helper function: helper_session_state
+
+  ########## Deprecated arguments ##########################################
+  # Renamed in 3.2.1 so that all test functions use the same names for the
+  # same report parts: `diagnostic_plots` (assumption and residual checks)
+  # and `effect_plots` (effect, estimated-means and interaction plots).
+  # The old name still works for one release, with a warning.
+  if (lifecycle::is_present(effect_plot)) {
+    lifecycle::deprecate_warn(
+      when = "3.2.1",
+      what = "f_glm(effect_plot)",
+      with = "f_glm(effect_plots)"
+    )
+    effect_plots <- effect_plot
+  }
 
 
   ##### Save dataframe name and Handle input from vectors (dataframe column) #####
@@ -387,18 +456,73 @@ f_glm <- function(
   # Extract the right-hand side (RHS) of the formula as a string
   rhs <- deparse(formula[[3]])  # Preserve the RHS structure
 
-  # Ensure response and predictors are in the data
+  # Ensure response and predictors are in the data. A categorical response
+  # (factor / character / logical) is allowed for binomial families only, and
+  # is recoded to 0/1 with the user's explicit 'event' choice
+  # (helper_binomial_event.R). Never guessed: see ?f_glm, argument 'event'.
+  is_binomial_family <- family$family %in% c("binomial", "quasibinomial")
+  event_coding <- list()
+
+  if (!is.null(event)) {
+    ev_names <- names(event)
+    if (!is.null(ev_names) && all(nzchar(ev_names))) {
+      bad_names <- setdiff(ev_names, response_names)
+      if (length(bad_names)) {
+        stop("f_glm(): 'event' is named for ", fmt_q(bad_names),
+             ", which is not a response in the formula. Responses: ",
+             fmt_q(response_names), ".", call. = FALSE)
+      }
+    }
+  }
+
   for (response in response_names) {
 
     if (!(response %in% names(data))) {
       stop(paste("Response variable", response, "not found in the data."))
     }
-    # Ensure the response variable is numeric
     response_var <- data[[response]]
+    resp_event   <- event_for_response(event, response)
 
-    if (!is.numeric(response_var)) {
-      stop("The response variable must be numeric.")
+    if (is.numeric(response_var)) {
+      ev_names <- names(event)
+      if (!is.null(resp_event) && !is.null(ev_names) && all(nzchar(ev_names))) {
+        stop("f_glm(): 'event' was given for '", response, "', but '", response,
+             "' is numeric. 'event' is only used for factor, character or ",
+             "logical responses. A numeric binomial response must already be ",
+             "0/1, where 1 is the event.", call. = FALSE)
+      }
+      next
     }
+
+    if (!(is.factor(response_var) || is.character(response_var) ||
+          is.logical(response_var))) {
+      stop("The response variable '", response, "' must be numeric, or (for ",
+           "family = binomial) a factor, character or logical column.",
+           call. = FALSE)
+    }
+
+    if (!is_binomial_family) {
+      stop("f_glm(): the response '", response, "' is categorical (",
+           class(response_var)[1], "). A categorical response can only be ",
+           "used with family = \"binomial\" (or \"quasibinomial\"), together ",
+           "with event = \"<level>\". For the ", family$family, " family the ",
+           "response must be numeric.", call. = FALSE)
+    }
+
+    example <- paste0("f_glm(", paste(deparse(formula), collapse = " "),
+                      ", data = ", data_name,
+                      ", family = \"binomial\", event = \"EVENT\")")
+    rec <- recode_binomial_event(response_var, response, resp_event, example)
+    data[[response]] <- rec$y
+    event_coding[[response]] <- rec$coding
+    message("f_glm(): ", rec$coding$text)
+  }
+
+  if (!is.null(event) && length(event_coding) == 0L) {
+    stop("f_glm(): 'event' was given, but no response in the formula is ",
+         "categorical, so it would be ignored. Remove 'event', or check that ",
+         "the response column is a factor, character or logical.",
+         call. = FALSE)
   }
 
   for (predictor in predictor_names) {
@@ -546,7 +670,7 @@ f_glm <- function(
                       reversed = TRUE),
       error = function(e) {
         warning("f_glm: LRT pairwise letter assignment failed (",
-                conditionMessage(e), "). Letters fall back to '\u2014'.",
+                conditionMessage(e), "). Letters fall back to '-'.",
                 call. = FALSE)
         NULL
       }
@@ -621,9 +745,9 @@ f_glm <- function(
       if (!is.null(lrt_letters)) {
         pred <- predictor_names[1]
         summary_table$Letter <- lrt_letters[as.character(summary_table[[pred]])]
-        summary_table$Letter[is.na(summary_table$Letter)] <- "\u2014"
+        summary_table$Letter[is.na(summary_table$Letter)] <- "-"
       } else {
-        summary_table$Letter <- "\u2014"
+        summary_table$Letter <- "-"
       }
     }
 
@@ -703,9 +827,9 @@ f_glm <- function(
                  "tukey" = "Bonferroni method (Tukey HSD not available for LRT; Bonferroni used instead)",
                  adjust
           ), "**.  \n",
-          if (any(summary_table$Letter == "\u2014", na.rm = TRUE)) {
+          if (any(summary_table$Letter == "-", na.rm = TRUE)) {
             paste0(
-              "If letters show '\u2014', LRT comparisons could not be computed ",
+              "If letters show '-', LRT comparisons could not be computed ",
               "(e.g. more than one predictor). ",
               "Refer to the **Type II Analysis of Deviance** table for the overall test.\n"
             )
@@ -941,12 +1065,24 @@ This plot shows your residuals (errors) on the Y-axis against the model's predic
                             data = data,
                             ...)
 
+      # Rows glm() left out because of NA (na.omit keeps their row names)
+      na_act <- stats::na.action(glm_fit)
+      if (length(na_act) > 0) {
+        na_notes <<- c(na_notes, na_removed_note(
+          as.data.frame(data)[names(na_act), , drop = FALSE],
+          vars = all.vars(current_formula), response = response_name,
+          n_removed = length(na_act)))
+      }
+
       # Update the call info in glm_fit, did not succeed in family update.
       glm_fit$call$formula <- current_formula
       glm_fit$call$data    <- as.symbol(data_name)
 
       # Store the GLM model object in output_list
       output_list[[response_name]][["model"]] <- glm_fit
+
+      # How a categorical response was coded to 0/1 (NULL for numeric ones)
+      output_list[[response_name]][["event_coding"]] <- event_coding[[response_name]]
 
       # Store GLM model summary object in output_list
       output_list[[response_name]][["summary"]] <- summary(glm_fit)
@@ -1183,12 +1319,18 @@ This plot shows your residuals (errors) on the Y-axis against the model's predic
       output_list[[response_name]][["ns_interactions"]]   <- ns_interactions
       output_list[[response_name]][["cat_preds"]]         <- cat_preds
 
-      output_list[[response_name]][["posthoc"]] <- perform_posthoc(
-        glm_fit, adjust, sig_effects, response_name, predictor_names, data,
-        sep_flag    = sep_flag_early,
-        emm_is_cells = emm_is_cells,
-        cat_preds   = cat_preds
-      )
+      # An intercept-only model (y ~ 1) has nothing to compare: skip the
+      # post hoc step instead of failing inside emmeans.
+      output_list[[response_name]][["posthoc"]] <- if (length(all.vars(formula[[3]])) == 0L) {
+        NULL
+      } else {
+        perform_posthoc(
+          glm_fit, adjust, sig_effects, response_name, predictor_names, data,
+          sep_flag    = sep_flag_early,
+          emm_is_cells = emm_is_cells,
+          cat_preds   = cat_preds
+        )
+      }
 
 
       # Create output and text for knitr
@@ -1337,6 +1479,7 @@ This plot shows your residuals (errors) on the Y-axis against the model's predic
         }
       }
 
+      if (!is.null(output_list[[response_name]][["posthoc"]])) {
       cat(paste("\n## Observed Descriptives Table of: ", deparse(current_formula), "  \n"))
       f_pander(f_conditional_round(output_list[[response_name]][['posthoc']][['data_summary_table']], digits = 3))
       # Add footnote
@@ -1346,6 +1489,7 @@ Use this table for *Methods* sections or Supplementary materials (to describe th
 **CAUTION:** For statistical inference (significance letters and *p-values*) and reporting
 main findings in the *Results* section, you **must** use the Emmeans table below.\n"
       )
+      }
 
       # Print the glm and posthoc
       cat("\n
@@ -1364,6 +1508,13 @@ main findings in the *Results* section, you **must** use the Emmeans table below
         "**Residual deviance:** ", round(glm_fit$deviance, 3),
         " (df = ", glm_fit$df.residual, ")  \n\n"
       ))
+
+      # State the 0/1 coding of a categorical response, so the reader knows
+      # which outcome every probability and coefficient refers to.
+      if (!is.null(event_coding[[response_name]])) {
+        cat("**Response coding:** ", event_coding[[response_name]]$text,
+            "  \n\n", sep = "")
+      }
 
       # Convergence / separation warning
       if (!glm_fit$converged) {
@@ -1425,7 +1576,7 @@ main findings in the *Results* section, you **must** use the Emmeans table below
       ## magnitude usually dwarfs the others). Wald CIs are used so the plot
       ## matches the coefficient table above; they are unreliable under
       ## separation, so the plot is skipped when sep_flag is TRUE.
-      if (isTRUE(effect_plot) && !isTRUE(sep_flag)) {
+      if (isTRUE(effect_plots) && !isTRUE(sep_flag)) {
         coef_fp <- tryCatch({
           cf <- as.data.frame(coef_mat)
           cf$Term <- rownames(cf)
@@ -1562,7 +1713,7 @@ main findings in the *Results* section, you **must** use the Emmeans table below
         lrt_df    <- as.data.frame(lrt)
         dev_red   <- round(sum(lrt_df$Deviance, na.rm = TRUE), 4)
         p_col     <- grep("Pr|p.value|p-value", names(lrt_df), ignore.case = TRUE, value = TRUE)[1]
-        lrt_p     <- if (!is.na(p_col)) min(lrt_df[[p_col]], na.rm = TRUE) else NA
+        lrt_p     <- if (!is.na(p_col) && any(!is.na(lrt_df[[p_col]]))) min(lrt_df[[p_col]], na.rm = TRUE) else NA
         lrt_p_fmt <- if (!is.na(lrt_p) && lrt_p < 0.001) "< 0.001" else if (!is.na(lrt_p)) as.character(round(lrt_p, 4)) else NA
 
         cat(paste0(
@@ -1627,6 +1778,10 @@ main findings in the *Results* section, you **must** use the Emmeans table below
       }
 
 
+      # An intercept-only model (y ~ 1) has no post hoc analysis.
+      if (is.null(output_list[[response_name]][["posthoc"]])) {
+        cat("\n**No post hoc analysis:** the model has no predictors (intercept only).  \n\n")
+      } else {
       # Pagebreak
       if(output_type != "rmd"){
         # Pagebreak
@@ -1773,7 +1928,7 @@ main findings in the *Results* section, you **must** use the Emmeans table below
       # two-way interaction between two categorical factors: interaction
       # plots (both orientations), matching f_aov(). Otherwise one means
       # plot per categorical main effect.
-      if (isTRUE(effect_plot)) {
+      if (isTRUE(effect_plots)) {
         emm_obj_doc  <- output_list[[response_name]][["posthoc"]][["emm"]]
         ph_tab_doc   <- output_list[[response_name]][["posthoc"]][["post_hoc_summary_table"]]
         cat_preds_pl <- cat_preds_out
@@ -1797,7 +1952,10 @@ main findings in the *Results* section, you **must** use the Emmeans table below
         }
 
         y_label_doc <- if (family$family == "gaussian" || type == "link")
-          response_name else paste0(response_name, " (response scale)")
+          response_name
+        else if (!is.null(event_coding[[response_name]]))
+          event_coding[[response_name]]$label
+        else paste0(response_name, " (response scale)")
 
         # Overall model significance (LRT-based, robust under separation). When
         # the model is not significant the post hoc table already shows "ns", so
@@ -2451,7 +2609,7 @@ main findings in the *Results* section, you **must** use the Emmeans table below
       }
 
       # ---- Pairwise contrast forest plots (opt-in) -----------------------
-      # Independent of effect_plot: one row per pairwise difference with its
+      # Independent of effect_plots: one row per pairwise difference with its
       # adjusted CI and a zero reference line, drawn with the shared forest
       # helper (helper_contrast_forest.R) so the look matches f_aov() and
       # f_lmer(). Contrasts are computed on the LINK scale (type = "link"),
@@ -2561,6 +2719,7 @@ main findings in the *Results* section, you **must** use the Emmeans table below
           }
         }
       }
+      } # end: post hoc section (skipped for intercept-only models)
     }
 
     if (output == TRUE) {
@@ -2571,6 +2730,7 @@ main findings in the *Results* section, you **must** use the Emmeans table below
   # Execute analysis ONCE: capture both the output_list and the markdown text.
   # Caching avoids running every GLM/DHARMa simulation a second time
   # (DHARMa uses random simulation, so two runs can yield different p-values).
+  na_notes <- character(0)  # filled by generate_report(), sent below
   cached_markdown <- NULL
   suppressMessages(
     cached_markdown <- utils::capture.output(
@@ -2578,6 +2738,7 @@ main findings in the *Results* section, you **must** use the Emmeans table below
     )
   )
   class(output_list) <- "f_glm"
+  for (na_msg in unique(na_notes)) message(na_msg)
 
   # Helper so word/pdf/rmd paths all use the same already-generated markdown.
   get_cached_markdown <- function() cached_markdown
@@ -2702,6 +2863,10 @@ print.f_glm <- function(x, ...) {
     cat("Family:", glm_sum$family$family,
         " | Link:", glm_sum$family$link,
         " | AIC:", round(sublist$model$aic, 3), "\n")
+    if (!is.null(sublist$event_coding)) {
+      cat(paste(strwrap(sublist$event_coding$text, width = 76), collapse = "\n"),
+          "\n")
+    }
     cat("Null deviance:", round(sublist$lrt_null_dev, 4),
         "on", sublist$lrt_null_df, "df",
         " | Residual deviance:", round(sublist$lrt_resid_dev, 4),
@@ -2731,9 +2896,13 @@ print.f_glm <- function(x, ...) {
     cat("McFadden's Pseudo-R\u00b2:", sublist$lrt_pct_explained, "\n")
 
     cat("\n--- Post hoc Comparisons of:", category, "---\n")
-    print(sublist$posthoc$post_hoc_summary_table)
-    cat("___________________________\n")
-    cat(sublist$posthoc$cld_text)
+    if (is.null(sublist$posthoc)) {
+      cat("None: the model has no predictors (intercept only).\n")
+    } else {
+      print(sublist$posthoc$post_hoc_summary_table)
+      cat("___________________________\n")
+      cat(sublist$posthoc$cld_text)
+    }
     cat("\n   \n")
   }
 

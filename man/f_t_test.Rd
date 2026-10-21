@@ -17,7 +17,8 @@ f_t_test(x, ...)
   conf.level = NULL,
   mu = 0,
   alternative = "two.sided",
-  norm_plots = TRUE,
+  diagnostic_plots = TRUE,
+  effect_plots = TRUE,
   transformation = TRUE,
   force_transformation = NULL,
   alpha = 0.05,
@@ -27,6 +28,7 @@ f_t_test(x, ...)
   output_type = "default",
   save_as = NULL,
   save_in_wdir = FALSE,
+  norm_plots = lifecycle::deprecated(),
   ...
 )
 
@@ -38,7 +40,8 @@ f_t_test(x, ...)
   conf.level = NULL,
   mu = 0,
   alternative = "two.sided",
-  norm_plots = TRUE,
+  diagnostic_plots = TRUE,
+  effect_plots = TRUE,
   transformation = TRUE,
   force_transformation = NULL,
   alpha = 0.05,
@@ -48,6 +51,7 @@ f_t_test(x, ...)
   output_type = "default",
   save_as = NULL,
   save_in_wdir = FALSE,
+  norm_plots = lifecycle::deprecated(),
   ...
 )
 }
@@ -64,7 +68,10 @@ expression is evaluated in the data's column scope (e.g.
 \code{subset = cyl == 6} works). All responses in a
 multi-response call (\code{y1 + y2 ~ group}) are then tested on
 the identical row set. For the default (vector) method, \code{...}
-is currently unused.}
+is currently unused.
+\code{subset} can also pick two groups of a factor with more
+levels (e.g. \code{subset = treatment \%in\% c("control", "high_N")});
+the check for exactly two groups runs after the subset.}
 
 \item{formula}{A formula specifying the model (alternative to using x/y).
 \itemize{
@@ -118,8 +125,12 @@ paired tests. For two-sample tests with \code{mu != 0} a warning is issued.}
 \item{alternative}{Character string. \code{"two.sided"} (default),
 \code{"greater"}, or \code{"less"}.}
 
-\item{norm_plots}{Logical. If \code{TRUE}, diagnostic plots are included in the
+\item{diagnostic_plots}{Logical. If \code{TRUE}, diagnostic plots are included in the
 output. Default is \code{TRUE}.}
+
+\item{effect_plots}{Logical. If \code{TRUE} (default), the main effect
+plot (\code{main_effect_plot}) is built, stored and included in the
+output files. With \code{FALSE} it is not built.}
 
 \item{transformation}{Logical or character string. If \code{TRUE} or
 \code{"boxcox"}, applies \code{f_boxcox()} when Shapiro-Wilk indicates
@@ -127,7 +138,12 @@ non-normality. If \code{"bestnormalize"}, applies \code{f_bestNormalize()}.
 If \code{FALSE} or \code{"none"}, no transformation is applied.
 \strong{Note:} For paired tests, \code{bestNormalize} (Yeo-Johnson) is always
 used on the differences, since Box-Cox requires strictly positive values.
-Default is \code{TRUE}.}
+Default is \code{TRUE}.
+A transformation is kept only when it improves the normality of the
+residuals (Shapiro-Wilk, or Anderson-Darling when Shapiro-Wilk is
+unavailable). Otherwise the untransformed test is reported, the report says
+so, and the attempt is recorded in \code{transformation_rejected}. Responses
+named in \code{force_transformation} are always transformed.}
 
 \item{force_transformation}{Character vector. Names of variables to transform
 regardless of normality results.}
@@ -165,6 +181,9 @@ Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.}
 
 \item{save_in_wdir}{Logical. Save in working directory. Default \code{FALSE}.}
 
+\item{norm_plots}{\strong{Deprecated} in 3.2.1. Use \code{diagnostic_plots} instead. If
+supplied, its value is passed to \code{diagnostic_plots} with a warning.}
+
 \item{y}{Optional numeric vector (second group) for two-sample tests if using
 the vector interface. Ignored when a formula is supplied.}
 }
@@ -181,6 +200,19 @@ An object of class \code{'f_t_test'}, a named list with one element per
   reference line at \code{mu} (paired). When the response was transformed the
   estimate and interval are back-transformed to the original scale and
   labelled as a median.
+  \code{Response_Transformed}: \code{TRUE} when the response was
+  transformed (Box-Cox or bestNormalize) because the residuals were not normal and
+  the transformation was kept (see \code{transformation}).
+  \code{t_test}: \code{htest} result of the untransformed response.
+  \code{transformed_t_test}: \code{htest} result of the transformed response, or
+  \code{NULL} when no transformation was applied. The printed and reported
+  result is \code{transformed_t_test} when \code{Response_Transformed} is
+  \code{TRUE}, otherwise \code{t_test}. To pick it in code:
+  \code{tab <- if (out$y$Response_Transformed) out$y$transformed_t_test else out$y$t_test}.
+  When a transformation was tried but not kept, \code{transformation_rejected}
+  records the method, the reason and the p-values before and after.
+  \code{t_test_transformed} is a \strong{deprecated} alias of
+  \code{transformed_t_test} and will be removed in the next release.
 }
 \description{
 Performs One-sample, Two-sample (Independent), or Paired t-tests on a given dataset
@@ -192,70 +224,70 @@ is supported.
 \examples{
 \donttest{
 # 1. Two-sample independent Welch's t-test (default)
-f_t_test(mpg ~ am, data = mtcars, output_type = "console", norm_plots = FALSE)
+f_t_test(mpg ~ am, data = mtcars, output_type = "console", diagnostic_plots = FALSE)
 
 # 2. Multiple response variables in one call
-f_t_test(mpg + hp ~ am, data = mtcars, output_type = "console", norm_plots = FALSE)
+f_t_test(mpg + hp ~ am, data = mtcars, output_type = "console", diagnostic_plots = FALSE)
 
 # 3. One-sample t-test: test if mean mpg equals 20
 f_t_test(mpg ~ 1, data = mtcars, mu = 20,
-         output_type = "console", norm_plots = FALSE)
+         output_type = "console", diagnostic_plots = FALSE)
 
 # 4. Paired t-test with explicit subject id (recommended)
 f_t_test(extra ~ group, data = sleep, paired = TRUE, paired_by = "ID",
-         output_type = "console", norm_plots = FALSE)
+         output_type = "console", diagnostic_plots = FALSE)
 
 # 4b. Paired t-test without paired_by (warns; pairing is positional and
 # only safe when data is in AABB order with matching within-group order)
 f_t_test(extra ~ group, data = sleep, paired = TRUE,
-         output_type = "console", norm_plots = FALSE)
+         output_type = "console", diagnostic_plots = FALSE)
 
 # 5. Vector interface: two-sample independent
 group_auto   <- mtcars$mpg[mtcars$am == 0]
 group_manual <- mtcars$mpg[mtcars$am == 1]
-f_t_test(group_auto, group_manual, output_type = "console", norm_plots = FALSE)
+f_t_test(group_auto, group_manual, output_type = "console", diagnostic_plots = FALSE)
 
 # 6. Vector interface: one-sample
-f_t_test(mtcars$mpg, mu = 20, output_type = "console", norm_plots = FALSE)
+f_t_test(mtcars$mpg, mu = 20, output_type = "console", diagnostic_plots = FALSE)
 
 # 7. Force Student's t-test (equal variances assumed)
 f_t_test(mpg ~ am, data = mtcars, var.equal = TRUE,
-         output_type = "console", norm_plots = FALSE)
+         output_type = "console", diagnostic_plots = FALSE)
 
 # 8. One-sided test
 f_t_test(mpg ~ am, data = mtcars, alternative = "greater",
-         output_type = "console", norm_plots = FALSE)
+         output_type = "console", diagnostic_plots = FALSE)
 
 # 9. Custom significance level (alpha = 0.01 is equivalent to conf.level = 0.99)
 f_t_test(mpg ~ am, data = mtcars, alpha = 0.01,
-         output_type = "console", norm_plots = FALSE)
+         output_type = "console", diagnostic_plots = FALSE)
 
 # 10. Box-Cox transformation with back-transformed CI
 # The back-transformed CI estimates the MEDIAN, not the arithmetic mean.
 result <- f_t_test(hp ~ am, data = mtcars, transformation = TRUE,
-                   output_type = "console", norm_plots = FALSE)
+                   output_type = "console", diagnostic_plots = FALSE)
 result[["hp"]]$ci_backtransformed
 
 # 11. One-sample with non-zero mu and back-transformation
 f_t_test(hp ~ 1, data = mtcars, mu = 100, transformation = TRUE,
-         output_type = "console", norm_plots = FALSE)
+         output_type = "console", diagnostic_plots = FALSE)
 
 # 12. BestNormalize transformation (set seed for reproducibility)
 set.seed(123)
 f_t_test(hp ~ am, data = mtcars, transformation = "bestnormalize",
-         output_type = "console", norm_plots = FALSE)
+         output_type = "console", diagnostic_plots = FALSE)
 
 # 13. Force transformation regardless of normality
 f_t_test(mpg + hp ~ am, data = mtcars, force_transformation = "mpg",
-         output_type = "console", norm_plots = FALSE)
+         output_type = "console", diagnostic_plots = FALSE)
 
 # 14. Suppress transformation (diagnostic mode)
 f_t_test(hp ~ am, data = mtcars, transformation = FALSE,
-         output_type = "console", norm_plots = FALSE)
+         output_type = "console", diagnostic_plots = FALSE)
 
 # 15. Access return object fields directly
 result <- f_t_test(mpg + hp ~ am, data = mtcars,
-                   output_type = "default", norm_plots = FALSE, intro_text = FALSE)
+                   output_type = "default", diagnostic_plots = FALSE, intro_text = FALSE)
 result[["mpg"]]$t_test          # standard htest object
 result[["hp"]]$shapiro_res      # Shapiro-Wilk result
 result[["hp"]]$homog_p_bartlett # Bartlett p-value (diagnostic only)

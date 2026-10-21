@@ -12,9 +12,12 @@ f_example_data(file = NULL, dest = NULL, overwrite = FALSE)
 returns the names of all available example files.}
 
 \item{dest}{Optional path. If supplied, the example file is copied there and
-the path of the copy is returned (invisibly). \code{dest} may be a
-directory (the original file name is kept) or a full target file path. The
-working directory is never changed.}
+the path of the copy is returned (invisibly). \code{dest} is a folder when
+it is an existing folder, ends with \code{"/"}, or has no file extension
+(such as \code{"data"}): the folder is created if needed (with a message)
+and the original file name is kept. Otherwise \code{dest} is the full
+target file path (such as \code{"data/my_copy.csv"}); its folder must
+exist. The working directory is never changed.}
 
 \item{overwrite}{Logical; passed to \code{\link[base]{file.copy}} when
 \code{dest} is supplied. Default \code{FALSE}.}
@@ -52,6 +55,9 @@ df <- read.csv(path)
 \dontrun{
 # Copy a file into the current working directory to import it "from disk"
 f_example_data("plant_trial_raw.xlsx", dest = getwd())
+
+# Copy it into a subfolder "data" (created if it does not exist yet)
+f_example_data("plant_trial_raw.csv", dest = "data")
 
 # Open an example file in its default application
 f_open_file(f_example_data("plant_trial_raw.xlsx"))

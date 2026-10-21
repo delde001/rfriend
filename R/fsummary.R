@@ -34,7 +34,8 @@
 #' @param show_skew Logical. Include Skewness (measure of asymmetry). Default \code{FALSE}.
 #' @param show_kurtosis Logical. Include Excess Kurtosis (measure of "tailedness"). Default \code{FALSE}.
 #' @param digits Integer. Number of decimal places for the R console output.
-#'   Default is \code{2}. If \code{NULL}, no rounding is applied.
+#'   Default is \code{2}. If \code{NULL}, no rounding is applied. Rounding
+#'   only affects the printed table; the returned values are never rounded.
 #'   (Note: This does not affect the raw numbers exported to Excel).
 #' @param export_to_excel Logical. If \code{TRUE}, exports results to an 'Excel' file. Default \code{FALSE}.
 #' @param digits_excel Integer. Number of decimal places for the Excel file cells. Default \code{NULL} (no rounding). Defining \code{digits_excel}, sets \code{export_to_excel = TRUE} when excel output is not intended use: \code{digits} instead.
@@ -230,7 +231,7 @@ f_summary.data.frame <- function(x,
                                  show_Q3 = TRUE,
                                  show_skew = FALSE,
                                  show_kurtosis = FALSE,
-                                 digits = NULL,
+                                 digits = 2,
                                  # File Options
                                  export_to_excel = FALSE,
                                  close_generated_files = FALSE,
@@ -241,6 +242,16 @@ f_summary.data.frame <- function(x,
                                  digits_excel = NULL,
                                  allow_integer_decimal_mix = FALSE,
                                  ...) {
+
+  # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  # check_dots to prevent ignoring typos
+  # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  check_known_dots(...names(), ...length(),
+                   allowed = c("data", "internal_data_name"),
+                   fun_name   = "f_summary",
+                   valid_args = names(formals(sys.function())))
+
+
   # Map 'x' (S3 standard) back to 'data' (Internal logic)
   data <- x
 
@@ -344,24 +355,27 @@ f_summary.data.frame <- function(x,
       result["max"] <- max(vec, na.rm = TRUE)
 
     if (show_skew || show_kurtosis) {
-      n <- length(vec)
-      s <- sd(vec, na.rm = TRUE)
-      m <- mean(vec, na.rm = TRUE)
+      # Sample skewness G1 and sample excess kurtosis G2 (the bias-adjusted
+      # estimators also used by SPSS, SAS and e1071 type = 2), computed on
+      # the non-missing values only.
+      v <- vec[!is.na(vec)]
+      n <- length(v)
+      s <- if (n > 1) sd(v) else NA_real_
+      m <- mean(v)
       if (show_skew) {
-        if (n < 3 || s == 0)
+        if (n < 3 || is.na(s) || s == 0)
           result["skew"] <- NA
         else {
-          m3 <- sum((vec - m)^3) / n
-          result["skew"] <- (n * (n - 1)) / (n - 2) * (m3 / s^3)
+          result["skew"] <- n / ((n - 1) * (n - 2)) * sum((v - m)^3) / s^3
         }
       }
       if (show_kurtosis) {
-        if (n < 4 || s == 0)
+        if (n < 4 || is.na(s) || s == 0)
           result["kurt"] <- NA
         else {
-          m4 <- sum((vec - m)^4) / n
-          kurt_val <- ((n + 1) * n * (n - 1)) / ((n - 2) * (n - 3)) * (m4 / s^4)
-          result["kurt"] <- kurt_val - (3 * (n - 1)^2) / ((n - 2) * (n - 3))
+          result["kurt"] <- (n * (n + 1)) / ((n - 1) * (n - 2) * (n - 3)) *
+            sum((v - m)^4) / s^4 -
+            (3 * (n - 1)^2) / ((n - 2) * (n - 3))
         }
       }
     }
@@ -446,7 +460,12 @@ f_summary.data.frame <- function(x,
     }
   }
 
-  attr(output_list, "digits") <- digits
+  # Console formatting is applied by print.f_summary(), so the choices made
+  # here are stored with the result. digits = NULL means "no rounding"; it is
+  # stored as NA because a NULL attribute cannot be told apart from "not set"
+  # (older objects), which would fall back to the print default of 2.
+  attr(output_list, "digits") <- if (is.null(digits)) NA_integer_ else digits
+  attr(output_list, "allow_integer_decimal_mix") <- allow_integer_decimal_mix
   # Record the confidence level only when a CI was actually requested, so the
   # print method can both detect that CI columns are present and report the
   # level. Kept as an attribute (rather than encoded in the column names) so
@@ -465,7 +484,9 @@ f_summary.data.frame <- function(x,
 #' @param x Object of class f_summary.
 #' @param col_width Integer. Max characters in header before line break. Default \code{6}.
 #' @param table_width Integer or \code{NULL}. Characters after which table splits. Default \code{90}.
-#' @param digits Integer. Number of decimal digits to use in formatting. Default is \code{3}.
+#' @param digits Integer. Number of decimal digits to use in formatting. By
+#'   default the \code{digits} given to \code{f_summary()} (2 unless set);
+#'   \code{NULL} prints unrounded values.
 #' @param allow_integer_decimal_mix Logical. If \code{TRUE}, each individual cell is evaluated: integer values are displayed without decimal places, and non-integer values are displayed with the specified number of decimal places, i.e. \code{digits}. Default is \code{FALSE}, when a column contains a mix of integers and decimal values, all values are displayed with the specified number of decimal places. Note: columns containing only integers are **always** displayed without decimal places, regardless of \code{allow_integer_decimal_mix}.
 #' @param ... Additional arguments passed to \code{pander}.
 #' @return Invisibly returns \code{1}.
@@ -477,9 +498,15 @@ print.f_summary <- function(x,
                             allow_integer_decimal_mix = FALSE,
                             ...) {
 
-  # Get digits from f_summary()
+  # Use the formatting chosen in f_summary(), unless print() overrides it.
+  # A stored NA means f_summary(..., digits = NULL): no rounding.
   if (missing(digits) && !is.null(attr(x, "digits"))) {
     digits <- attr(x, "digits")
+    if (length(digits) == 1L && is.na(digits)) digits <- NULL
+  }
+  if (missing(allow_integer_decimal_mix) &&
+      !is.null(attr(x, "allow_integer_decimal_mix"))) {
+    allow_integer_decimal_mix <- attr(x, "allow_integer_decimal_mix")
   }
 
   # If a confidence interval was requested, report its level once up front.
@@ -511,6 +538,13 @@ print.f_summary <- function(x,
       cat("\n Variable: ", category, sep = "")
     }
 
-    f_pander(sublist, col_width = col_width, table_width = table_width)
+    # Without rounding, pander would still cut numbers to its own default of
+    # 4 significant digits; show them as base print() does instead.
+    if (is.null(digits)) {
+      f_pander(sublist, col_width = col_width, table_width = table_width,
+               digits = getOption("digits"), ...)
+    } else {
+      f_pander(sublist, col_width = col_width, table_width = table_width, ...)
+    }
   }
 }

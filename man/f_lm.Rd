@@ -7,19 +7,22 @@
 f_lm(
   formula,
   data = NULL,
-  norm_plots = TRUE,
+  diagnostic_plots = TRUE,
   effect_plots = TRUE,
   contrast_plots = FALSE,
   transformation = TRUE,
   force_transformation = NULL,
   alpha = 0.05,
   adjust = "sidak",
+  post_hoc = NULL,
+  by = NULL,
   intro_text = TRUE,
   close_generated_files = FALSE,
   open_generated_files = interactive(),
   output_type = "default",
   save_as = NULL,
   save_in_wdir = FALSE,
+  norm_plots = lifecycle::deprecated(),
   ...
 )
 }
@@ -28,7 +31,7 @@ f_lm(
 
 \item{data}{A data frame containing the variables in the model.}
 
-\item{norm_plots}{Logical. If \code{TRUE}, diagnostic residual plots are included in the output files. Default is \code{TRUE}.}
+\item{diagnostic_plots}{Logical. If \code{TRUE}, diagnostic residual plots are included in the output files. Default is \code{TRUE}.}
 
 \item{effect_plots}{Logical. If \code{TRUE}, regression / effect plots are
 included in the output files after the post hoc table. See Details for what
@@ -45,7 +48,13 @@ contrasts). Main-effect contrast plots are stored as
 \code{out$y1$interaction_contrast_plot_<term>}. Contrast CIs use the same
 \code{adjust} method as the post hoc p-values, so figure and table agree.}
 
-\item{transformation}{Logical or character string. If \code{TRUE}, or if \code{"boxcox"} applies an \code{f_boxcox()} transformation if residuals are not normal. If \code{"bestnormalize"}, applies \code{f_bestNormalize()} transformation. If \code{FALSE} no transformation will be applied. Default is \code{TRUE}.}
+\item{transformation}{Logical or character string. If \code{TRUE}, or if \code{"boxcox"} applies an \code{f_boxcox()} transformation if residuals are not normal. If \code{"bestnormalize"}, applies \code{f_bestNormalize()} transformation. If \code{FALSE} no transformation will be applied. Default is \code{TRUE}.
+A transformation is kept only when it improves the residual check
+that triggered it: normality (Shapiro-Wilk, or Anderson-Darling when
+Shapiro-Wilk is unavailable) or, when only the variance check failed, equal
+variance (Breusch-Pagan test). Otherwise the untransformed analysis is reported, the
+report says so, and the attempt is recorded in \code{transformation_rejected}.
+Responses named in \code{force_transformation} are always transformed.}
 
 \item{force_transformation}{Character string. A vector containing the names of response variables that should be transformed regardless of the normality test. Default is \code{NULL}.}
 
@@ -60,6 +69,26 @@ for multiple comparisons. Available methods include:
   \item{"none"}{No adjustment.}
   \item{"fdr"}{False Discovery Rate adjustment.}
 } Default is \code{"sidak"}.}
+
+\item{post_hoc}{Which post hoc tables to build; the same syntax and rules as
+\code{\link{f_aov}}. \code{NULL} or \code{TRUE} (default): a cell-means
+table for each significant interaction of categorical predictors and a
+marginal-means table for each categorical main effect (letters \code{"ns"}
+when the term is not significant, an "Interpret with caution" note when the
+factor takes part in a significant interaction); numeric predictors get no
+table, their slope is in the coefficient table. \code{FALSE}: no post hoc.
+A character vector of terms: only those tables, e.g.
+\code{post_hoc = "treatment"} (leave blocks out of the comparisons) or
+\code{post_hoc = "treatment:week"}. Unknown names stop with a "did you mean"
+error. Letters and the \code{adjust} method apply within each table, and
+each table has its own footer.}
+
+\item{by}{\code{NULL} (default) or one categorical predictor, used with
+\code{post_hoc} for simple effects: \code{post_hoc = "treatment",
+by = "week"} compares the treatments within each week
+(\code{emmeans(model, ~ treatment | week)}), stored as
+\code{out$y$post_hoc[["treatment | week"]]}. The rules are those of
+\code{\link{f_aov}}.}
 
 \item{intro_text}{Logical. If \code{TRUE}, includes a short explanation about linear regression assumptions in the output file. Default is \code{TRUE}.}
 
@@ -88,6 +117,9 @@ the file is named "dataname_lm_output" in that directory. If an extension is pro
 
 \item{save_in_wdir}{Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.}
 
+\item{norm_plots}{\strong{Deprecated} in 3.2.1. Use \code{diagnostic_plots} instead. If
+supplied, its value is passed to \code{diagnostic_plots} with a warning.}
+
 \item{...}{Additional arguments forwarded to \code{\link[stats]{lm}}.
 The arguments \code{subset} and \code{weights} are handled specially: when
 supplied, they are applied via \code{\link[stats]{model.frame}} so that the
@@ -97,6 +129,30 @@ same row set as \code{lm()} itself.}
 }
 \value{
 An object of class 'f_lm' containing results from \code{lm()}, normality tests, transformations, coefficient tables, Type II ANOVA, and post hoc tests. Using the option "output_type", it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and plot methods for 'f_lm' objects.
+  Post hoc tables: \code{out$y$post_hoc[[term]]}, each a list with
+  \code{emmeans}, \code{pairs}, \code{cld} (the letters), \code{cld_text}
+  (the footer) and \code{caution}, the same structure as \code{\link{f_aov}}
+  and \code{\link{f_lmer}}. The elements \code{post_hoc_summary_table},
+  \code{emmeans_table} and \code{cld_text} are \strong{deprecated} and will
+  be removed in the next release: they hold the cell-means table when a
+  significant interaction is tabulated, otherwise the first table. (Before
+  3.2.1 this single table compared every combination of all categorical
+  predictors, also in additive models.)
+  \code{Response_Transformed}: \code{TRUE} when the response was
+  transformed (Box-Cox or bestNormalize) because the residuals were not normal (or, alone, had unequal variances) and
+  the transformation was kept (see \code{transformation}).
+  \code{anova}: Type II ANOVA table of the untransformed response.
+  \code{transformed_anova}: Type II ANOVA table of the transformed response, or
+  \code{NULL} when no transformation was applied. The printed and reported
+  result is \code{transformed_anova} when \code{Response_Transformed} is
+  \code{TRUE}, otherwise \code{anova}. To pick it in code:
+  \code{tab <- if (out$y$Response_Transformed) out$y$transformed_anova else out$y$anova}.
+  When a transformation was tried but not kept, \code{transformation_rejected}
+  records the method, the reason and the p-values before and after.
+  The same convention holds for \code{summary} / \code{transformed_summary}
+  and \code{coefficients} / \code{transformed_coefficients}. Since rfriend
+  3.2.1 the plain names always hold the untransformed fit (in 3.2.0 they held
+  the transformed fit when a transformation was applied).
 }
 \description{
 Performs ordinary least squares linear regression (\code{stats::lm}) on a
@@ -182,7 +238,7 @@ estimates are back-transformed to the original scale (medians), exactly as in
 
 Outputs can be generated in multiple formats ("pdf", "word", "excel" and "rmd") as specified by \code{output_type}. If \code{output_type = "rmd"} is used it is advised to use it in a chunk with \{r, echo=FALSE, results='asis'\}.
 
-This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
+This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or higher), a universal document converter.
 }
 \section{Multiple Testing Across Response Variables}{
 
@@ -211,7 +267,7 @@ f_lm(Sepal.Length ~ Petal.Length + Species, data = iris, output_type = "word")
 # Two responses analysed in sequence, captured in one output file.
 f_lm(Sepal.Width + Sepal.Length ~ Petal.Length * Species,
            effect_plots = FALSE,
-           norm_plots = FALSE,
+           diagnostic_plots = FALSE,
            data = iris)
 
 # To print rmd output set chunk option to results = 'asis' and use cat().

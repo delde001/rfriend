@@ -348,3 +348,17 @@ test_that("combined: 3x4 table + hommel + alpha=0.10: output dimensions correct"
   expect_equal(nrow(result$adjusted_p_values), 3)
   expect_equal(nrow(result$observed_vs_adj_p_value), 6)
 })
+
+test_that("two-vector input keeps the caller's name for y in the data label", {
+  d <- data.frame(a = rep(c("u", "v"), each = 20),
+                  b = rep(c("p", "q", "p", "q"), times = c(12, 8, 6, 14)))
+  res <- suppressMessages(f_chisq_test(d$a, d$b))
+  expect_identical(res$chisq_test_output$data.name, "d$a and d$b")
+})
+
+test_that("print without post hoc ends with a newline", {
+  tbl <- as.table(matrix(c(10, 11, 12, 13), nrow = 2))
+  res <- suppressMessages(f_chisq_test(tbl))
+  out <- utils::capture.output(print(res), type = "output")
+  expect_true(grepl("force_posthoc = TRUE')$", out[length(out)]))
+})

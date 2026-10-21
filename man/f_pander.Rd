@@ -15,7 +15,9 @@ f_pander(
 )
 }
 \arguments{
-\item{table}{A data frame, matrix, or other table-like structure to be rendered.}
+\item{table}{A data frame, matrix, or other table-like structure to be rendered.
+An \code{f_summary} result is also accepted: each table it holds is
+rendered in turn.}
 
 \item{col_width}{Integer. Specifies the maximum number of characters allowed in table header columns before a line break is inserted. Defaults to \code{10}. Note that latex will not break the table header if the col with is longer due to long names below the header.}
 
@@ -48,7 +50,7 @@ This function sets several \code{pander} options to ensure that the table output
   \item \code{table.split.cells}: Inserts line breaks in headers every \code{col_width} characters.
 }
 
-This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
+This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or higher), a universal document converter.
 \itemize{
 \item \bold{Windows:} Install Pandoc and ensure the installation folder \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
 \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.

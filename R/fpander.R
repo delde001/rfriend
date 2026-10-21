@@ -3,6 +3,8 @@
 #' Is a wrapper around the \code{pander} function from the 'pander' package, designed to produce a fancy table output with specific formatting options.
 #'
 #' @param table A data frame, matrix, or other table-like structure to be rendered.
+#'   An \code{f_summary} result is also accepted: each table it holds is
+#'   rendered in turn.
 #' @param col_width Integer. Specifies the maximum number of characters allowed in table header columns before a line break is inserted. Defaults to \code{10}. Note that latex will not break the table header if the col with is longer due to long names below the header.
 #' @param table_width Integer or \code{NULL}. Defines the number of characters after which the table is split into separate sections. Defaults to \code{NULL}, meaning no break is applied.
 #' @param limit_columns Integer or \code{NULL}. Defines the number of columns shown in a table.
@@ -23,7 +25,7 @@
 #'   \item \code{table.split.cells}: Inserts line breaks in headers every \code{col_width} characters.
 #' }
 #'
-#' This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
+#' This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or higher), a universal document converter.
 #' \itemize{
 #' \item \bold{Windows:} Install Pandoc and ensure the installation folder \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
 #' \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.
@@ -54,6 +56,21 @@ f_pander <- function(table,
                      style = "multiline",
                      console = TRUE,
                      ...) {
+  # An f_summary() result is a list of tables (one per variable, or a single
+  # grouped "output_df"). Render the tables it holds instead of the list
+  # wrapper, which pander would otherwise print with a
+  # 'No pander.method for "f_summary"' warning.
+  if (inherits(table, "f_summary")) {
+    parts <- Filter(is.data.frame, unclass(table))
+    for (nm in names(parts)) {
+      if (!identical(nm, "output_df")) cat("\n Variable: ", nm, "\n", sep = "")
+      f_pander(parts[[nm]], col_width = col_width, table_width = table_width,
+               limit_columns = limit_columns, style = style,
+               console = console, ...)
+    }
+    return(invisible(table))
+  }
+
   # 1. SAVE EXISTING OPTIONS
   old_options <- panderOptions()
 

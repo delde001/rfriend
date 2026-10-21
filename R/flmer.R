@@ -48,7 +48,7 @@
 #' @param diagnostic_plots Logical. If \code{TRUE} (default), diagnostic plots
 #'   (residuals vs fitted, Q-Q of level-1 residuals, Q-Q of random-effect
 #'   BLUPs, scale-location) are included in the output.
-#' @param effect_plot Logical. If \code{TRUE} (default), an estimated
+#' @param effect_plots Logical. If \code{TRUE} (default), an estimated
 #'   marginal means plot (estimate \eqn{\pm} 95\% CI, with jittered raw
 #'   data and compact-letter-display labels) is added after each
 #'   categorical fixed-effect term's post hoc table. For a significant
@@ -97,30 +97,41 @@
 #'   \code{interaction_contrast_plot_a_b}) and rendered with the
 #'   interaction cell-means tables. Contrast CIs use the same \code{adjust}
 #'   method as the post hoc p-values, so figure and table agree.
-#' @param norm_plots `r lifecycle::badge("deprecated")` Deprecated in
-#'   version 4.0.0. Use \code{diagnostic_plots} instead. If supplied, its
-#'   value is passed through to \code{diagnostic_plots} with a warning.
-#' @param post_hoc Logical. If \code{TRUE} (default), runs
-#'   \code{emmeans::emmeans()} pairwise comparisons \strong{only when}
-#'   the linear mixed model finds a significant fixed-effect term
-#'   (ANOVA p-value below \code{alpha}). The post hoc is performed on
-#'   each significant factor fixed-effect term separately. Numeric
-#'   covariates are skipped because their slope is already reported in
-#'   the fixed-effects coefficient table; pairwise contrasts are not
-#'   meaningful for a continuous predictor. If no fixed-effect term is
-#'   significant, no post hoc is run. When a significant interaction
-#'   between categorical factors is present, an additional
-#'   \strong{cell-means} post hoc table is produced for that interaction
+#' @param norm_plots \strong{Deprecated} in 3.2.0. Use \code{diagnostic_plots} instead. If
+#'   supplied, its value is passed to \code{diagnostic_plots} with a warning.
+#' @param effect_plot \strong{Deprecated} in 3.2.1. Use \code{effect_plots} instead. If
+#'   supplied, its value is passed to \code{effect_plots} with a warning.
+#' @param post_hoc Which post hoc tables to build; the same syntax as
+#'   \code{\link{f_aov}}. \code{TRUE} (default) or \code{NULL}: every categorical
+#'   fixed-effect main effect gets its own marginal-means table
+#'   (\code{emmeans::emmeans()} pairwise comparisons with a compact letter
+#'   display). A term that is not significant is still tabulated, with letters
+#'   shown as \code{"ns"}, because the estimates and CIs are often needed for
+#'   manuscript tables. Numeric covariates get no table: their slope is already
+#'   reported in the fixed-effects coefficient table, and pairwise contrasts are
+#'   not meaningful for a continuous predictor. Every significant interaction
+#'   between categorical factors gets an additional \strong{cell-means} table
 #'   (estimated mean for every factor-level combination, compared
-#'   simultaneously, with a compact letter display and pairwise
-#'   contrasts), matching \code{\link{f_aov}}. It is stored alongside the
-#'   main-effect results under the interaction term name, e.g.
-#'   \code{out$y1$post_hoc[["a:b"]]}. In addition, when a main-effect term
-#'   takes part in a significant interaction, a caution note is printed
-#'   directly above that term's marginal-means table (and the term's
-#'   heading is annotated), warning that the marginal means average over
-#'   the interacting factor and can hide or reverse the real pattern; the
-#'   interaction cell-means table and plot(s) should be read instead.
+#'   simultaneously, with a compact letter display and pairwise contrasts),
+#'   stored under the interaction term name, e.g.
+#'   \code{out$y1$post_hoc[["a:b"]]}. When a main-effect term takes part in a
+#'   significant interaction, a caution note is printed directly above that
+#'   term's marginal-means table (and the heading is annotated), warning that the
+#'   marginal means average over the interacting factor and can hide or reverse
+#'   the real pattern; read the interaction cell-means table and plot(s)
+#'   instead. \code{FALSE}: no post hoc. A character vector of terms: only those
+#'   tables, e.g. \code{post_hoc = "treatment"} or
+#'   \code{post_hoc = "treatment:week"} (tabulated with \code{"ns"} letters when
+#'   not significant). Unknown or misspelled names stop with a "did you mean"
+#'   error.
+#' @param by \code{NULL} (default) or one categorical fixed-effect predictor,
+#'   used with \code{post_hoc} for simple effects:
+#'   \code{post_hoc = "treatment", by = "week"} compares the treatments within
+#'   each week (\code{emmeans(model, ~ treatment | week)}), with letters and the
+#'   p-value adjustment computed per level of \code{by}, stored as
+#'   \code{out$y1$post_hoc[["treatment | week"]]}. The rules are those of
+#'   \code{\link{f_aov}}: \code{by} requires \code{post_hoc}, must not also be
+#'   named in it, and cannot be combined with an interaction term there.
 #' @param intro_text Logical. If \code{TRUE} (default), prepends an
 #'   explanation of LMM assumptions and the random-effects syntax linked
 #'   to study design.
@@ -310,7 +321,7 @@
 #' data (often a random slope with too few levels) - simplify the model
 #' before interpreting results.
 #'
-#' This function requires Pandoc (>= 1.12.3) for \code{pdf}, \code{word}
+#' This function requires Pandoc (>= 3.1) for \code{pdf}, \code{word}
 #' and \code{rmd} output. See \code{\link{f_aov}} for installation notes.
 #'
 #' @section Multiple Testing Across Response Variables:
@@ -456,9 +467,10 @@ f_lmer <- function(
     alpha = 0.05,
     adjust = "sidak",
     diagnostic_plots = TRUE,
-    effect_plot = TRUE,
+    effect_plots = TRUE,
     contrast_plots = FALSE,
     post_hoc = TRUE,
+    by = NULL,
     intro_text = TRUE,
     output_type = "default",
     save_as = NULL,
@@ -466,6 +478,7 @@ f_lmer <- function(
     close_generated_files = FALSE,
     open_generated_files = interactive(),
     norm_plots = lifecycle::deprecated(),
+    effect_plot = lifecycle::deprecated(),
     ...
     # Additional arguments forwarded to lme4::lmer() / lmerTest::lmer().
     # subset, na.action and weights are baked into a single master data
@@ -479,18 +492,26 @@ f_lmer <- function(
   on.exit(restore_session_state(.session_state), add = TRUE) # Helper function: helper_session_state
 
   ########## Deprecated arguments ##########################################
-  # `norm_plots` was renamed to `diagnostic_plots` in version 4.0.0 because
-  # not all tests in the package assume normality; "diagnostic" is the
-  # neutral, accurate name across the test family. Soft-deprecated for one
-  # release cycle: if supplied, it is honoured but emits a warning and maps
-  # to `diagnostic_plots`.
+  # Renamed (norm_plots in 3.2.0, effect_plot in 3.2.1) so that all test
+  # functions use the same names for the same report parts:
+  # `diagnostic_plots` (assumption and residual checks) and `effect_plots`
+  # (effect, estimated-means and interaction plots). The old names still
+  # work, with a warning.
   if (lifecycle::is_present(norm_plots)) {
     lifecycle::deprecate_warn(
-      when = "4.0.0",
+      when = "3.2.0",
       what = "f_lmer(norm_plots)",
       with = "f_lmer(diagnostic_plots)"
     )
     diagnostic_plots <- norm_plots
+  }
+  if (lifecycle::is_present(effect_plot)) {
+    lifecycle::deprecate_warn(
+      when = "3.2.1",
+      what = "f_lmer(effect_plot)",
+      with = "f_lmer(effect_plots)"
+    )
+    effect_plots <- effect_plot
   }
 
   ########## Required packages ##############################################
@@ -653,7 +674,10 @@ f_lmer <- function(
   )
   if (!is.null(weights_vec)) mf_args$weights <- weights_vec
 
+  data_before_na <- data
   data <- do.call(stats::model.frame, mf_args)
+  message_na_removed(data_before_na, nrow(data), all.vars(master_formula))
+  rm(data_before_na)
 
   # Extract the weights vector once (NULL if none supplied) for the
   # lmer() calls below.
@@ -1186,7 +1210,7 @@ steps (generalised mixed model, transformation).
     ## table. The intercept is dropped by default: it is the reference-cell
     ## mean, not an "effect", and its magnitude usually dwarfs the others,
     ## squashing the informative rows.
-    if (isTRUE(effect_plot)) {
+    if (isTRUE(effect_plots)) {
       coef_fp <- tryCatch({
         cf <- coef_summary
         est_col <- intersect(c("Estimate"), names(cf))[1]
@@ -2046,7 +2070,17 @@ not independent; do not report them as clean per-group standard deviations.\n"
     ## `factor(vs)` and `trm %in% names(data)` would be FALSE, causing
     ## the loop to silently skip every term (the bug present before).
     posthoc_results <- list()
-    if (post_hoc == TRUE && !is.null(anova_tbl)) {
+    # post_hoc / by: same syntax as f_aov() (helper_post_hoc.R). TRUE/NULL =
+    # default per-term tables, FALSE = none, character = only those terms.
+    ph_spec <- resolve_post_hoc_spec(
+      post_hoc, by,
+      cat_predictors     = cat_predictors,
+      numeric_predictors = numeric_predictors,
+      model_terms        = tryCatch(
+        attr(stats::terms(fit, fixed.only = TRUE), "term.labels"),
+        error = function(e) character(0)),
+      fun_name           = "f_lmer")
+    if (!identical(ph_spec$mode, "none") && !is.null(anova_tbl)) {
       # Per-term p-value lookup for the ns decision.
       p_lookup <- stats::setNames(anova_tbl[["Pr(>F)"]], anova_tbl$Term)
 
@@ -2060,6 +2094,12 @@ not independent; do not report them as clean per-group standard deviations.\n"
       ]
       posthoc_terms <- intersect(candidate_terms, cat_predictors)
       numeric_in_anova <- intersect(candidate_terms, numeric_predictors)
+      # Named post_hoc: only the requested main effects (none when `by` is
+      # set: those become simple-effects tables, built after this loop).
+      if (identical(ph_spec$mode, "named")) {
+        posthoc_terms <- if (is.null(ph_spec$by))
+          intersect(posthoc_terms, ph_spec$mains) else character(0)
+      }
 
       # Overall significance: if no categorical fixed effect reaches
       # alpha, all letters collapse to "ns". We still print the table
@@ -2789,6 +2829,7 @@ not independent; do not report them as clean per-group standard deviations.\n"
             else if (in_sig_int) "  (involved in a significant interaction)"
             else "",
             "\n\n", sep = "")
+        cat("*", ph_caption(), "*  \n\n", sep = "")
 
         if (term_ns) {
           cat("Term `", trm, "` was not significant (p = ",
@@ -2802,7 +2843,7 @@ not independent; do not report them as clean per-group standard deviations.\n"
         #
         # The pointer at the end must match what is actually produced for
         # each interaction this term belongs to: an all-categorical
-        # interaction gets a cell-means table (and, when effect_plot = TRUE,
+        # interaction gets a cell-means table (and, when effect_plots = TRUE,
         # a plot); an interaction that includes a numeric covariate gets
         # neither - only a skip note - so we must not send the reader to a
         # table/plot that does not exist. We split trm_sig_ints accordingly.
@@ -2822,7 +2863,7 @@ not independent; do not report them as clean per-group standard deviations.\n"
           if (length(cat_ints) > 0L) {
             pointer <- paste0(
               "Read these letters alongside the interaction cell-means ",
-              "table", if (isTRUE(effect_plot)) " and plot(s)" else "",
+              "table", if (isTRUE(effect_plots)) " and plot(s)" else "",
               " for ", paste0("`", cat_ints, "`", collapse = ", "),
               " below, not on their own.")
           } else {
@@ -2863,14 +2904,18 @@ not independent; do not report them as clean per-group standard deviations.\n"
             }
           }
 
-          cat("**[!] Interpret with caution:** `", trm, "` takes part in the ",
+          caution_text <- paste0(
+              "**[!] Interpret with caution:** `", trm, "` takes part in the ",
               "significant interaction(s) ",
               paste0("`", trm_sig_ints, "`", collapse = ", "), ". The ",
               "estimated marginal means below average over the other ",
               "term(s) in that interaction, so they can hide or even ",
               "reverse the real pattern - the effect of `", trm, "` depends ",
               "on the level/value of the interacting term(s). ",
-              pointer, "  \n\n", sep = "")
+              pointer)
+          cat(caution_text, "  \n\n", sep = "")
+        } else {
+          caution_text <- NULL
         }
 
         if (!is.null(cld_tbl)) {
@@ -2907,10 +2952,15 @@ not independent; do not report them as clean per-group standard deviations.\n"
           f_pander(f_conditional_round(pairs_tbl, digits = 4))
         }
 
+        # cld_text and caution are stored per term so print() shows the
+        # footer and caveat that belong to this table (the response-level
+        # "cld_text" above only holds the last term's footer).
         posthoc_results[[trm]] <- list(
-          emmeans = emm_tbl,
-          pairs   = pairs_tbl,
-          cld     = cld_tbl
+          emmeans  = emm_tbl,
+          pairs    = pairs_tbl,
+          cld      = cld_tbl,
+          cld_text = cld_text,
+          caution  = caution_text
         )
 
         ## ---- Contrast forest plot for this main-effect term -------------
@@ -2956,7 +3006,7 @@ not independent; do not report them as clean per-group standard deviations.\n"
         ## One estimated-means plot per term, placed directly after the
         ## term's tables (as requested). emm_spec is the bare variable name
         ## resolved earlier (e.g. "vs" from "factor(vs)").
-        if (isTRUE(effect_plot) && length(emm_spec) == 1L) {
+        if (isTRUE(effect_plots) && length(emm_spec) == 1L) {
           p_eff <- tryCatch(
             make_lmer_means_plot(emm, cld_tbl, trm, emm_spec),
             error = function(e) NULL
@@ -2984,6 +3034,58 @@ not independent; do not report them as clean per-group standard deviations.\n"
         }
       }
 
+      # ---- Simple effects: post_hoc = "a", by = "b" -----------------------
+      # emmeans(fit, ~ a | b): letters and adjustment within each level of b.
+      if (identical(ph_spec$mode, "named") && !is.null(ph_spec$by)) {
+        by_v <- ph_spec$by
+        lmer_df_by <- switch(ddf, "Satterthwaite" = "satterthwaite",
+                             "Kenward-Roger" = "kenward-roger",
+                             "lme4" = "asymptotic")
+        cat("\n## Post hoc comparisons: simple effects (`emmeans`, adjust = `",
+            adjust, "`)\n\n", sep = "")
+        for (trm in ph_spec$mains) {
+          p_trm  <- p_lookup[trm]
+          int_by <- intersect(c(paste(trm, by_v, sep = ":"),
+                                paste(by_v, trm, sep = ":")), anova_tbl$Term)
+          p_int  <- if (length(int_by)) p_lookup[int_by] else NA_real_
+          term_ns <- (is.na(p_trm) || p_trm >= alpha) &&
+            (!length(int_by) || all(is.na(p_int) | p_int >= alpha))
+          tab <- tryCatch(
+            compute_post_hoc_table(fit, trm, by = by_v, adjust = adjust,
+                                   alpha = alpha, term_ns = term_ns,
+                                   emm_args = list(lmer.df = lmer_df_by)),
+            error = function(e) {
+              cat("\n### ", trm, " | ", by_v, "\n\nemmeans failed for this ",
+                  "term: ", conditionMessage(e), "\n\n", sep = "")
+              NULL
+            })
+          if (is.null(tab)) next
+          key <- paste0(trm, " | ", by_v)
+          cat("\n### ", key, " (simple effects)",
+              if (term_ns) "  (not significant)" else "", "\n\n", sep = "")
+          cat("*", ph_caption(by_v), "*  \n\n", sep = "")
+          if (!is.null(tab$cld)) {
+            f_pander(f_conditional_round(tab$cld, digits = 4))
+          } else {
+            f_pander(f_conditional_round(tab$emmeans, digits = 4))
+          }
+          footer <- ph_footer(adjust, alpha, tab$n_est, tab$n_tests, by = by_v)
+          cat(footer)
+          if (!is.null(tab$pairs)) {
+            cat("\n**Pairwise contrasts within each level of ", by_v, " (",
+                adjust, " adjusted):**  \n\n", sep = "")
+            f_pander(f_conditional_round(tab$pairs, digits = 4))
+          }
+          posthoc_results[[key]] <- list(
+            emmeans  = tab$emmeans,
+            pairs    = tab$pairs,
+            cld      = tab$cld,
+            cld_text = footer,
+            caution  = NULL
+          )
+        }
+      }
+
       # Note on numeric covariates in the fixed-effects table.
       if (length(numeric_in_anova) > 0L) {
         cat("\n**Note on numeric covariate(s):** ",
@@ -3007,14 +3109,16 @@ not independent; do not report them as clean per-group standard deviations.\n"
       # Note about significant interactions. Reuses sig_int_terms, computed
       # once before the post hoc loop (see above), so the per-table inline
       # warnings and this summary block cannot drift apart.
-      int_terms <- sig_int_terms
-      if (length(int_terms) > 0) {
+      int_terms <- if (identical(ph_spec$mode, "named")) ph_spec$ints else sig_int_terms
+      if (length(intersect(int_terms, sig_int_terms)) > 0) {
         cat("\n**[!] Significant interaction(s) detected:** ",
-            paste(int_terms, collapse = ", "),
+            paste(intersect(int_terms, sig_int_terms), collapse = ", "),
             ". Main-effect post hoc tests above should be interpreted with ",
             "care - the effect of one factor depends on the level of another. ",
-            "Use `emmeans(model, ~ factor1 | factor2)` manually for ",
-            "simple-effects contrasts.\n\n", sep = "")
+            "For simple effects use e.g. `post_hoc = \"factor1\", ",
+            "by = \"factor2\"`.\n\n", sep = "")
+      }
+      if (length(int_terms) > 0) {
 
         ## ---- Interaction post hoc table (cell means) --------------------
         ## For each significant interaction made up solely of categorical
@@ -3080,6 +3184,8 @@ not independent; do not report them as clean per-group standard deviations.\n"
           )
           if (!is.null(int_cld_tbl) && ".group" %in% names(int_cld_tbl)) {
             names(int_cld_tbl)[names(int_cld_tbl) == ".group"] <- "Letter"
+            # Requested via post_hoc = "a:b" but not significant: "ns".
+            if (!it %in% sig_int_terms) int_cld_tbl$Letter <- "ns"
           }
           if (!is.null(int_cld_tbl)) rownames(int_cld_tbl) <- NULL
           if (!is.null(int_pairs_tbl)) rownames(int_pairs_tbl) <- NULL
@@ -3087,9 +3193,12 @@ not independent; do not report them as clean per-group standard deviations.\n"
           rownames(emm_int_tbl) <- NULL
 
           cat("\n### Interaction cell means: ", it, "\n\n", sep = "")
+          cat("*", ph_caption(), "*  \n\n", sep = "")
           cat("Estimated **cell means** for every combination of ",
               paste(int_parts, collapse = " \u00d7 "),
-              ". Because the interaction is significant, all cells are ",
+              if (it %in% sig_int_terms)
+                ". Because the interaction is significant, all cells are "
+              else ". The interaction is NOT significant (letters `ns`); all cells are ",
               "compared simultaneously - interpret the joint pattern, not ",
               "the single-factor marginal means above. Letters here ",
               "compare all cells at once and are the reference grouping ",
@@ -3135,9 +3244,11 @@ not independent; do not report them as clean per-group standard deviations.\n"
           # Store under the interaction term name so it sits alongside the
           # main-effect post hoc results in out$<resp>$post_hoc[[it]].
           posthoc_results[[it]] <- list(
-            emmeans = emm_int_tbl,
-            pairs   = int_pairs_tbl,
-            cld     = int_cld_tbl
+            emmeans  = emm_int_tbl,
+            pairs    = int_pairs_tbl,
+            cld      = int_cld_tbl,
+            cld_text = int_cld_text,
+            caution  = NULL
           )
 
           ## ---- Contrast forest plot for this interaction ----------------
@@ -3193,7 +3304,7 @@ not independent; do not report them as clean per-group standard deviations.\n"
         ## visible note - the cell-means table above still reports every
         ## combination.
         MAX_PLOT_FACTORS <- 4L
-        if (isTRUE(effect_plot)) {
+        if (isTRUE(effect_plots)) {
           for (it in int_terms) {
             parts <- strsplit(it, ":", fixed = TRUE)[[1]]
             parts <- vapply(parts, function(p)
@@ -3595,11 +3706,19 @@ print.f_lmer <- function(x, ...) {
       cat("\n--- Post hoc comparisons ---\n")
       for (trm in names(sub$post_hoc)) {
         cat("\n* ", trm, " *\n", sep = "")
+        by_k <- if (grepl("|", trm, fixed = TRUE)) trimws(sub(".*\\|", "", trm)) else NULL
+        cat(ph_caption(by_k), "\n", sep = "")
         ph <- sub$post_hoc[[trm]]
+        if (!is.null(ph$caution)) {
+          cat(paste(strwrap(ph$caution, width = 76), collapse = "\n"),
+              "\n\n", sep = "")
+        }
         if (!is.null(ph$cld)) {
           cat("Estimated marginal means with compact letter display:\n")
           f_pander(f_conditional_round(ph$cld, digits = 4))
-          cat(sub$cld_text)
+          # Per-term footer. Objects from rfriend < 3.2.1 only stored one
+          # response-level footer, so fall back to it for those.
+          cat(if (!is.null(ph$cld_text)) ph$cld_text else sub$cld_text)
         } else if (!is.null(ph$emmeans)) {
           cat("Estimated marginal means:\n")
           f_pander(f_conditional_round(ph$emmeans, digits = 4))

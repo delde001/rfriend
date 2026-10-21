@@ -3,8 +3,8 @@
 #' Compares two statistical models by calculating key metrics such as AIC, BIC, log-likelihood, \eqn{R^2},
 #' and others. Supports comparison of nested models using ANOVA tests.
 #'
-#' @param model1 The first model object. Supported classes include: \code{"lm", "glm", "aov", "lmerMod", "glmerMod", and "nls"}.
-#' @param model2 The second model object. Supported classes include: \code{"lm", "glm", "aov", "lmerMod", "glmerMod", and "nls"}.
+#' @param model1 The first model object. Supported classes include: \code{"lm", "glm", "aov", "lmerMod", "glmerMod", and "nls"}. The result of \code{f_lm()}, \code{f_aov()}, \code{f_glm()} or \code{f_lmer()} (for one response) is also accepted; the fitted model stored in it is used.
+#' @param model2 The second model object. Supported classes include: \code{"lm", "glm", "aov", "lmerMod", "glmerMod", and "nls"}. The result of \code{f_lm()}, \code{f_aov()}, \code{f_glm()} or \code{f_lmer()} (for one response) is also accepted; the fitted model stored in it is used.
 #' @param nested Logical. If \code{TRUE}, assumes the models are nested and performs an ANOVA comparison.
 #'   If \code{NULL} (default), the function attempts to automatically determine if the models are nested.
 #' @param model1_name Optional character string. A custom name for model1 in the output. If \code{NULL} (default),
@@ -36,7 +36,14 @@
 #'   }
 #'
 #' Note: Multi-stratum AOV models (fitted with \code{Error()}) are not supported
-#' and will produce a warning.
+#' and stop with an error that suggests the equivalent mixed model.
+#'
+#' Results of rfriend test functions are accepted as well: for a result of
+#' \code{f_lm()}, \code{f_aov()}, \code{f_glm()} or \code{f_lmer()} the
+#' fitted model stored in it is compared. A result with more than one response,
+#' or with a response that the function transformed (Box-Cox or
+#' bestNormalize), stops with a message, because models on different scales
+#' cannot be compared on AIC, BIC or likelihood.
 #'
 #' @details
 #' Calculate various metrics to assess model fit:
@@ -60,6 +67,16 @@
 #'
 #' If the models are nested, an ANOVA test is performed to compare them, and a p-value
 #' is provided to assess whether the more complex model significantly improves fit.
+#' For linear models this is an F test. For GLMs with a fixed dispersion
+#' (binomial, poisson, negative binomial) it is a likelihood-ratio
+#' (chi-square) test; for GLMs with an estimated dispersion (gaussian, Gamma,
+#' quasi families) it is an F test. Mixed models are compared with a
+#' likelihood-ratio test.
+#'
+#' Linear mixed models fitted with REML (the \code{lme4::lmer()} default, and
+#' the models stored by \code{f_lmer()}) are refitted with maximum likelihood
+#' before the comparison, with a message: AIC, BIC and the log-likelihood of
+#' REML fits are not comparable between models with different fixed effects.
 #'
 #' @note
 #'   \itemize{
@@ -113,32 +130,6 @@ f_model_compare <- function(model1, model2, nested = NULL,
                             model1_name = NULL, model2_name = NULL,
                             digits = 3) {
 
-  # ---- Identify model classes using inherits() ----
-  # Order matters: check more specific classes first (glm before lm, aov before lm)
-  supported_classes <- c("glmerMod", "lmerMod", "glm", "aov", "nls", "lm")
-
-  get_model_class <- function(model) {
-    for (cls in supported_classes) {
-      if (inherits(model, cls)) return(cls)
-    }
-    return(class(model)[1])  # fallback for unsupported classes
-  }
-
-  # ---- Guard against aovlist (multi-stratum Error() models) ----
-  if (inherits(model1, "aovlist") || inherits(model2, "aovlist")) {
-    warning(
-      "Multi-stratum aov models (fitted with Error()) are not supported. ",
-      "The summary structure differs from standard aov. Results may be unreliable."
-    )
-  }
-
-  m1_class <- get_model_class(model1)
-  m2_class <- get_model_class(model2)
-
-  if (!m1_class %in% supported_classes || !m2_class %in% supported_classes) {
-    warning("One or both models are not of a supported class. Results may be unreliable.")
-  }
-
   # ---- Get model names (before potential swap) ----
   # deparse(substitute()) must be called before any reassignment
   if (is.null(model1_name)) {
@@ -151,6 +142,46 @@ f_model_compare <- function(model1, model2, nested = NULL,
   } else {
     m2_name <- model2_name
   }
+
+  # ---- Accept rfriend results: use the fitted model stored inside ----
+  # f_lm(), f_aov(), f_glm() and f_lmer() return a report (a list per
+  # response), not a model. Take the fitted model out of it, or stop with a
+  # clear message when that is not possible.
+  model1 <- extract_rfriend_model(model1, m1_name)
+  model2 <- extract_rfriend_model(model2, m2_name)
+
+  # ---- Identify model classes using inherits() ----
+  # Order matters: check more specific classes first (glm before lm, aov before lm)
+  supported_classes <- c("glmerMod", "lmerMod", "glm", "aov", "nls", "lm")
+
+  get_model_class <- function(model) {
+    for (cls in supported_classes) {
+      if (inherits(model, cls)) return(cls)
+    }
+    return(class(model)[1])  # fallback for unsupported classes
+  }
+
+  # ---- Guard against aovlist (multi-stratum Error() models) ----
+  # These have no single likelihood or residual structure, so the metrics
+  # below cannot be computed. Stop with a clear message instead of failing
+  # later with an internal error.
+  if (inherits(model1, "aovlist") || inherits(model2, "aovlist")) {
+    stop(
+      "Multi-stratum aov models (fitted with Error()) are not supported by ",
+      "f_model_compare(): they have no single likelihood to compare.\n",
+      "Refit the error strata as random effects and compare those models, e.g. ",
+      "aov(y ~ x + Error(block)) -> lme4::lmer(y ~ x + (1 | block), REML = FALSE).",
+      call. = FALSE
+    )
+  }
+
+  m1_class <- get_model_class(model1)
+  m2_class <- get_model_class(model2)
+
+  if (!m1_class %in% supported_classes || !m2_class %in% supported_classes) {
+    warning("One or both models are not of a supported class. Results may be unreliable.")
+  }
+
 
   # ---- Validate that models were fit on the same number of observations ----
   n1 <- tryCatch(nobs(model1), error = function(e) NA)
@@ -195,6 +226,24 @@ f_model_compare <- function(model1, model2, nested = NULL,
   # Safety net: if nested is still NULL at this point, default to FALSE
   if (is.null(nested)) nested <- FALSE
 
+
+  # ---- Mixed models: compare ML fits, not REML fits ----
+  # AIC, BIC and the log-likelihood of REML fits are not comparable between
+  # models with different fixed effects. Refit with ML (as anova() does).
+  refit_ml <- function(model) {
+    if (inherits(model, "lmerMod") && isTRUE(lme4::isREML(model))) {
+      lme4::refitML(model)
+    } else {
+      model
+    }
+  }
+  if (any(vapply(list(model1, model2), function(m)
+        inherits(m, "lmerMod") && isTRUE(lme4::isREML(m)), logical(1)))) {
+    model1 <- refit_ml(model1)
+    model2 <- refit_ml(model2)
+    message("Note: mixed model(s) fitted with REML were refitted with ML ",
+            "(REML = FALSE), so that AIC, BIC and the log-likelihood can be compared.")
+  }
 
   # ---- Ensure model1 is the simpler model (fewer parameters) ----
   # This guarantees correct sign on differences and valid ANOVA ordering.
@@ -410,7 +459,11 @@ f_model_compare <- function(model1, model2, nested = NULL,
   if (isTRUE(nested)) {
     # Determine test type
     test_type <- if (m1_class == "glm") {
-      ifelse(stats::family(model1)$family == "binomial", "Chisq", "F")
+      # Families with a fixed dispersion (binomial, poisson, negative
+      # binomial) use a likelihood-ratio (chi-square) test; families with an
+      # estimated dispersion (gaussian, Gamma, quasi-) use an F test.
+      fam <- stats::family(model1)$family
+      if (fam %in% c("binomial", "poisson") || grepl("^Negative Binomial", fam)) "Chisq" else "F"
     } else if (m1_class %in% c("lmerMod", "glmerMod")) {
       "Chisq"
     } else if (m1_class == "nls") {
@@ -427,6 +480,21 @@ f_model_compare <- function(model1, model2, nested = NULL,
         stats::anova(model1, model2)
       }
     }, error = function(e) {
+      if (m1_class %in% c("lmerMod", "glmerMod")) {
+        # anova.merMod() refuses models whose calls hold different data
+        # objects (e.g. models stored by f_lmer()). Both models are ML fits
+        # on the same observations, so compute the likelihood-ratio test.
+        ll1 <- stats::logLik(model1); ll2 <- stats::logLik(model2)
+        chisq <- 2 * (as.numeric(ll2) - as.numeric(ll1))
+        ddf   <- attr(ll2, "df") - attr(ll1, "df")
+        return(data.frame(npar   = c(attr(ll1, "df"), attr(ll2, "df")),
+                          logLik = c(as.numeric(ll1), as.numeric(ll2)),
+                          Chisq  = c(NA, chisq),
+                          Df     = c(NA, ddf),
+                          `Pr(>Chisq)` = c(NA, stats::pchisq(chisq, ddf, lower.tail = FALSE)),
+                          row.names = c("model1", "model2"),
+                          check.names = FALSE))
+      }
       warning("Model comparison failed: ", e$message)
       return(NULL)
     })
@@ -558,3 +626,50 @@ print.f_model_comparison <- function(x, ...) {
 
   invisible(x)
 }
+
+
+#' Take the fitted model out of an rfriend result
+#'
+#' Internal helper for \code{f_model_compare()}. Results of \code{f_lm()},
+#' \code{f_aov()}, \code{f_glm()} and \code{f_lmer()} are lists with one
+#' element per response; each element stores the fitted model. Other objects
+#' are returned unchanged.
+#'
+#' @param x A model or an rfriend result.
+#' @param x_name Name of the argument as typed by the user, for messages.
+#' @return A fitted model object.
+#' @keywords internal
+#' @noRd
+extract_rfriend_model <- function(x, x_name) {
+  slots <- c(f_lm = "lm_fit_active", f_aov = "aov_test",
+             f_glm = "model", f_lmer = "model")
+  cls <- intersect(class(x), names(slots))
+  if (length(cls) == 0L) {
+    return(x)
+  }
+  cls  <- cls[1L]
+  slot <- slots[[cls]]
+  has_model <- vapply(x, function(el) is.list(el) && !is.null(el[[slot]]), logical(1))
+  responses <- names(x)[has_model]
+
+  if (length(responses) == 0L) {
+    stop("f_model_compare(): '", x_name, "' is a result of ", cls, "() but ",
+         "contains no fitted model (was the response skipped?).", call. = FALSE)
+  }
+  if (length(responses) > 1L) {
+    stop("f_model_compare(): '", x_name, "' is a result of ", cls, "() with ",
+         length(responses), " responses (", paste(responses, collapse = ", "),
+         "). Compare one response at a time, e.g. ", x_name, "$",
+         responses[1L], "$", slot, ".", call. = FALSE)
+  }
+  el <- x[[responses]]
+  if (isTRUE(el$Response_Transformed)) {
+    stop("f_model_compare(): in '", x_name, "' the response '", responses,
+         "' was transformed by ", cls, "(). Models on different scales cannot ",
+         "be compared on AIC, BIC or likelihood. Refit both models with ",
+         "transformation = FALSE, or compare models fitted with lm()/glm() on ",
+         "the same scale.", call. = FALSE)
+  }
+  el[[slot]]
+}
+

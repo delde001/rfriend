@@ -52,8 +52,13 @@
 #'   paired tests. For two-sample tests with \code{mu != 0} a warning is issued.
 #' @param alternative Character string. \code{"two.sided"} (default),
 #'   \code{"greater"}, or \code{"less"}.
-#' @param norm_plots Logical. If \code{TRUE}, diagnostic plots are included in the
+#' @param diagnostic_plots Logical. If \code{TRUE}, diagnostic plots are included in the
 #'   output. Default is \code{TRUE}.
+#' @param effect_plots Logical. If \code{TRUE} (default), the main effect
+#'   plot (\code{main_effect_plot}) is built, stored and included in the
+#'   output files. With \code{FALSE} it is not built.
+#' @param norm_plots \strong{Deprecated} in 3.2.1. Use \code{diagnostic_plots} instead. If
+#'   supplied, its value is passed to \code{diagnostic_plots} with a warning.
 #' @param transformation Logical or character string. If \code{TRUE} or
 #'   \code{"boxcox"}, applies \code{f_boxcox()} when Shapiro-Wilk indicates
 #'   non-normality. If \code{"bestnormalize"}, applies \code{f_bestNormalize()}.
@@ -61,6 +66,11 @@
 #'   \strong{Note:} For paired tests, \code{bestNormalize} (Yeo-Johnson) is always
 #'   used on the differences, since Box-Cox requires strictly positive values.
 #'   Default is \code{TRUE}.
+#'   A transformation is kept only when it improves the normality of the
+#'   residuals (Shapiro-Wilk, or Anderson-Darling when Shapiro-Wilk is
+#'   unavailable). Otherwise the untransformed test is reported, the report says
+#'   so, and the attempt is recorded in \code{transformation_rejected}. Responses
+#'   named in \code{force_transformation} are always transformed.
 #' @param force_transformation Character vector. Names of variables to transform
 #'   regardless of normality results.
 #' @param alpha Numeric. Significance level. Default is \code{0.05}.
@@ -101,6 +111,9 @@
 #'   multi-response call (\code{y1 + y2 ~ group}) are then tested on
 #'   the identical row set. For the default (vector) method, \code{...}
 #'   is currently unused.
+#'   \code{subset} can also pick two groups of a factor with more
+#'   levels (e.g. \code{subset = treatment \%in\% c("control", "high_N")});
+#'   the check for exactly two groups runs after the subset.
 #'
 #' @return An object of class \code{'f_t_test'}, a named list with one element per
 #'   response variable. Each element contains the t-test result, normality test
@@ -114,6 +127,19 @@
 #'   reference line at \code{mu} (paired). When the response was transformed the
 #'   estimate and interval are back-transformed to the original scale and
 #'   labelled as a median.
+#'   \code{Response_Transformed}: \code{TRUE} when the response was
+#'   transformed (Box-Cox or bestNormalize) because the residuals were not normal and
+#'   the transformation was kept (see \code{transformation}).
+#'   \code{t_test}: \code{htest} result of the untransformed response.
+#'   \code{transformed_t_test}: \code{htest} result of the transformed response, or
+#'   \code{NULL} when no transformation was applied. The printed and reported
+#'   result is \code{transformed_t_test} when \code{Response_Transformed} is
+#'   \code{TRUE}, otherwise \code{t_test}. To pick it in code:
+#'   \code{tab <- if (out$y$Response_Transformed) out$y$transformed_t_test else out$y$t_test}.
+#'   When a transformation was tried but not kept, \code{transformation_rejected}
+#'   records the method, the reason and the p-values before and after.
+#'   \code{t_test_transformed} is a \strong{deprecated} alias of
+#'   \code{transformed_t_test} and will be removed in the next release.
 #'
 #' @references
 #' Delacre, M., Lakens, D., & Leys, C. (2017). Why psychologists should by default
@@ -124,70 +150,70 @@
 #' @examples
 #' \donttest{
 #' # 1. Two-sample independent Welch's t-test (default)
-#' f_t_test(mpg ~ am, data = mtcars, output_type = "console", norm_plots = FALSE)
+#' f_t_test(mpg ~ am, data = mtcars, output_type = "console", diagnostic_plots = FALSE)
 #'
 #' # 2. Multiple response variables in one call
-#' f_t_test(mpg + hp ~ am, data = mtcars, output_type = "console", norm_plots = FALSE)
+#' f_t_test(mpg + hp ~ am, data = mtcars, output_type = "console", diagnostic_plots = FALSE)
 #'
 #' # 3. One-sample t-test: test if mean mpg equals 20
 #' f_t_test(mpg ~ 1, data = mtcars, mu = 20,
-#'          output_type = "console", norm_plots = FALSE)
+#'          output_type = "console", diagnostic_plots = FALSE)
 #'
 #' # 4. Paired t-test with explicit subject id (recommended)
 #' f_t_test(extra ~ group, data = sleep, paired = TRUE, paired_by = "ID",
-#'          output_type = "console", norm_plots = FALSE)
+#'          output_type = "console", diagnostic_plots = FALSE)
 #'
 #' # 4b. Paired t-test without paired_by (warns; pairing is positional and
 #' # only safe when data is in AABB order with matching within-group order)
 #' f_t_test(extra ~ group, data = sleep, paired = TRUE,
-#'          output_type = "console", norm_plots = FALSE)
+#'          output_type = "console", diagnostic_plots = FALSE)
 #'
 #' # 5. Vector interface: two-sample independent
 #' group_auto   <- mtcars$mpg[mtcars$am == 0]
 #' group_manual <- mtcars$mpg[mtcars$am == 1]
-#' f_t_test(group_auto, group_manual, output_type = "console", norm_plots = FALSE)
+#' f_t_test(group_auto, group_manual, output_type = "console", diagnostic_plots = FALSE)
 #'
 #' # 6. Vector interface: one-sample
-#' f_t_test(mtcars$mpg, mu = 20, output_type = "console", norm_plots = FALSE)
+#' f_t_test(mtcars$mpg, mu = 20, output_type = "console", diagnostic_plots = FALSE)
 #'
 #' # 7. Force Student's t-test (equal variances assumed)
 #' f_t_test(mpg ~ am, data = mtcars, var.equal = TRUE,
-#'          output_type = "console", norm_plots = FALSE)
+#'          output_type = "console", diagnostic_plots = FALSE)
 #'
 #' # 8. One-sided test
 #' f_t_test(mpg ~ am, data = mtcars, alternative = "greater",
-#'          output_type = "console", norm_plots = FALSE)
+#'          output_type = "console", diagnostic_plots = FALSE)
 #'
 #' # 9. Custom significance level (alpha = 0.01 is equivalent to conf.level = 0.99)
 #' f_t_test(mpg ~ am, data = mtcars, alpha = 0.01,
-#'          output_type = "console", norm_plots = FALSE)
+#'          output_type = "console", diagnostic_plots = FALSE)
 #'
 #' # 10. Box-Cox transformation with back-transformed CI
 #' # The back-transformed CI estimates the MEDIAN, not the arithmetic mean.
 #' result <- f_t_test(hp ~ am, data = mtcars, transformation = TRUE,
-#'                    output_type = "console", norm_plots = FALSE)
+#'                    output_type = "console", diagnostic_plots = FALSE)
 #' result[["hp"]]$ci_backtransformed
 #'
 #' # 11. One-sample with non-zero mu and back-transformation
 #' f_t_test(hp ~ 1, data = mtcars, mu = 100, transformation = TRUE,
-#'          output_type = "console", norm_plots = FALSE)
+#'          output_type = "console", diagnostic_plots = FALSE)
 #'
 #' # 12. BestNormalize transformation (set seed for reproducibility)
 #' set.seed(123)
 #' f_t_test(hp ~ am, data = mtcars, transformation = "bestnormalize",
-#'          output_type = "console", norm_plots = FALSE)
+#'          output_type = "console", diagnostic_plots = FALSE)
 #'
 #' # 13. Force transformation regardless of normality
 #' f_t_test(mpg + hp ~ am, data = mtcars, force_transformation = "mpg",
-#'          output_type = "console", norm_plots = FALSE)
+#'          output_type = "console", diagnostic_plots = FALSE)
 #'
 #' # 14. Suppress transformation (diagnostic mode)
 #' f_t_test(hp ~ am, data = mtcars, transformation = FALSE,
-#'          output_type = "console", norm_plots = FALSE)
+#'          output_type = "console", diagnostic_plots = FALSE)
 #'
 #' # 15. Access return object fields directly
 #' result <- f_t_test(mpg + hp ~ am, data = mtcars,
-#'                    output_type = "default", norm_plots = FALSE, intro_text = FALSE)
+#'                    output_type = "default", diagnostic_plots = FALSE, intro_text = FALSE)
 #' result[["mpg"]]$t_test          # standard htest object
 #' result[["hp"]]$shapiro_res      # Shapiro-Wilk result
 #' result[["hp"]]$homog_p_bartlett # Bartlett p-value (diagnostic only)
@@ -222,7 +248,8 @@ f_t_test.formula <- function(formula,
                              conf.level = NULL,
                              mu = 0,
                              alternative = "two.sided",
-                             norm_plots = TRUE,
+                             diagnostic_plots = TRUE,
+                             effect_plots     = TRUE,
                              transformation = TRUE,
                              force_transformation = NULL,
                              alpha = 0.05,
@@ -232,12 +259,35 @@ f_t_test.formula <- function(formula,
                              output_type = "default",
                              save_as = NULL,
                              save_in_wdir = FALSE,
+                             norm_plots = lifecycle::deprecated(),
                              ...) {
   # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   # 1. Reset initial settings on exit ----
   # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   .session_state <- save_session_state()  # Helper function: helper_session_state
   on.exit(restore_session_state(.session_state), add = TRUE) # Helper function: helper_session_state
+
+  ########## Deprecated arguments ##########################################
+  # Renamed in 3.2.1 so that all test functions use the same names for the
+  # same report parts: `diagnostic_plots` (assumption and residual checks)
+  # and `effect_plots` (effect, estimated-means and interaction plots).
+  # The old name still works for one release, with a warning.
+  if (lifecycle::is_present(norm_plots)) {
+    lifecycle::deprecate_warn(
+      when = "3.2.1",
+      what = "f_t_test(norm_plots)",
+      with = "f_t_test(diagnostic_plots)"
+    )
+    diagnostic_plots <- norm_plots
+  }
+
+  # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  # check_dots to prevent ignoring typos
+  # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  check_known_dots(...names(), ...length(),
+                   allowed    = c("subset", "na.action"),
+                   fun_name   = "f_t_test",
+                   valid_args = names(formals(sys.function())))
 
   # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   # 2. Data & Formula Parsing ----
@@ -403,8 +453,6 @@ f_t_test.formula <- function(formula,
     if (!(predictor_name %in% names(data)))
       stop(paste("Predictor", predictor_name, "not found."))
     data[[predictor_name]] <- as.factor(data[[predictor_name]])
-    if (nlevels(data[[predictor_name]]) != 2)
-      stop("Grouping variable must have exactly 2 levels for a t-test.")
   }
 
   # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -475,10 +523,10 @@ f_t_test.formula <- function(formula,
     subset_vec <- eval(dots_exprs$subset, envir = data, enclos = caller_env)
     if (is.logical(subset_vec)) subset_vec[is.na(subset_vec)] <- FALSE
   }
-  n_before_master <- nrow(data)            # before any filtering
   if (!is.null(subset_vec)) {
     data <- data[subset_vec, , drop = FALSE]
   }
+  n_before_master <- nrow(data)            # after subset, before NA drop
 
   # Resolve na.action (a function, defaults to na.omit)
   na_action_fn <- stats::na.omit
@@ -493,8 +541,23 @@ f_t_test.formula <- function(formula,
     na.action          = na_action_fn
   )
 
+  data_before_na <- data
   data <- do.call(stats::model.frame, mf_args)
+  message_na_removed(data_before_na, nrow(data), all.vars(master_formula))
+  rm(data_before_na)
   n_after_master  <- nrow(data)            # after subset + NA drop
+  # Two groups are needed. Checked here, after `subset` and the NA drop
+  # (model.frame drops unused levels), so `subset` can pick two groups.
+  if (!is_one_sample) {
+    levs <- levels(data[[predictor_name]])
+    if (length(levs) != 2)
+      stop("Grouping variable must have exactly 2 levels for a t-test; '",
+           predictor_name, "' has ", length(levs),
+           if (length(levs) > 0) paste0(" (", paste(levs, collapse = ", "), ")") else "",
+           " after subset and removing missing values. ",
+           "Select two groups with `subset` or subset the data first.",
+           call. = FALSE)
+  }
 
 
   # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -987,7 +1050,7 @@ f_t_test.formula <- function(formula,
       }
       dev.off()
 
-      if (isTRUE(norm_plots)) {
+      if (isTRUE(diagnostic_plots)) {
         cat("\n     \n&nbsp;   \nCheck the plots below to assess assumptions.  \n")
         cat(paste0("![](", temp_file, ")"), "  \n\n")
         cat("&nbsp;\n  \n")
@@ -1057,7 +1120,7 @@ f_t_test.formula <- function(formula,
               values_to_transform,
               data_name   = trans_subject_label,
               output_type = "rmd",
-              plots       = isTRUE(norm_plots),
+              plots       = isTRUE(diagnostic_plots),
               alpha       = alpha,
               standardize = FALSE
             )
@@ -1211,21 +1274,53 @@ f_t_test.formula <- function(formula,
           }
           dev.off()
 
-          if (isTRUE(norm_plots)) {
+          if (isTRUE(diagnostic_plots)) {
             cat("\n   \nAssumption plots after transformation:  \n")
             cat(paste0("![](", temp_file_t, ")"), "  \n\n")
           }
 
-          output_list[[response_name]][["t_test_transformed"]]          <- test_res_t
-          output_list[[response_name]][["Response_Transformed"]]        <- TRUE
-          output_list[[response_name]][["trans_name"]]                  <- trans_name
-          output_list[[response_name]][["shapiro_res_transformed"]]     <- shapiro_res_t
-          output_list[[response_name]][["transformed_normality_plots"]] <- temp_file_t
-          output_list[[response_name]][["mu_transformed"]]              <- mu_transformed
-          output_list[[response_name]][["ci_backtransformed"]]          <- ci_backtransformed
+          # Keep the transformation only if it improved normality
+          # (helper_transform_decision.R); otherwise report the untransformed
+          # test and say so. Anderson-Darling backs up Shapiro-Wilk when it
+          # is unavailable, as in the untransformed check.
+          adt_res_t <- safe_ad(res_t)
+          t_lab <- transformation_label(
+            if (isTRUE(is_boxcox_trans)) "boxcox" else "bestnormalize",
+            lambda  = if (isTRUE(is_boxcox_trans)) transformed_var$lambda else NULL,
+            bn_name = if (!isTRUE(is_boxcox_trans)) trans_name else NULL)
+          nb  <- norm_check_p(shapiro_res, adt_res)
+          na  <- norm_check_p(shapiro_res_t, adt_res_t)
+          dec <- keep_transformation(
+            trigger_normality = normality_violated,
+            trigger_variance  = FALSE,
+            trigger_forced    = response_name %in% force_transformation,
+            norm_before = nb$p, norm_after = na$p, norm_test = nb$test,
+            method_label = if (isTRUE(is_boxcox_trans)) "Box-Cox" else "bestNormalize")
 
-          t_test_final         <- test_res_t
-          Response_Transformed <- TRUE
+          if (isTRUE(dec$keep)) {
+            output_list[[response_name]][["transformed_t_test"]]          <- test_res_t
+            # Deprecated alias (one release): use $transformed_t_test.
+            output_list[[response_name]][["t_test_transformed"]]          <- test_res_t
+            output_list[[response_name]][["Response_Transformed"]]        <- TRUE
+            output_list[[response_name]][["trans_name"]]                  <- trans_name
+            output_list[[response_name]][["transformation_label"]]        <- t_lab
+            output_list[[response_name]][["shapiro_res_transformed"]]     <- shapiro_res_t
+            output_list[[response_name]][["transformed_normality_plots"]] <- temp_file_t
+            output_list[[response_name]][["mu_transformed"]]              <- mu_transformed
+            output_list[[response_name]][["ci_backtransformed"]]          <- ci_backtransformed
+
+            t_test_final         <- test_res_t
+            Response_Transformed <- TRUE
+          } else {
+            cat(transformation_rejected_note(dec$reason))
+            output_list[[response_name]][["transformation_rejected"]] <- list(
+              method = t_lab, reason = dec$reason,
+              normality_p_before = nb$p, normality_p_after = na$p)
+            output_list[[response_name]][["trans_object"]] <- NULL
+            output_list[[response_name]][["is_boxcox"]]    <- NULL
+            if (!(paired && !is_one_sample))
+              data_complete[[response_name]] <- values_to_transform
+          }
 
           if (output_type %in% c("pdf", "word"))
             cat("\n<div style=\"page-break-after: always;\"></div>\n\\newpage")
@@ -1235,6 +1330,8 @@ f_t_test.formula <- function(formula,
       if (!Response_Transformed) {
         t_test_final <- test_res
         output_list[[response_name]][["Response_Transformed"]] <- FALSE
+        # Always present, NULL when no transformation was applied.
+        output_list[[response_name]]["transformed_t_test"] <- list(NULL)
         output_list[[response_name]][["mu_transformed"]]       <- NULL
         output_list[[response_name]][["ci_backtransformed"]]   <- NULL
       }
@@ -1466,11 +1563,10 @@ f_t_test.formula <- function(formula,
       # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
       # Determine title
-      method_title <- if (Response_Transformed) {
-        paste0(t_test_final$method, " of (", trans_name, " transformed): ", response_name)
-      } else {
-        paste0(t_test_final$method, " of: ", response_name)
-      }
+      method_title <- scale_heading(
+        t_test_final$method, response_name,
+        if (Response_Transformed) output_list[[response_name]][["transformation_label"]] else NULL)
+      output_list[[response_name]][["test_heading"]] <- method_title
 
       # Determine levs_for_hyp
       if (is_one_sample) {
@@ -1825,7 +1921,7 @@ f_t_test.formula <- function(formula,
         p
       }
 
-      main_effect_plot <- tryCatch(build_main_effect_plot(),
+      main_effect_plot <- if (!isTRUE(effect_plots)) NULL else tryCatch(build_main_effect_plot(),
                                     error = function(e) {
                                       warning("f_t_test: main effect plot for '",
                                               response_name, "' could not be built: ",
@@ -2043,7 +2139,8 @@ f_t_test.default <- function(x,
                              conf.level = NULL,
                              mu = 0,
                              alternative = "two.sided",
-                             norm_plots = TRUE,
+                             diagnostic_plots = TRUE,
+                             effect_plots     = TRUE,
                              transformation = TRUE,
                              force_transformation = NULL,
                              alpha = 0.05,
@@ -2053,7 +2150,22 @@ f_t_test.default <- function(x,
                              output_type = "default",
                              save_as = NULL,
                              save_in_wdir = FALSE,
+                             norm_plots = lifecycle::deprecated(),
                              ...) {
+
+  ########## Deprecated arguments ##########################################
+  # Renamed in 3.2.1 so that all test functions use the same names for the
+  # same report parts: `diagnostic_plots` (assumption and residual checks)
+  # and `effect_plots` (effect, estimated-means and interaction plots).
+  # The old name still works for one release, with a warning.
+  if (lifecycle::is_present(norm_plots)) {
+    lifecycle::deprecate_warn(
+      when = "3.2.1",
+      what = "f_t_test(norm_plots)",
+      with = "f_t_test(diagnostic_plots)"
+    )
+    diagnostic_plots <- norm_plots
+  }
   if (!is.numeric(x))
     stop("'x' must be numeric for the vector interface.")
   if (!is.null(y) &&
@@ -2137,7 +2249,8 @@ f_t_test.default <- function(x,
     conf.level            = conf.level,
     mu                    = mu,
     alternative           = alternative,
-    norm_plots            = norm_plots,
+    diagnostic_plots            = diagnostic_plots,
+    effect_plots          = effect_plots,
     transformation        = transformation,
     force_transformation  = if (is.null(force_transformation))
       NULL
@@ -2171,20 +2284,21 @@ print.f_t_test <- function(x, ...) {
     sublist <- x[[nm]]
 
     t_obj <- if (isTRUE(sublist$Response_Transformed)) {
-      sublist$t_test_transformed
+      if (!is.null(sublist$transformed_t_test)) sublist$transformed_t_test
+      else sublist$t_test_transformed
     } else {
       sublist$t_test
     }
 
-    # Header
+    # Header: names the scale of the reported test
     cat("\n==========================================================\n")
-    if (isTRUE(sublist$Response_Transformed)) {
-      cat(paste0(t_obj$method, " (", sublist$trans_name,
-                 " transformed) of: ", nm, "\n"))
-    } else {
-      cat(paste0(t_obj$method, " (", t_obj$alternative, ") of: ", nm, "\n"))
-    }
+    cat(paste0(scale_heading(paste0(t_obj$method, " (", t_obj$alternative, ")"),
+                             nm, if (isTRUE(sublist$Response_Transformed))
+                               sublist$transformation_label else NULL), "\n"))
     cat("==========================================================\n")
+    if (!is.null(sublist$transformation_rejected))
+      message("Note: ", sublist$transformation_rejected$reason,
+              " The untransformed test is reported.")
 
     # Sample statistics
     cat("\nSAMPLE STATISTICS:")
@@ -2257,6 +2371,6 @@ plot.f_t_test <- function(x, ...) {
     }
   }
   if (plots_shown == 0)
-    cat("No plots found. Run with norm_plots = TRUE and output_type != 'default'.\n")
+    cat("No plots found. Run with diagnostic_plots = TRUE and output_type != 'default'.\n")
   invisible(x)
 }

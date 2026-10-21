@@ -7,7 +7,8 @@
 f_friedman(
   formula,
   data = NULL,
-  plot = TRUE,
+  diagnostic_plots = TRUE,
+  effect_plots = TRUE,
   alpha = 0.05,
   output_type = "default",
   save_as = NULL,
@@ -16,6 +17,7 @@ f_friedman(
   adjust = "bonferroni",
   close_generated_files = FALSE,
   open_generated_files = interactive(),
+  plot = lifecycle::deprecated(),
   ...
 )
 }
@@ -28,13 +30,21 @@ matched set) within which the groups are related. More response variables
 can be tested in sequence using \code{+} on the left-hand side (e.g.
 \code{response1 + response2 ~ group | block}). The function iterates
 through the responses, because the Friedman test itself only allows one
-response at a time.}
+response at a time.
+The response must be numeric or an ordered factor (an ordinal score,
+e.g. \code{factor(score, ordered = TRUE)}). An ordered factor is tested
+on the rank codes of its levels (1 = lowest level), which is exact for a
+rank test; a message shows the coding. Other non-numeric responses stop
+with an error.}
 
 \item{data}{A \code{data.frame} containing the variables referenced in the formula.}
 
-\item{plot}{Logical. If \code{TRUE}, generates two plots (a within-block
-trace plot with median trend line, and a boxplot with compact letter
-display) in the output files. Default is \code{TRUE}.}
+\item{diagnostic_plots}{Logical. If \code{TRUE} (default), the within-block
+trace plot with median trend line is included in the output files.}
+
+\item{effect_plots}{Logical. If \code{TRUE} (default), the boxplot with the
+compact letter display of the post hoc test is included in the output
+files.}
 
 \item{alpha}{Numeric. The significance level for the Friedman test and the
 pairwise post hoc tests. Default is \code{0.05}.}
@@ -80,6 +90,9 @@ files after creation. Defaults to \code{TRUE} in an interactive R session
 and \code{FALSE} otherwise (e.g. in scripts or automated pipelines).
 Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.}
 
+\item{plot}{\strong{Deprecated} in 3.2.1. Use \code{diagnostic_plots} and \code{effect_plots} instead. If
+supplied, its value is passed to \code{diagnostic_plots} and \code{effect_plots} with a warning.}
+
 \item{...}{Additional arguments forwarded to \code{\link[stats]{friedman.test}}.}
 }
 \value{
@@ -94,10 +107,10 @@ An object of class 'f_friedman' (a named list, one entry per
     \item{adjust}{The p-value adjustment method used.}
     \item{distributions}{ggplot within-block trace plot with grey
        spaghetti lines, raw group-coloured points, and a black median
-       trend line on top (if \code{plot = TRUE}).}
+       trend line on top (if \code{diagnostic_plots = TRUE}).}
     \item{Boxplot}{ggplot boxplot with jittered raw points and
        compact-letter-display letters from the post hoc test (if
-       \code{plot = TRUE}).}
+       \code{effect_plots = TRUE}).}
   }
 
 Using the option \code{output_type}, it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and plot methods for 'f_friedman' objects.
@@ -126,7 +139,7 @@ unreplicated complete block design using the Friedman test:
 
 Output files are generated in the format specified by \code{output_type =} and saved to the working directory, options are \code{"pdf", "word"} or \code{"excel"}. If \code{output_type = "rmd"} is used it is advised to use it in a chunk with \{r, echo=FALSE, results='asis'\}
 
-This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
+This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or higher), a universal document converter.
 \itemize{
 \item \bold{Windows:} Install Pandoc and ensure the installation folder \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
 \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.
@@ -167,7 +180,8 @@ df_rm <- data.frame(
 output <- f_friedman(
                score ~ condition | subject,
                data = df_rm,
-               plot = FALSE,
+               diagnostic_plots = FALSE,
+               effect_plots = FALSE,
                output_type = "word",
                adjust = "holm"
                )

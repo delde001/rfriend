@@ -303,3 +303,68 @@ test_that("rmd output has no orphaned bold/italic markup artifacts", {
   # around grouping names (e.g. "**Levels of**** ****Subject****:**").
   expect_false(grepl("****", rmd, fixed = TRUE))
 })
+
+# ===========================================================================
+# 23. print.f_lmer: per-term adjustment footer and interaction caution
+# ===========================================================================
+# Before 3.2.1 print() reused one response-level footer (the last main
+# effect's) under every post hoc table, so a 4-level factor showed
+# "3 estimates / 3 tests". plant_trial has a significant treatment:time_f
+# interaction (4 x 3 cells), which exercises main effects and cell means.
+
+test_that("print.f_lmer shows the footer that belongs to each post hoc table", {
+  skip_on_cran()
+  skip_if_no_lme4()
+  pt <- plant_trial
+  pt$time_f <- factor(pt$time_weeks)
+  res <- quiet_f_lmer(height_cm ~ treatment * time_f + (1 | block/plant_id),
+                      data = pt)
+  ph <- res$height_cm$post_hoc
+  expect_match(ph$treatment$cld_text,          "4 estimates / 6 tests",   fixed = TRUE)
+  expect_match(ph$time_f$cld_text,             "3 estimates / 3 tests",   fixed = TRUE)
+  expect_match(ph[["treatment:time_f"]]$cld_text, "12 estimates / 66 tests", fixed = TRUE)
+
+  out <- paste(utils::capture.output(print(res)), collapse = "\n")
+  expect_true(grepl("4 estimates / 6 tests",   out, fixed = TRUE))
+  expect_true(grepl("12 estimates / 66 tests", out, fixed = TRUE))
+})
+
+test_that("print.f_lmer shows the interaction caution above main-effect tables", {
+  skip_on_cran()
+  skip_if_no_lme4()
+  pt <- plant_trial
+  pt$time_f <- factor(pt$time_weeks)
+  res <- quiet_f_lmer(height_cm ~ treatment * time_f + (1 | block/plant_id),
+                      data = pt)
+  expect_false(is.null(res$height_cm$post_hoc$treatment$caution))
+  expect_null(res$height_cm$post_hoc[["treatment:time_f"]]$caution)
+  out <- paste(utils::capture.output(print(res)), collapse = "\n")
+  expect_true(grepl("Interpret with caution", out, fixed = TRUE))
+})
+
+# ===========================================================================
+# 24. post_hoc / by: the same syntax as f_aov()
+# ===========================================================================
+
+test_that("f_lmer: post_hoc names, FALSE, by, and bad names", {
+  skip_on_cran()
+  skip_if_no_lme4()
+  pt <- plant_trial
+  pt$week <- factor(pt$time_weeks)
+  f <- height_cm ~ treatment * week + (1 | block/plant_id)
+  expect_setequal(names(quiet_f_lmer(f, data = pt)$height_cm$post_hoc),
+                  c("treatment", "week", "treatment:week"))
+  expect_identical(names(quiet_f_lmer(f, data = pt, post_hoc = "treatment")$height_cm$post_hoc),
+                   "treatment")
+  expect_length(quiet_f_lmer(f, data = pt, post_hoc = FALSE)$height_cm$post_hoc, 0)
+  res <- quiet_f_lmer(f, data = pt, post_hoc = "treatment", by = "week")
+  ph  <- res$height_cm$post_hoc[["treatment | week"]]
+  ref <- as.data.frame(emmeans::emmeans(res$height_cm$model, ~ treatment | week,
+                                        lmer.df = "satterthwaite"))
+  m <- merge(ref, ph$emmeans, by = c("treatment", "week"))
+  expect_equal(m$emmean.x, m$emmean.y)
+  expect_match(ph$cld_text, "per level of week", fixed = TRUE)
+  expect_error(quiet_f_lmer(f, data = pt, post_hoc = "treatmen"),
+               "did you mean 'treatment'")
+  expect_error(quiet_f_lmer(f, data = pt, by = "week"), "'by' needs 'post_hoc'")
+})

@@ -11,10 +11,19 @@
 #'   \code{response1 + response2 ~ group | block}). The function iterates
 #'   through the responses, because the Friedman test itself only allows one
 #'   response at a time.
+#'   The response must be numeric or an ordered factor (an ordinal score,
+#'   e.g. \code{factor(score, ordered = TRUE)}). An ordered factor is tested
+#'   on the rank codes of its levels (1 = lowest level), which is exact for a
+#'   rank test; a message shows the coding. Other non-numeric responses stop
+#'   with an error.
 #' @param data A \code{data.frame} containing the variables referenced in the formula.
-#' @param plot Logical. If \code{TRUE}, generates two plots (a within-block
-#'   trace plot with median trend line, and a boxplot with compact letter
-#'   display) in the output files. Default is \code{TRUE}.
+#' @param diagnostic_plots Logical. If \code{TRUE} (default), the within-block
+#'   trace plot with median trend line is included in the output files.
+#' @param effect_plots Logical. If \code{TRUE} (default), the boxplot with the
+#'   compact letter display of the post hoc test is included in the output
+#'   files.
+#' @param plot \strong{Deprecated} in 3.2.1. Use \code{diagnostic_plots} and \code{effect_plots} instead. If
+#'   supplied, its value is passed to \code{diagnostic_plots} and \code{effect_plots} with a warning.
 #' @param alpha Numeric. The significance level for the Friedman test and the
 #'   pairwise post hoc tests. Default is \code{0.05}.
 #' @param adjust Character string. Adjustment method for the pairwise post hoc
@@ -64,10 +73,10 @@
 #'     \item{adjust}{The p-value adjustment method used.}
 #'     \item{distributions}{ggplot within-block trace plot with grey
 #'        spaghetti lines, raw group-coloured points, and a black median
-#'        trend line on top (if \code{plot = TRUE}).}
+#'        trend line on top (if \code{diagnostic_plots = TRUE}).}
 #'     \item{Boxplot}{ggplot boxplot with jittered raw points and
 #'        compact-letter-display letters from the post hoc test (if
-#'        \code{plot = TRUE}).}
+#'        \code{effect_plots = TRUE}).}
 #'   }
 #'
 #' Using the option \code{output_type}, it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and plot methods for 'f_friedman' objects.
@@ -93,7 +102,7 @@
 #'
 #' Output files are generated in the format specified by \code{output_type =} and saved to the working directory, options are \code{"pdf", "word"} or \code{"excel"}. If \code{output_type = "rmd"} is used it is advised to use it in a chunk with \{r, echo=FALSE, results='asis'\}
 #'
-#' This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
+#' This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or higher), a universal document converter.
 #'\itemize{
 #' \item \bold{Windows:} Install Pandoc and ensure the installation folder \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
 #' \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.
@@ -135,7 +144,8 @@
 #' output <- f_friedman(
 #'                score ~ condition | subject,
 #'                data = df_rm,
-#'                plot = FALSE,
+#'                diagnostic_plots = FALSE,
+#'                effect_plots = FALSE,
 #'                output_type = "word",
 #'                adjust = "holm"
 #'                )
@@ -144,7 +154,8 @@
 f_friedman <- function(
     formula,              # Friedman function formula: response ~ group | block
     data = NULL,          # data.frame used for the Friedman test
-    plot = TRUE,          # Show plots in output files
+    diagnostic_plots = TRUE, # Distribution / trace check plot in output files
+    effect_plots = TRUE,  # Boxplot with letters in output files
     alpha = 0.05,         # Set significance level alpha for Friedman and post hoc
     output_type = "default",
     save_as = NULL,       # Specify the name of the file.
@@ -153,6 +164,7 @@ f_friedman <- function(
     adjust = "bonferroni",           # Correction method for the pairwise post hoc comparisons.
     close_generated_files = FALSE,   # Closes either open excel or word files depending on the output format.
     open_generated_files = interactive(),     # Open files after creation
+    plot = lifecycle::deprecated(),
     ...
     # Additional arguments forwarded to friedman.test().
 )
@@ -163,6 +175,30 @@ f_friedman <- function(
   ########## Reset initial settings on exit #################################
   .session_state <- save_session_state()  # Helper function: helper_session_state
   on.exit(restore_session_state(.session_state), add = TRUE) # Helper function: helper_session_state
+
+  ########## Deprecated arguments ##########################################
+  # Renamed in 3.2.1 so that all test functions use the same names for the
+  # same report parts: `diagnostic_plots` (assumption and residual checks)
+  # and `effect_plots` (effect, estimated-means and interaction plots).
+  # The old name still works for one release, with a warning.
+  if (lifecycle::is_present(plot)) {
+    lifecycle::deprecate_warn(
+      when = "3.2.1",
+      what = "f_friedman(plot)",
+      with = "f_friedman(diagnostic_plots)",
+      details = "`plot` is passed to both `diagnostic_plots` and `effect_plots`."
+    )
+    diagnostic_plots <- plot
+    effect_plots <- plot
+  }
+
+  # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  # check_dots to prevent ignoring typos
+  # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  check_known_dots(...names(), ...length(),
+                   allowed    = 	c("subset", "na.action"),
+                   fun_name   = "f_friedman",
+                   valid_args = names(formals(sys.function())))
 
 
 
@@ -366,6 +402,9 @@ f_friedman <- function(
     if (!(response %in% names(data))) {
       stop(paste("Response variable", response, "not found in the data."))
     }
+    # Ordered factor -> rank codes (with a message); other non-numeric
+    # responses stop with a clear message (helper_rank_response.R).
+    data <- prepare_rank_response(data, response, "f_friedman")
   }
   if (!(group_name %in% names(data))) {
     stop(paste("Group variable", group_name, "not found in the data."))
@@ -514,6 +553,10 @@ If the distribution shapes are similar across groups, the test can be interprete
       data_r <- data[stats::complete.cases(
         data[, c(response_name, group_name, block_name)]),
         c(response_name, group_name, block_name), drop = FALSE]
+      na_notes <<- c(na_notes, na_removed_note(
+        data[, c(response_name, group_name, block_name), drop = FALSE],
+        nrow(data_r), c(response_name, group_name, block_name),
+        response = response_name))
       data_r[[group_name]] <- droplevels(data_r[[group_name]])
       data_r[[block_name]] <- droplevels(data_r[[block_name]])
 
@@ -524,7 +567,7 @@ If the distribution shapes are similar across groups, the test can be interprete
       current_formula <- as.formula(
         paste0(response_name, " ~ ", group_name, " | ", block_name))
 
-      if(plot == TRUE){
+      if(isTRUE(diagnostic_plots)){
         cat("  \n## Visual check on within-block traces  \n")
 
         # Repeated-measures diagnostic plot. The Friedman test compares
@@ -726,7 +769,7 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 pai
       above and the within-block trace plot earlier in this section), the result reflects a
       difference in the paired ranks rather than medians.
 \n  **Note 2 (Results):** Groups in the \"Letters\" column sharing the same letter are ",
-                         "**not** significantly different (\u03B1 = ", alpha, ".",
+                         "**not** significantly different (\u03B1 = ", alpha, "). ",
                          "Groups with different letters are significantly different. Sharing a letter ",
                          "indicates insufficient evidence to claim a difference; it does not ",
                          "prove the groups are identical.\n",
@@ -734,7 +777,7 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 pai
                          } else {paste0(" P-values were adjusted with ", adjust,".")
                          })
 
-      if(plot == TRUE){
+      if(isTRUE(effect_plots)){
 
         cat("  \n## Boxplot of: ", response_name, " by ", group_name,
             "  and pairwise post hoc test  \n  \n")
@@ -888,6 +931,7 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 pai
     }
   } # End generate report function.
 
+  na_notes <- character(0)  # filled by generate_report(), sent below
   # Execute analysis and return results but hide this from console.
   suppressMessages(
     utils::capture.output(
@@ -896,6 +940,7 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 pai
     )
   )
   class(output_list) <- "f_friedman"
+  for (na_msg in unique(na_notes)) message(na_msg)
 
 
 
@@ -1069,7 +1114,7 @@ print.f_friedman <- function(x, ...) {
       posthoc_used <- paste0("
 Note 1 (Assumptions): The pairwise paired Wilcoxon signed-rank test does not assume normality, but implies a test for difference in medians only if distribution shapes are similar across groups. If shapes or spreads differ substantially (check the boxplot and the within-block trace plot via plot(...)), the result reflects a difference in paired ranks rather than medians.\n
 Note 2 (Results): Groups in the \"Letters\" column sharing the same letter are ",
-"**not** significantly different (\u03B1 = ", format(sublist$alpha, nsmall = 3), ".",
+"**not** significantly different (\u03B1 = ", format(sublist$alpha, nsmall = 3), "). ",
 "Groups with different letters are significantly different. Sharing a letter ",
 "indicates insufficient evidence to claim a difference; it does not ",
 "prove the groups are identical.\n",
@@ -1094,7 +1139,8 @@ Note 2 (Results): Groups in the \"Letters\" column sharing the same letter are "
 #'
 #' Displays the within-block trace plot and/or the boxplot stored in an
 #' \code{f_friedman} object. Plots are only available when the original
-#' call used \code{plot = TRUE}.
+#' call used \code{diagnostic_plots = TRUE} (trace plot) or
+#' \code{effect_plots = TRUE} (boxplot).
 #'
 #' @param x An object of class \code{f_friedman}.
 #' @param which Character vector indicating which plots to show. Options are

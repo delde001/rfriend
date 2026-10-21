@@ -15,14 +15,16 @@ f_wilcox_test(x, ...)
   conf.level = NULL,
   mu = 0,
   alternative = "two.sided",
-  norm_plots = TRUE,
+  diagnostic_plots = TRUE,
+  effect_plots = TRUE,
   alpha = 0.05,
   intro_text = TRUE,
   close_generated_files = FALSE,
-  open_generated_files = TRUE,
+  open_generated_files = interactive(),
   output_type = "default",
   save_as = NULL,
   save_in_wdir = FALSE,
+  norm_plots = lifecycle::deprecated(),
   ...
 )
 
@@ -33,14 +35,16 @@ f_wilcox_test(x, ...)
   conf.level = NULL,
   mu = 0,
   alternative = "two.sided",
-  norm_plots = TRUE,
+  diagnostic_plots = TRUE,
+  effect_plots = TRUE,
   alpha = 0.05,
   intro_text = TRUE,
   close_generated_files = FALSE,
-  open_generated_files = TRUE,
+  open_generated_files = interactive(),
   output_type = "default",
   save_as = NULL,
   save_in_wdir = FALSE,
+  norm_plots = lifecycle::deprecated(),
   ...
 )
 }
@@ -57,7 +61,10 @@ expression is evaluated in the data's column scope (e.g.
 \code{subset = cyl == 6} works). All responses in a multi-response
 call (\code{y1 + y2 ~ group}) are then tested on the identical row
 set. For the default (vector) method, \code{...} is currently
-unused.}
+unused.
+\code{subset} can also pick two groups of a factor with more
+levels (e.g. \code{subset = treatment \%in\% c("control", "high_N")});
+the check for exactly two groups runs after the subset.}
 
 \item{formula}{A formula specifying the model (alternative to using x/y).
 \itemize{
@@ -65,7 +72,12 @@ unused.}
         (where group has exactly 2 levels).
   \item \strong{One-sample:} \code{response ~ 1} or \code{response ~ NULL}.
 }
-More response variables can be added using \code{+} (e.g., \code{y1 + y2 ~ group}).}
+More response variables can be added using \code{+} (e.g., \code{y1 + y2 ~ group}).
+The response must be numeric or an ordered factor (an ordinal score,
+e.g. \code{factor(score, ordered = TRUE)}). An ordered factor is tested
+on the rank codes of its levels (1 = lowest level), which is exact for a
+rank test; a message shows the coding. Other non-numeric responses stop
+with an error.}
 
 \item{data}{A data frame containing the variables when using the formula interface.}
 
@@ -99,8 +111,12 @@ location shift (paired/two-sample) under H0. Default is 0.}
 \item{alternative}{Character string. \code{"two.sided"} (default),
 \code{"greater"}, or \code{"less"}.}
 
-\item{norm_plots}{Logical. If \code{TRUE}, descriptive diagnostic plots are
+\item{diagnostic_plots}{Logical. If \code{TRUE}, descriptive diagnostic plots are
 included in the output. Default is \code{TRUE}.}
+
+\item{effect_plots}{Logical. If \code{TRUE} (default), the main effect
+plot (\code{main_effect_plot}) is built, stored and included in the
+output files. With \code{FALSE} it is not built.}
 
 \item{alpha}{Numeric. Significance level. Default is \code{0.05}.}
 
@@ -135,6 +151,9 @@ Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.}
 \item{save_as}{Character. Specific path/filename for output.}
 
 \item{save_in_wdir}{Logical. Save in working directory.}
+
+\item{norm_plots}{\strong{Deprecated} in 3.2.1. Use \code{diagnostic_plots} instead. If
+supplied, its value is passed to \code{diagnostic_plots} with a warning.}
 
 \item{y}{Optional numeric vector (second group) for two-sample tests if using
 the vector interface. Ignored when a formula is supplied.}

@@ -1,50 +1,41 @@
 Package: rfriend
 Type: Package
-Title: Provides Batch Functions and Visualisation for Basic Statistical
-        Procedures
-Version: 3.2.0
-Authors@R: c(person("Sander H.", "van Delden", role = c("aut", "cre"), email = "plantmind@proton.me"))
-Description: Designed to streamline data analysis and statistical testing, reducing the length of R 
-    scripts while generating well-formatted outputs in 'pdf', 'Microsoft Word', and 'Microsoft Excel' 
-    formats. In essence, the package contains functions which are sophisticated wrappers around 
-    existing R functions that are called by using 'f_' (user f_riendly) prefix followed by the normal 
-    function name. This third version of the 'rfriend' package focuses  primarily on data exploration, 
-    including tools for creating summary tables, f_summary(), summary figures, f_scan(), 
-    outlier detection and removal, f_outlier() and f_remove_outliers(), performing data transformations,
-    f_boxcox() in part based on 'MASS/boxcox' and 'rcompanion', and f_bestNormalize() 
-    which wraps and extends functionality from the 'bestNormalize' package. Furthermore, 'rfriend' 
-    can automatically (or on request) generate visualizations such as boxplots, f_boxplot(), 
-    QQ-plots, f_qqnorm(), and histograms f_hist(). Additionally, the package includes several 
-    statistical test functions: f_aov(), f_chisq_test(), f_corplot(), f_kruskal_test(), 
-    f_lmer(), f_glm(), f_t_test(), f_wilcox_test(),  for sequential testing and visualisation of the 
-    similar named 'stats' functions. These functions, except for f_chisq_test(), support testing multiple
-    response variables and predictors, while also handling assumption checks, data transformations, 
-    and post hoc tests. Post hoc results are automatically summarized in a table using the compact letter 
-    display (cld) format for easy interpretation. The package also provides a function to do model 
-    comparison, f_model_comparison(), and several utility functions to simplify common R tasks. 
-    For example, f_clear() clears the workspace and restarts R with a single command; f_setwd() sets 
-    the working directory to match the directory of the current script; f_theme() quickly changes 
-    'RStudio' themes; and f_factors() converts multiple columns of a data frame to factors, and much more. 
-    If you encounter any issues or have feature requests, please feel free to contact me via email.
-Note: When loading, both MuMIn and rstatix are imported. Since rstatix internally depends on broom, 
-    this may trigger a warning about S3 method overwrites, specifically for nobs.fitdistr and 
-    nobs.multinom. These warnings are harmless and do not affect functionality.
+Title: Batch Statistical Tests with Assumption Checks and Reports
+Version: 3.2.1
+Authors@R: c(person("Sander H.", "van Delden", role = c("aut", "cre"),
+    email = "plantmind@proton.me"))
+Description: Wraps common statistical procedures in user-friendly 'f_'
+    functions that check model assumptions, transform the response when
+    needed, run post hoc tests and write publication-ready reports to the
+    console, 'pdf', 'Microsoft Word', 'Microsoft Excel' or 'R Markdown'.
+    Several response variables can be analysed in one call, and post hoc
+    results are summarised with a compact letter display. Tests include
+    analysis of variance f_aov(), linear regression f_lm(), linear
+    mixed-effects models f_lmer() (based on 'lme4' and 'lmerTest'),
+    generalised linear models f_glm(), t-tests f_t_test(), Wilcoxon tests
+    f_wilcox_test(), Kruskal-Wallis tests f_kruskal_test(), Friedman tests
+    f_friedman() and chi-square tests f_chisq_test(). The function
+    f_stat_wizard() inspects the data and recommends a suitable test as
+    ready-to-run code. Data exploration tools include f_summary(), f_scan(),
+    f_corplot(), f_boxplot(), f_hist() and f_qqnorm(), outlier handling with
+    f_outliers() and f_remove_outliers(), and transformations with
+    f_boxcox() (based on 'MASS' and 'rcompanion') and f_bestNormalize()
+    (extending 'bestNormalize'). Models can be compared with
+    f_model_compare(). Utilities such as f_clear(), f_setwd(), f_factors(),
+    f_long() and f_example_data() simplify everyday tasks in R.
 License: GPL-3
 Encoding: UTF-8
 Depends: R (>= 4.4.0)
-Imports: bestNormalize, crayon, car, DHARMa, dplyr, emmeans, ggplot2, grDevices, 
-         gridExtra, knitr, lifecycle, lme4, lmerTest, magick, 
-         MuMIn, nortest, pander, png, rlang, 
-         rmarkdown, rstatix, rstudioapi, this.path, tidyr, writexl, xfun
+Imports: bestNormalize, crayon, car, DHARMa, dplyr, emmeans, ggplot2, grDevices,
+    gridExtra, knitr, lifecycle, lme4, lmerTest, magick, MuMIn, nortest,
+    pander, png, rlang, rmarkdown, rstatix, rstudioapi, this.path, tidyr,
+    writexl, xfun
 Suggests: MASS, nnet, pbkrtest, testthat (>= 3.0.0), tibble, readxl
 Config/testthat/edition: 3
 Roxygen: list(markdown = FALSE)
-SystemRequirements: Pandoc (>= 3.2)
+SystemRequirements: Pandoc (>= 3.1)
 NeedsCompilation: no
-Packaged: 2025-06-22 20:29:49 UTC; sander
-Author: Sander H. van Delden [aut, cre]
-Maintainer: Sander H. van Delden <plantmind@proton.me>
-URL: https://delde001.github.io/rfriend/
+URL: https://delde001.github.io/rfriend/, https://github.com/delde001/rfriend
 BugReports: https://github.com/delde001/rfriend/issues
 Config/roxygen2/version: 8.0.0
 LazyData: true

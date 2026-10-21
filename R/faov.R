@@ -14,8 +14,12 @@
 #'
 #' @param formula A formula specifying the model to be fitted. More response variables can be added using \code{-} or \code{+} (e.g., \code{response1 + response2 ~ predictor}) to do a sequential \code{aov()} for each response parameter.
 #' @param data A data frame containing the variables in the model.
-#' @param norm_plots Logical. If \code{TRUE}, diagnostic residual plots are included in the output files. Default is \code{TRUE}.
-#' @param interaction_plots Logical. If \code{TRUE}, estimated means / interaction plots are included in the output files after the post hoc table. Default is \code{TRUE}.
+#' @param diagnostic_plots Logical. If \code{TRUE}, diagnostic residual plots are included in the output files. Default is \code{TRUE}.
+#' @param effect_plots Logical. If \code{TRUE}, estimated means / interaction plots are included in the output files after the post hoc table. Default is \code{TRUE}.
+#' @param norm_plots \strong{Deprecated} in 3.2.1. Use \code{diagnostic_plots} instead. If
+#'   supplied, its value is passed to \code{diagnostic_plots} with a warning.
+#' @param interaction_plots \strong{Deprecated} in 3.2.1. Use \code{effect_plots} instead. If
+#'   supplied, its value is passed to \code{effect_plots} with a warning.
 #' @param contrast_plots Logical. If \code{TRUE}, a \strong{contrast forest
 #'   plot} is added for each categorical post hoc term: one row per pairwise
 #'   comparison, showing the estimated difference between two levels with its
@@ -35,13 +39,24 @@
 #'   \code{adjust} method as the post hoc p-values, so figure and table agree.
 #' @param ANCOVA Logical. If \code{TRUE}, prevents automatic conversion of predictors to factors, allowing for Analysis of Covariance (ANCOVA). Default is \code{FALSE}.
 #' @param transformation Logical or character string. If \code{TRUE}, or if \code{"boxcox"} applies a \code{f_boxcox()} transformation if residuals are not normal. If \code{"bestnormalize"}, applies \code{f_bestNormalize()} transformation. If \code{FALSE} no transformation will be applied. Default is \code{TRUE}.
+#'   A transformation is kept only when it improves the residual check
+#'   that triggered it: normality (Shapiro-Wilk, or Anderson-Darling when
+#'   Shapiro-Wilk is unavailable) or, when only the variance check failed, equal
+#'   variance (Levene's test). Otherwise the untransformed analysis is reported, the
+#'   report says so, and the attempt is recorded in \code{transformation_rejected}.
+#'   Responses named in \code{force_transformation} are always transformed.
 #' @param force_transformation Character string. A vector containing the names of response variables that should be transformed regardless of the normality test. Default is \code{NULL}
-#' @param force_aov Logical. If \code{TRUE}, runs the ANOVA even when at least
-#'   one cell has \eqn{n = 1} (saturated model). By default (\code{FALSE}),
-#'   such responses are skipped with a warning because F-statistics and
-#'   p-values are undefined for saturated models. Set to \code{TRUE} only for
-#'   diagnostic purposes -- results should \strong{not} be reported or
-#'   interpreted as valid. Default is \code{FALSE}.
+#' @param force_aov Logical. Default \code{FALSE}. A response is skipped (with a
+#'   message) when its model is saturated: zero residual degrees of freedom, e.g.
+#'   a fully crossed design with \eqn{n = 1} in every cell, where no F-test
+#'   exists. Saturation is judged from the rank of the model matrix, so additive
+#'   designs with one observation per cell, such as a randomised complete block
+#'   design (\code{y ~ block + treatment}), are analysed normally. Since rfriend
+#'   3.2.1, \code{force_aov = TRUE} on a saturated model stops with an
+#'   explanation instead of fitting it, because the F-tests cannot be computed.
+#'   (Before 3.2.1 the skip also fired for any cell with \eqn{n = 1}.)
+#'   \code{Error()} terms are not supported; use \code{\link{f_lmer}} with
+#'   random effects instead.
 #' @param alpha Numeric. Significance level for ANOVA, post hoc tests, and Shapiro-Wilk test. Default is \code{0.05}.
 #' @param adjust Character string specifying the method used to adjust p-values
 #'   for multiple comparisons. Available methods include:
@@ -56,6 +71,38 @@
 #'     \item{"fdr"}{False Discovery Rate adjustment, controls the expected proportion
 #'                 of false positives among significant results.}
 #'   } Default is \code{"sidak"}.
+#' @param post_hoc Which post hoc tables to build. \code{NULL} or \code{TRUE}
+#'   (default): one table per term, see Details, "Which post hoc tables you
+#'   get". \code{FALSE}: no post hoc. A character vector of model terms: only
+#'   those tables, e.g. \code{post_hoc = "treatment"} (the marginal means of one
+#'   factor, averaged over the others), \code{post_hoc = c("treatment",
+#'   "week")}, or \code{post_hoc = "treatment:week"} (the cell means of that
+#'   interaction, every combination compared). A requested term that is not
+#'   significant is still tabulated, with letters shown as \code{"ns"}.
+#'   Misspelled or unknown names stop with a "did you mean" error. The same
+#'   syntax is used by \code{\link{f_lmer}}.
+#'
+#'   \strong{Leaving blocks out of the post hoc.} A block belongs in the model
+#'   because it removes known variation (soil, bench, day) from the error term,
+#'   which makes the treatment comparison more precise. Comparing the blocks with
+#'   each other, however, is not a research question, and block letters invite
+#'   over-interpretation. So keep the block in the formula and name only the
+#'   factors you study in \code{post_hoc}:
+#'   \code{f_aov(y ~ block + treatment, data, post_hoc = "treatment")}. The ANOVA
+#'   table still reports the block effect. With five or more blocks that are a
+#'   random sample of possible blocks, consider a mixed model instead:
+#'   \code{f_lmer(y ~ treatment + (1 | block))}.
+#' @param by \code{NULL} (default) or the name of one categorical predictor,
+#'   used together with \code{post_hoc} to get simple effects:
+#'   \code{post_hoc = "treatment", by = "week"} answers "which treatments differ
+#'   within each week?" with \code{emmeans(model, ~ treatment | week)}. Letters
+#'   and the p-value adjustment are computed separately within each level of
+#'   \code{by}. This makes fewer comparisons than the full cell-means table (for
+#'   4 treatments x 3 weeks: 3 x 6 = 18 instead of 66), so each comparison has
+#'   more power. The table is stored as
+#'   \code{out$y$post_hoc[["treatment | week"]]}. \code{by} requires
+#'   \code{post_hoc}, must not also be named in \code{post_hoc}, and cannot be
+#'   combined with an interaction term (\code{"a:b"}) in \code{post_hoc}.
 #' @param anova_type Integer, either \code{2} or \code{3}. Sums of Squares
 #'   type for the omnibus ANOVA table computed via \code{\link[car]{Anova}}.
 #'   \describe{
@@ -125,7 +172,24 @@
 #'   (\code{aov_test}), the \strong{Type II} omnibus ANOVA table from
 #'   \code{\link[car]{Anova}} (\code{aov_summary}), normality and homogeneity
 #'   diagnostics, optional transformation results, and the \code{emmeans}
-#'   post hoc tests. Using the option \code{output_type}, it can also
+#'   post hoc tests, one table per term in \code{out$y$post_hoc} (see
+#'   Details, "Which post hoc tables you get"). The elements
+#'   \code{post_hoc_summary_table}, \code{summary_table} and \code{cld_text} are
+#'   \strong{deprecated} and will be removed in the next release: they now hold
+#'   the cell-means table when a significant interaction is tabulated, otherwise
+#'   the first table; use \code{post_hoc} instead.
+#'   \code{Response_Transformed}: \code{TRUE} when the response was
+#'   transformed (Box-Cox or bestNormalize) because the residuals were not normal (or, alone, had unequal variances) and
+#'   the transformation was kept (see \code{transformation}).
+#'   \code{aov_summary}: ANOVA table of the untransformed response.
+#'   \code{transformed_aov_summary}: ANOVA table of the transformed response, or
+#'   \code{NULL} when no transformation was applied. The printed and reported
+#'   result is \code{transformed_aov_summary} when \code{Response_Transformed} is
+#'   \code{TRUE}, otherwise \code{aov_summary}. To pick it in code:
+#'   \code{tab <- if (out$y$Response_Transformed) out$y$transformed_aov_summary else out$y$aov_summary}.
+#'   When a transformation was tried but not kept, \code{transformation_rejected}
+#'   records the method, the reason and the p-values before and after.
+#'   Using the option \code{output_type}, it can also
 #'   generate output as R Markdown, 'Word', 'pdf', or 'Excel' files.
 #'   Includes \code{print} and \code{plot} methods for 'f_aov' objects.
 
@@ -147,10 +211,32 @@
 #'       sum / effect contrasts to be interpretable for main effects).
 #' \item Check normality of residuals using the Shapiro-Wilk test.
 #' \item If residuals are not normal and \code{transformation = TRUE} apply a data transformation.
-#' \item If significant differences are found in ANOVA, proceed with post hoc tests using estimated marginal means from \code{emmeans()} and Sidak adjustment (or another option of \code{adjust =}.
+#' \item Post hoc tests with estimated marginal means from \code{emmeans()}, one table per term, with Sidak adjustment (or another option of \code{adjust =}) within each table.
 #' }
 #'
-#' \strong{Effect and interaction plots.} When \code{interaction_plots = TRUE},
+#' \strong{Which post hoc tables you get.} With the default
+#' \code{post_hoc = NULL}, each term is handled on its own: every significant
+#' interaction of categorical factors gets one cell-means table (all
+#' combinations compared); every categorical main effect gets its own
+#' marginal-means table (\code{emmeans(model, ~ factor)}), with letters
+#' \code{"ns"} when the term is not significant and an "Interpret with caution"
+#' note when the factor takes part in a significant interaction; numeric
+#' covariates (ANCOVA) get no table, their slope is in the ANOVA table. The
+#' \code{adjust} method is applied within each table, and each table has its
+#' own footer with its own number of estimates and tests. Marginal means are
+#' equal-weighted estimated marginal means: every level of the other factors
+#' counts equally, so in unbalanced designs they can differ from the raw group
+#' means. All tables are stored in \code{out$y$post_hoc[[term]]} as a list
+#' with \code{emmeans}, \code{pairs}, \code{cld} (the letters), \code{cld_text}
+#' (the footer) and \code{caution}, the same structure as \code{\link{f_lmer}}.
+#' When the response was transformed, estimates and CIs are back-transformed
+#' per table (medians on the original scale) and the pairwise contrasts stay on
+#' the transformed scale. Effect plots take their letters from the factor's own
+#' table; a plot that averages over a factor in a significant interaction shows
+#' no letters and says why. Use \code{post_hoc} and \code{by} to choose the
+#' tables yourself.
+#'
+#' \strong{Effect and interaction plots.} When \code{effect_plots = TRUE},
 #' an estimated marginal means plot (estimate \eqn{\pm} 95\% CI, with jittered
 #' raw data and compact-letter-display labels) is added after the post hoc
 #' table for each categorical predictor. For a significant categorical
@@ -175,7 +261,7 @@
 #'
 #' *Non-significant ANOVA results*: When the overall F-test is not significant, f_aov still reports the estimated marginal means table, but with all pairwise comparison letters replaced by *"ns"*. The numeric estimates (and their confidence intervals) are provided because they are often needed for manuscript tables, especially when the response was back-transformed from a Box-Cox or bestNormalize scale - the raw descriptive means and the emmeans values can differ, and it is the emmeans values that correspond to the actual model. The *"ns"* labels signal that pairwise differences should not be interpreted.
 #'
-#' This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
+#' This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or higher), a universal document converter.
 #'\itemize{
 #' \item \bold{Windows:} Install Pandoc and ensure the installation folder.
 #' \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
@@ -242,6 +328,18 @@
 #'
 #' # Plot residual plots.
 #' plot(f_aov_out)
+#'
+#' # Randomised complete block design: the block stays in the model, but
+#' # only the treatment is compared in the post hoc.
+#' wk6 <- subset(plant_trial, time_weeks == 6)
+#' f_aov(height_cm ~ block + treatment, data = wk6, post_hoc = "treatment")
+#'
+#' # Simple effects: which treatments differ within each week?
+#' # illustration only: plants are measured repeatedly, see f_lmer()
+#' pt <- plant_trial
+#' pt$week <- factor(pt$time_weeks)
+#' f_aov(height_cm ~ treatment * week, data = pt,
+#'       post_hoc = "treatment", by = "week")
 #' }
 #'
 #' #To print rmd output set chunck option to results = 'asis' and use cat().
@@ -253,9 +351,9 @@ f_aov <- function(formula,
                   # aov function formula
                   data = NULL,
                   # Data.frame used for aov
-                  norm_plots = TRUE,
+                  diagnostic_plots = TRUE,
                   # Show diagnostic residual plots in output files
-                  interaction_plots = TRUE,
+                  effect_plots = TRUE,
                   # Show estimated means / interaction plots in output files
                   contrast_plots = FALSE,
                   # Show pairwise contrast forest plots in output files
@@ -272,6 +370,10 @@ f_aov <- function(formula,
                   # Significance level for both aov, posthoc and Shapiro-Wilk Test
                   adjust = "sidak",
                   # Specifying the method used to adjust p-values
+                  post_hoc = NULL,
+                  # NULL/TRUE: per-term tables; FALSE: none; "a" / "a:b": only those
+                  by = NULL,
+                  # with post_hoc = "a": simple effects of a within each level of by
                   anova_type = 2,
                   # Sums of Squares type for the omnibus table (car::Anova):
                   #   2 = Type II (default; order-invariant, safe with R's
@@ -292,6 +394,8 @@ f_aov <- function(formula,
                   save_as = NULL,
                   # Specify the name of the output dir and file (name and type).
                   save_in_wdir = FALSE,         # Save file output in the working directory.
+                  norm_plots = lifecycle::deprecated(),
+                  interaction_plots = lifecycle::deprecated(),
                   ...
                   # Additional arguments forwarded to aov(). Currently
                   # honored: subset, na.action, weights. If supplied, they
@@ -307,6 +411,28 @@ f_aov <- function(formula,
   ########## Reset initial settings on exit #################################
   .session_state <- save_session_state()  # Helper function: helper_session_state
   on.exit(restore_session_state(.session_state), add = TRUE) # Helper function: helper_session_state
+
+  ########## Deprecated arguments ##########################################
+  # Renamed in 3.2.1 so that all test functions use the same names for the
+  # same report parts: `diagnostic_plots` (assumption and residual checks)
+  # and `effect_plots` (effect, estimated-means and interaction plots).
+  # The old name still works for one release, with a warning.
+  if (lifecycle::is_present(norm_plots)) {
+    lifecycle::deprecate_warn(
+      when = "3.2.1",
+      what = "f_aov(norm_plots)",
+      with = "f_aov(diagnostic_plots)"
+    )
+    diagnostic_plots <- norm_plots
+  }
+  if (lifecycle::is_present(interaction_plots)) {
+    lifecycle::deprecate_warn(
+      when = "3.2.1",
+      what = "f_aov(interaction_plots)",
+      with = "f_aov(effect_plots)"
+    )
+    effect_plots <- interaction_plots
+  }
 
 
   ########## Capture ... UNEVALUATED at f_aov's own frame ##################
@@ -324,6 +450,18 @@ f_aov <- function(formula,
   # with "the ... list contains fewer than 3 elements" the moment a
   # user actually passes subset / weights / na.action through dots.
   dots_exprs  <- as.list(.mc[["..."]])
+
+  # Fail loud on misspelled arguments. `...` is forwarded to aov() and from
+  # there to lm(), so their own arguments (subset, weights, na.action,
+  # contrasts, ...) are the legitimate dot names; anything else would only
+  # trigger lm.fit()'s "extra argument ... will be disregarded" warning and
+  # silently run with the defaults.
+  check_known_dots(...names(), ...length(),
+                   allowed    = setdiff(union(names(formals(stats::aov)),
+                                              names(formals(stats::lm))),
+                                        c("formula", "data", "...")),
+                   fun_name   = "f_aov",
+                   valid_args = names(formals(sys.function())))
 
   # Capture the user's calling environment so that subset / weights /
   # na.action expressions passed via `...` can be resolved against it
@@ -555,11 +693,23 @@ f_aov <- function(formula,
   lhs <- all.vars(formula[[2]])  # Get LHS variables (response)
   response_names <- lhs
 
+  # Multi-stratum Error() models are not supported: car::Anova(), the
+  # assumption checks and the emmeans post hoc all need a single-stratum
+  # model. Stop with the mixed-model equivalent instead of failing later.
+  if ("Error" %in% all.names(formula[[3]])) {
+    stop("f_aov() does not support Error() terms (multi-stratum / repeated-",
+         "measures ANOVA).\n",
+         "  Fit the error strata as random effects with f_lmer() instead, e.g.\n",
+         "  f_aov(y ~ time + Error(subject/time))  ->  ",
+         "f_lmer(y ~ time + (1 | subject))",
+         call. = FALSE)
+  }
+
   # Extract predictor variables from the right-hand side of the formula
   predictor_names <- all.vars(formula[[3]]) # Get RHS variables (predictors)
 
   # Extract the right-hand side (RHS) of the formula as a string
-  rhs <- deparse(formula[[3]])  # Preserve the RHS structure
+  rhs <- paste(deparse(formula[[3]]), collapse = " ")  # Preserve the RHS structure
 
   # Ensure response and predictors are in the data
   for (response in response_names) {
@@ -722,6 +872,8 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
     data_master     <- do.call(stats::model.frame, mf_args)
     n_before_master <- nrow(data)
     n_after_master  <- nrow(data_master)
+    na_notes <<- c(na_notes, na_removed_note(data, n_after_master,
+                                             all.vars(combined_formula)))
 
     # Remaining ... args (e.g. contrasts, projections, qr) are
     # eager-evaluated in the caller's environment because they do not
@@ -769,10 +921,10 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
       # in plot.f_aov so points are always on the original scale.
       original_response <- data_complete[[response_name]]
 
-      # n=1 cell check: must happen BEFORE aov()
-      # In a factorial design, a cell with n=1 saturates the model,
-      # residual df = 0, F-statistics are undefined, p-values meaningless.
-      # Skip this response entirely and continue with the others.
+      # Saturation check: must happen BEFORE aov()
+      # A model with residual df = 0 (e.g. a fully crossed factorial with
+      # n = 1 in every cell) has undefined F-statistics and p-values. Skip
+      # this response entirely and continue with the others.
       #
       # Only categorical predictors (factor / character / logical)
       # define cells. In ANCOVA mode, numeric covariates have as many
@@ -793,14 +945,35 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
         min_cell_n  <- min(cell_counts)
       }
 
-      if (min_cell_n == 1) {
+      # Resolve post_hoc / by against this model's terms (fail loud on
+      # unknown names, see helper_post_hoc.R).
+      model_terms_ph <- attr(stats::terms(current_formula), "term.labels")
+      ph_spec <- resolve_post_hoc_spec(
+        post_hoc, by,
+        cat_predictors     = cat_predictors,
+        numeric_predictors = setdiff(predictor_names, cat_predictors),
+        model_terms        = model_terms_ph,
+        fun_name           = "f_aov")
+
+      # Saturation is judged on the model's own residual df (model-matrix
+      # rank), not on the smallest cell of all predictors crossed: an
+      # additive design such as a randomised complete block
+      # (y ~ block + treatment) has n = 1 per block x treatment cell by
+      # construction yet plenty of residual df. min_cell_n is still used for
+      # the Levene / small-cell notes.
+      mm_check <- stats::model.matrix(current_formula, data = data_complete)
+      resid_df <- nrow(mm_check) - qr(mm_check)$rank
+      output_list[[response_name]][["resid_df"]] <- resid_df
+
+      if (resid_df == 0) {
         if (!isTRUE(force_aov)) {
           # Default: skip this response entirely, continue with others
           cat(paste0(
             "   \n  \n# Analysis of: ", response_name, "  \n\n",
             "**WARNING: `", response_name, "` skipped.**  \n\n",
-            "At least one cell in the factorial design has $n = 1$. ",
-            "This saturates the ANOVA model (residual degrees of freedom = 0), ",
+            "The model leaves no residual degrees of freedom (for example a ",
+            "fully crossed design with $n = 1$ in every cell). ",
+            "This saturates the ANOVA model, ",
             "making F-statistics and p-values undefined and uninterpretable.  \n\n",
             "**What to do:**  \n",
             "\n- Collect more observations so every factor-level combination has $n \\geq 2$.",
@@ -813,7 +986,7 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
             "Results will be unreliable and should **not** be reported.  \n   \n"
           ))
 
-          skipped_reason <- paste0("ANOVA undefined, n=1 in at least one cell; model ",
+          skipped_reason <- paste0("ANOVA undefined: residual df = 0; model ",
                                   "saturated.\n  Only re-run with ",
                                   "`force_aov = TRUE` for diagnostic purposes."
                                   )
@@ -824,17 +997,16 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
           next
 
         } else {
-          # force_aov = TRUE: warn loudly and proceed
-          cat(paste0(
-            "   \n  \n# Analysis of: ", response_name, "  \n\n",
-            "**[!] WARNING  Saturated model: results are for diagnostic use only.**  \n\n",
-            "At least one cell has $n = 1$ (`force_aov = TRUE` overrides the skip). ",
-            "The ANOVA model has zero residual degrees of freedom. ",
-            "F-statistics and p-values below are **undefined and must not be reported**.  \n\n",
-            "***  \n\n"
-          ))
-          output_list[[response_name]][["force_aov_used"]] <- TRUE
-          output_list[[response_name]][["min_cell_n"]]     <- min_cell_n
+          # force_aov = TRUE cannot help here: with residual df = 0 there is
+          # no error variance, so car::Anova() has no F-test to compute.
+          # (Before 3.2.1 the skip also fired for unsaturated designs with an
+          # n = 1 cell, which force_aov could run; those are now analysed
+          # without it.)
+          stop("f_aov(): the model for '", response_name, "' has residual ",
+               "df = 0 (saturated), so no F-test exists, even with ",
+               "force_aov = TRUE. Collect more observations, or drop the ",
+               "interaction term(s), e.g. ", response_name, " ~ ",
+               paste(predictor_names, collapse = " + "), ".", call. = FALSE)
         }
       }
       # ------------------------------------------------------------------
@@ -1037,7 +1209,7 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
       # Close the png file
       dev.off()
 
-      if(norm_plots == TRUE){
+      if(diagnostic_plots == TRUE){
         # Include the saved plots in R Markdown
         cat("Check the plots in the figure below to assess normality.  \n")
         cat(paste0("![](", temp_file, ")"), "   \n  \n")
@@ -1300,7 +1472,7 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
 
           output_list[[response_name]][["transformed_normality_plots"]] <- temp_file
 
-          if(norm_plots == TRUE){
+          if(diagnostic_plots == TRUE){
             cat("  \nCheck the **residual** plots of the **transformed data** in the figure below to assess normality.  \n")
             # Include the saved plots in R Markdown
             cat(paste0("![](", temp_file, ")"), "   \n  \n")
@@ -1318,17 +1490,63 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
         }
       }
 
+      # Keep the transformation only if it improved the check that triggered
+      # it (helper_transform_decision.R); otherwise report the untransformed
+      # analysis and say so.
+      transformation_label_txt <- NULL
+      if (!is.null(aov_summary_transformed)) {
+        is_bn  <- identical(transformation, "bestnormalize")
+        t_lab  <- transformation_label(if (is_bn) "bestnormalize" else "boxcox",
+                                       lambda  = if (!is_bn) transformed_var$lambda else NULL,
+                                       bn_name = if (is_bn) transformed_var$transformation_name else NULL)
+        nb <- norm_check_p(shapiro_res, adt_res)
+        na <- norm_check_p(shapiro_res_transformed, adt_res_transformed)
+        dec <- keep_transformation(
+          trigger_normality = trigger_normality,
+          trigger_variance  = trigger_levene,
+          trigger_forced    = trigger_forced,
+          norm_before = nb$p, norm_after = na$p, norm_test = nb$test,
+          var_before = levene_res$p, var_after = levene_res_transformed$p,
+          var_test = "Levene's test",
+          method_label = if (is_bn) "bestNormalize" else "Box-Cox")
+        if (!isTRUE(dec$keep)) {
+          cat(transformation_rejected_note(dec$reason))
+          output_list[[response_name]][["transformation_rejected"]] <- list(
+            method = t_lab, reason = dec$reason,
+            normality_p_before = nb$p, normality_p_after = na$p,
+            variance_p_before = levene_res$p,
+            variance_p_after = levene_res_transformed$p)
+          for (nm in c("boxcox", "bestNormalize", "transformed_aov_test",
+                       "transformed_shapiro_test", "transformed_adt_test",
+                       "transformed_levene_test", "transformed_normality_plots"))
+            output_list[[response_name]][[nm]] <- NULL
+          data_complete[[response_name]] <- original_response
+          aov_summary_transformed <- NULL
+        } else {
+          transformation_label_txt <- t_lab
+        }
+      }
+
       if(!is.null(aov_summary_transformed)){
         #Overwrite earlier object with transformed output
         aov_test_out <- aov_test_transformed
         aov_summary  <- aov_summary_transformed
+        # Stored separately: $aov_summary keeps the untransformed table, and
+        # print() must show this one under its "TRANSFORMED" heading.
+        output_list[[response_name]][["transformed_aov_summary"]] <- aov_summary_transformed
         Response_Transformed <- TRUE
         output_list[[response_name]][["Response_Transformed"]] <- Response_Transformed
       } else {
         aov_test_out <- aov_test
         Response_Transformed <- FALSE
         output_list[[response_name]][["Response_Transformed"]] <- Response_Transformed
+        # Always present, NULL when no transformation was applied, so that
+        # is.null(out$y$transformed_aov_summary) is a reliable check.
+        output_list[[response_name]]["transformed_aov_summary"] <- list(NULL)
       }
+      output_list[[response_name]][["transformation_label"]] <- transformation_label_txt
+      output_list[[response_name]][["anova_heading"]] <-
+        scale_heading("ANOVA", response_name, transformation_label_txt)
 
       # Store a back-transform closure so plot.f_aov can convert emmip output
       # (which is always on the transformed scale) back to the original scale.
@@ -1420,88 +1638,61 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
       conf_perc  <- conf_level * 100
 
       # ----------------------------------------------------------------
-      # Determine emmeans specs and display labelling.
-      # emmeans ALWAYS uses predictor_names (the full set of predictors
-      # from the model formula). This guarantees the reference grid
-      # matches the fitted model regardless of significance.
-      #
-      # emm_is_cells  : TRUE  -> significant interaction present;
-      #                         emmeans returns cell means (all combinations).
-      #                 FALSE -> no significant interaction;
-      #                         emmeans returns marginal means.
-      # emm_type_label: used only in headings and description text.
+      # Post hoc tables, decided per term (see helper_post_hoc.R).
+      #   * every significant categorical interaction: one cell-means table
+      #   * every categorical main effect: its own marginal-means table
+      #     (emmeans ~ factor); "ns" letters when the term is not
+      #     significant; a caution when it takes part in a significant
+      #     interaction
+      #   * numeric covariates (ANCOVA): no table
+      #   * post_hoc = "a" / "a:b" / by = "c": only the requested tables
+      # Letters and the p-value adjustment are computed WITHIN each table.
       # ----------------------------------------------------------------
-      # Initialize a deferred-display note for the post-hoc table.
-      # Both branches below set this; it is cat()-ed later, directly
-      # above the post-hoc header, so the NOTE sits next to the table
-      # it describes rather than being visually attached to the
-      # Observed Descriptives Table that comes earlier in the report.
+      cat_sig_ints <- sig_interactions[vapply(sig_interactions, function(it)
+        all(ph_parts(it) %in% cat_predictors), logical(1))]
+      ph_mains <- ph_spec$mains
+      ph_ints  <- if (identical(ph_spec$mode, "default")) cat_sig_ints else ph_spec$ints
+      ph_by    <- ph_spec$by
+
+      emm_is_cells   <- length(cat_sig_ints) > 0
+      emm_type_label <- if (emm_is_cells) "Cell Means" else "Marginal Means"
+
+      p_of <- function(trm) {
+        p <- p_values_sig[match(trm, term_names_sig)]
+        if (length(p) == 0L) NA_real_ else p
+      }
+      posthoc_results <- build_post_hoc_tables(
+        model = aov_test_out, mains = ph_mains, ints = ph_ints, by = ph_by,
+        sig_interactions = sig_interactions, cat_sig_ints = cat_sig_ints,
+        p_of = p_of, term_names = term_names_sig, adjust = adjust,
+        alpha = alpha, conf_level = conf_level,
+        bt_fn = output_list[[response_name]][["back_transform_fn"]],
+        transformed = Response_Transformed, data_complete = data_complete,
+        fun_name = "f_aov")
+      output_list[[response_name]][["post_hoc"]] <- posthoc_results
+
       post_hoc_intro_note <- ""
-
-      if (length(sig_interactions) > 0) {
-        emm_is_cells   <- TRUE
-        emm_type_label <- "Cell Means"
-
-        sig_int_preds  <- unique(unlist(strsplit(sig_interactions, ":")))
-
+      if (length(cat_sig_ints) > 0 && identical(ph_spec$mode, "default")) {
         post_hoc_intro_note <- paste0(
           "\n   \n**NOTE: Significant interaction(s) detected: ",
-          paste(sig_interactions, collapse = ", "), "**  \n",
-          "The post hoc table below shows **cell means**, i.e. the estimated mean for ",
-          "every combination of ", paste(sig_int_preds, collapse = " \u00d7 "), ".",
-          "Letters compare all cells simultaneously and are the reference ",
-          "grouping for this response: interaction plots that average over an ",
-          "interacting factor omit their own letters and refer back to the ",
-          "post hoc table below. Interpretation should focus on the full interaction ",
-          "pattern, not on individual factor effects in isolation.  \n\n"
-        )
-
-      } else {
-        emm_is_cells   <- FALSE
-        emm_type_label <- "Marginal Means"
-
-        # Report non-significant main effects so the reader knows they
-        # were tested. They are still included in the emmeans call
-        # (correct: the model controls for them), but the reader is
-        # informed they were not significant.
-        #
-        # The NOTE is *stored* here rather than printed immediately,
-        # because it describes letter groups in the emmeans post-hoc
-        # table -- which appears much later in the report, after the
-        # Observed Descriptives Table. Printing it here would place
-        # the warning directly above the descriptive table and create
-        # the false impression that the letters being warned about
-        # are in the descriptive table. See the cat(post_hoc_intro_note)
-        # call below, just before the post-hoc header.
-        if (length(ns_main_effects) > 0) {
-          post_hoc_intro_note <- paste0(
-            "\n   \n**NOTE:** The following term(s) were **not significant** ",
-            "(p \u2265 ", alpha, "): ",
-            paste(ns_main_effects, collapse = ", "), ".  \n",
-            "Their marginal means are shown in the emmeans table below for ",
-            "completeness (the model controls for them), but their letter ",
-            "groups are not meaningful given the non-significant ANOVA ",
-            "result.  \n\n"
-          )
-        }
-
-        # Interaction term(s) present but not significant: suggest refitting
-        # without the interaction term to gain power for the main effects.
-        if (length(ns_interactions) > 0) {
-          post_hoc_intro_note <- paste0(
-            post_hoc_intro_note,
-            "\n   \n**NOTE:** The interaction term(s) ",
-            paste(ns_interactions, collapse = ", "),
-            " were **not significant** (p \u2265 ", alpha, ").  \n",
-            "Consider refitting the model without the interaction term if the ",
-            "research question and research setup allow this; the main effects ",
-            "are then estimated with more power.  \n\n"
-          )
-        }
+          paste(cat_sig_ints, collapse = ", "), "**  \n",
+          "The cell-means table compares every combination of ",
+          paste(unique(unlist(lapply(cat_sig_ints, ph_parts))), collapse = " \u00d7 "),
+          " and is the reference grouping for this response. The main-effect ",
+          "tables after it average over the interacting factor(s); read them ",
+          "with the caution printed above each one.  \n\n")
+      } else if (length(ns_interactions) > 0 && identical(ph_spec$mode, "default")) {
+        post_hoc_intro_note <- paste0(
+          "\n   \n**NOTE:** The interaction term(s) ",
+          paste(ns_interactions, collapse = ", "),
+          " were **not significant** (p \u2265 ", alpha, ").  \n",
+          "Consider refitting the model without the interaction term if the ",
+          "research question and research setup allow this; the main effects ",
+          "are then estimated with more power.  \n\n")
       }
 
-      # Estimated Marginal Means -- always uses all predictor_names so that
-      # the specs exactly match the model's reference grid.
+      # Full-grid emmeans (all predictors), kept for the plots: every plot
+      # recomputes the means on exactly the grid it shows from this object.
       emm <- emmeans::emmeans(aov_test_out,
                               specs = predictor_names,
                               level = conf_level)
@@ -1525,163 +1716,24 @@ Checking the assumptions of ANOVA (Analysis of Variance) are critical for ensuri
       # whether to draw interaction plots instead of single-factor means plots.
       output_list[[response_name]][["sig_interactions"]]  <- sig_interactions
 
-      # Perform post hoc test with adjustment
-      mult_cld <- cld_emmeans(emm,
-                              alpha = alpha,
-                              Letters = letters,
-                              adjust = adjust,
-                              decreasing = TRUE)
 
-      # Convert the result to a data frame
-      summary_table <- as.data.frame(mult_cld)
-
-      # ============================================================
-      # START: Emmeans table Back-transformation
-      # ============================================================
-      if (Response_Transformed == TRUE) {
-        # Columns to back-transform
-        bt_cols <- intersect(c("emmean", "lower.CL", "upper.CL"), names(summary_table))
-
-
-        # Handle Box-Cox Back-transformation
-        if (transformation == "boxcox" || transformation == TRUE) {
-          # f_boxcox function returns the lambda value
-          lambda <- transformed_var$lambda
-
-          if (!is.null(lambda)) {
-            # Define Inverse BoxCox function
-            inv_boxcox <- function(x, lambda) {
-              if (abs(lambda) < 1e-6)
-                exp(x)
-              else
-                (lambda * x + 1)^(1 / lambda)
-            }
-
-            summary_table[bt_cols] <- lapply(summary_table[bt_cols], function(x) {
-              inv_boxcox(x, lambda)
-            })
-          }
-        }
-
-
-        # Handle BestNormalize Back-transformation
-        else if (transformation == "bestnormalize") {
-          # f_bestNormalize function returns the BN object
-          bn_object <- transformed_var$bestNormalize
-
-          if (!is.null(bn_object)) {
-            # Use the predict method with inverse = TRUE
-            summary_table[bt_cols] <- lapply(summary_table[bt_cols], function(x) {
-              predict(bn_object, newdata = x, inverse = TRUE)
-            })
-
-            # Flag column to indicate these are back-transformed
-            summary_table$scale <- "response (back-transformed)"
-          }
-        }
-      }
-      output_list[[response_name]][["summary_table"]] <- summary_table
-      # ============================================================
-      # END: Emmeans table Back-transformation
-      # ============================================================
-
-      # Remove row names
-      rownames(summary_table) <- NULL
-
-      # Rename columns for clarity
-      names(summary_table)[names(summary_table) == ".group"] <- "Letter"
-
-      if (overall_p_value >= alpha) {
-        summary_table$Letter <- "ns"
-      }
-
-      # Identify the grouping key (e.g., "treatment")
-      common_cols <- intersect(names(summary_table), names(data_summary_table))
-
-      # exclude 'df' here by simply not listing it
-      emm_cols <- c(common_cols, "emmean", "SE", "lower.CL", "upper.CL", "Letter")
-
-      # Subset the Emmeans table to just those columns
-      #    (This is your 'x' - the left side of the join)
-      emm_subset <- summary_table[, emm_cols]
-
-      # Getting n from data_summary_table
-      n_df <- as.data.frame(data_summary_table[common_cols])
-      n_df$n <- data_summary_table$n
-
-      # Perform the Merge
-      #    sort = FALSE -> CRITICAL! Prevents R from re-shuffling rows alphabetically
-      post_hoc_summary_table <- merge(x = emm_subset,
-                                      y = n_df,
-                                      by = common_cols,
-                                      all.x = TRUE,
-                                      sort = FALSE)
-
-      # Rename emmean column: back-transformed values estimate the MEDIAN on the
-      # original scale (back-transforming a mean gives the median for any monotone
-      # transformation). Label clearly to avoid misreporting as an arithmetic mean.
-      # Also drop SE when back-transformed: the SE was computed on the transformed
-      # scale and is invalid on the original scale (asymmetric error). The footnote
-      # directs the reader to the CIs instead.
-      if (Response_Transformed == TRUE) {
-        names(post_hoc_summary_table)[names(post_hoc_summary_table) == "emmean"] <- "median (BT)"
-        post_hoc_summary_table$SE <- NULL
+      # ---- Deprecated (kept for one release, see ?f_aov) ------------------
+      # post_hoc_summary_table / summary_table / cld_text used to hold the
+      # single post hoc table. They now hold the cell-means table when a
+      # significant interaction is tabulated, otherwise the first table.
+      dep_key <- if (length(ph_ints)) ph_ints[1] else
+        if (length(posthoc_results)) names(posthoc_results)[1] else NULL
+      if (!is.null(dep_key) && dep_key %in% names(posthoc_results)) {
+        summary_table          <- posthoc_results[[dep_key]]$cld
+        post_hoc_summary_table <- attr(posthoc_results[[dep_key]], "display")
+        cld_text               <- posthoc_results[[dep_key]]$cld_text
       } else {
-        # Prevent breaking of emmean col title in wide tables
-        names(post_hoc_summary_table)[names(post_hoc_summary_table) == "emmean"] <- "emmean.."
-      }
-
-
-
-      # Store output in output_list (after rename and SE removal so print.f_aov
-      # receives the same clean table as the document output)
-      output_list[[response_name]][["post_hoc_summary_table"]] <- post_hoc_summary_table
-
-      # Prepare table footnote CLD text string
-      if (exists("mult_cld")) {
-
-        raw_msg <- attr(mult_cld, "mesg")
-
-        # Identify the indices of the old disclaimer (lines starting with NOTE or indentation)
-        bad_lines <- grep("NOTE:|share the same|show them to be", raw_msg)
-
-        # Remove the old lines
-        if (length(bad_lines) > 0) {
-          raw_msg <- raw_msg[-bad_lines]
-        }
-
-        # Add your new note
-        raw_msg <- c(raw_msg, paste0(
-          "\n**Note:** Groups in the \"Letters\" column sharing the same letter are ",
-          "**not** significantly different (\u03B1 = ", alpha, "). Groups with ",
-          "different letters are significantly different. Sharing a letter ",
-          "indicates insufficient evidence to claim a difference; it does not ",
-          "prove the groups are identical.
-        \n")
-        )
-
-        # Collapse
-        cld_text <- paste(raw_msg, collapse = "  \n")
-
-        # Substitute 'alpha' with '$\alpha$'
-        # We use "\\alpha" because in R strings, you need \\ to produce a single \
-        cld_text <- gsub("alpha", "\u03B1", cld_text)
-
-        # Extract min and max once to keep code clean and efficient
-        min_df <- min(summary_table$df, na.rm = TRUE)
-        max_df <- max(summary_table$df, na.rm = TRUE)
-
-        # add the degrees of freedom
-        cld_text <- paste0("Degrees of freedom: ",
-                           if (min_df != max_df) {
-                             paste(min_df, "-", max_df)
-                           } else {
-                             max_df
-                           }, "  \n", cld_text
-        )
-      } else {
+        summary_table <- NULL
+        post_hoc_summary_table <- NULL
         cld_text <- ""
       }
+      output_list[[response_name]][["summary_table"]]          <- summary_table
+      output_list[[response_name]][["post_hoc_summary_table"]] <- post_hoc_summary_table
 
       cat(paste("\n## Observed Descriptives Table of: ", deparse(current_formula), "  \n"))
       f_pander(f_conditional_round(data_summary_table, digits = 3, replace_na = FALSE))
@@ -1757,8 +1809,10 @@ main findings in the *Results* section, you **must** use the Emmeans table below
             "\n   \n**WARNING**  \n",
             "*Levene's Test (", round(levene_res$p, digits = 4), " < ", alpha, "): ",
             "residuals do NOT have equal variance (heteroscedasticity).  \n",
-            "ANOVA results can be misleading. Enable the transformation option ",
-            "(`transformation = TRUE`) or resort to other statistical tests.*"
+            "ANOVA results can be misleading. ",
+            if (!is.null(output_list[[response_name]][["transformation_rejected"]]))
+              "A transformation was tried but not kept (see above); resort to other statistical tests.*"
+            else "Enable the transformation option (`transformation = TRUE`) or resort to other statistical tests.*"
           ))
         }
         if (isTRUE(shapiro_res$p.value <= alpha)) {
@@ -1766,8 +1820,10 @@ main findings in the *Results* section, you **must** use the Emmeans table below
             "\n   \n**WARNING**  \n",
             "*Shapiro-Wilk Test (", round(shapiro_res$p.value, digits = 4),
             " \u2264 ", alpha, "): residuals are NOT normally distributed.  \n",
-            "ANOVA results can be misleading. Enable the transformation option ",
-            "(`transformation = TRUE`) or resort to other statistical tests.*"
+            "ANOVA results can be misleading. ",
+            if (!is.null(output_list[[response_name]][["transformation_rejected"]]))
+              "A transformation was tried but not kept (see above); resort to other statistical tests.*"
+            else "Enable the transformation option (`transformation = TRUE`) or resort to other statistical tests.*"
           ))
         }
       }
@@ -1779,21 +1835,7 @@ main findings in the *Results* section, you **must** use the Emmeans table below
       }
 
 
-      if(Response_Transformed == TRUE){
-        if(transformation == "bestnormalize"){
-          cat("
-   \n## ANOVA Summary of '",transformed_var$transformation_name,"TRANSFORMED' response variable:", response_name, "  \n")
-        }
-
-        if(transformation == "boxcox" ||
-           transformation == TRUE){
-          cat("
-   \n## ANOVA Summary of 'Box-Cox TRANSFORMED' response variable:", response_name, "  \n")
-        }
-      } else {
-        cat("
-   \n## ANOVA Summary of ", response_name, "  \n")
-      }
+      cat("\n   \n## ", output_list[[response_name]][["anova_heading"]], "  \n", sep = "")
 
       cat("&nbsp;\n  \n")
       cat(paste("\n**Table** of aov call: ", deparse(current_formula), "  \n"))
@@ -1821,75 +1863,60 @@ main findings in the *Results* section, you **must** use the Emmeans table below
         cat(paste0(
           "\n\n***\n\n",
           "**[!] Diagnostic output only, do not report these results.**  \n",
-          "The model above is saturated (at least one cell has $n = 1$). ",
+          "The model above is saturated (residual df = 0). ",
           "F-statistics and p-values are undefined.  \n",
           "\n\n***\n\n"
         ))
       }
 
 
-      if (!is.null(post_hoc_summary_table)) {
-        # Emit the deferred post-hoc intro note right here, so it
-        # sits directly above the post-hoc table it describes rather
-        # than being visually attached to the Observed Descriptives
-        # Table that comes earlier in the report. An empty string is
-        # a no-op for cat(), so we do not need a length check.
+      if (length(posthoc_results) > 0) {
+        # Emit the deferred post-hoc intro note right here, so it sits
+        # directly above the post hoc tables it describes.
         cat(post_hoc_intro_note)
 
-        cat(paste0("  \n## Post Hoc Test on Estimated ", emm_type_label, " of ",
-                   response_name, "  \n"))
+        cat(paste0("  \n## Post Hoc Tests of ", response_name, "  \n"))
+        cat(paste0(
+          "\nEstimated marginal means (emmeans) are model-based means of ",
+          response_name, ". Each table below answers one question and has its ",
+          "own letters, adjustment and footer: a **cell-means** table compares ",
+          "every combination of an interaction, a **marginal-means** table ",
+          "compares the levels of one factor averaged over the others, and a ",
+          "**simple-effects** table compares one factor within each level of ",
+          "another. Marginal means are equal-weighted emmeans: every level of ",
+          "the other factors counts equally, so in unbalanced designs they can ",
+          "differ from the raw group means in the Observed Descriptives Table. ",
+          "The $n$ column is the raw observed count.  \n",
+          "\n*Reporting Tips:* Report the table that matches your question. ",
+          "When an interaction is significant, report its cell means (with ",
+          conf_perc, "% CIs) and describe how the pattern changes; main-effect ",
+          "letters average over that pattern.  \n\n"))
 
-        if (emm_is_cells) {
-          cat(paste0("
-        \nEstimated Cell Means (emmeans) are the model-based mean for each unique
-          combination of all factors in the model for response variable ", response_name, ".
-          Unlike raw data averages (see: Observed Descriptives Table), these model-based
-          cell means correct for unbalanced designs.Because a significant interaction was
-          detected, pairwise comparisons are performed across **all** factor-level combinations
-          simultaneously to pinpoint specific differences.
-          The $n$ column corresponds to the raw observed data.
-          If $n$ is blank, there is no observed data and emmeans estimates marginal means
-          from the model.
-        \n  \n&nbsp;\n  \n
-        \n*Reporting Tips:* When an interaction is significant, report and plot the full
-          cell means pattern. To best show the shape of the interaction, it is strongly
-          recommended to use a figure with individual data points overlaid on the cell means
-          (with ", conf_perc, "% CIs).
-        \n   \n&nbsp;   \n   \n&nbsp;  \n   \n"))
-        } else {
-          cat(paste0("
-        \nEstimated Marginal Means (emmeans) are model-based mean values of ",
-                     response_name,
-                     " for each level of the significant predictor(s), averaged over all other
-          factors in the model. Unlike raw data averages (see: Observed Descriptives Table),
-          emmeans correct for unbalanced designs and reflect the statistical
-          model used for pairwise comparisons (significance testing **letters**). ",
-                     if(Response_Transformed == FALSE){"SE values are identical for groups with equal
-          sample sizes and differ only to reflect variation in group size ($n$). "}else{""},
-                     "The $n$ column corresponds to the raw observed data of ",
-                     response_name, ". If $n$ is blank, there is no observed data and
-          emmeans estimates marginal means from the model.
-        \n  \n&nbsp;\n  \n
-        \n*Reporting Tips:* For main results showing significant differences, prioritize
-          the Emmeans table (preferably with ", conf_perc, "% CIs).
-          Figures should include all individual raw data points to show the
-          Model Fit (Emmeans) relative to the Observed Spread (Raw Data).
-          \n   \n&nbsp;   \n   \n&nbsp;  \n   \n"
-        ))
-
-        } # end if/else emm_is_cells
-
-        if(Response_Transformed == TRUE){
-          cat(paste0("\n**Back-transformed Post Hoc Table** of aov call: ",
-                     deparse(current_formula), "\n"))
-        } else {
-          cat(paste0("\n**Post Hoc ", emm_type_label, " Table** of aov call: ",
-                     deparse(current_formula), "  \n"))
+        for (k in names(posthoc_results)) {
+          ph_k   <- posthoc_results[[k]]
+          kind_k <- attr(ph_k, "kind")
+          kind_lbl <- switch(kind_k,
+                             cells    = "cell means",
+                             marginal = "marginal means",
+                             simple   = "simple effects")
+          by_k <- if (identical(kind_k, "simple")) trimws(sub(".*\\|", "", k)) else NULL
+          cat(paste0("\n### Post hoc: ", k, " (", kind_lbl, ")",
+                     if (isTRUE(attr(ph_k, "term_ns"))) "  (not significant)" else "",
+                     "  \n\n"))
+          cat(paste0("*", ph_caption(by_k), "*  \n\n"))
+          if (isTRUE(attr(ph_k, "term_ns")))
+            cat("Term not significant at \u03b1 = ", alpha,
+                ": letters collapsed to `ns`.  \n\n", sep = "")
+          if (!is.null(ph_k$caution)) cat(ph_k$caution, "  \n\n", sep = "")
+          disp <- attr(ph_k, "display")
+          if (!is.null(disp)) {
+            f_pander(f_conditional_round(disp, digits = 3, replace_na = FALSE))
+          } else {
+            cat("*Letters could not be computed for this table.*  \n\n")
+          }
+          cat(ph_k$cld_text)
         }
 
-        f_pander(f_conditional_round(post_hoc_summary_table, digits = 3, replace_na = FALSE))
-        # Add footnote
-        cat(cld_text)
         # Add footnote specifically explaining back-transformed values and median interpretation
         if(Response_Transformed == TRUE){
           cat(paste0("
@@ -1905,7 +1932,8 @@ non-linear, which results in asymmetric uncertainty margins on the original scal
 distance from the median to the lower bound differs from that to the upper bound).
 A single SE value implies symmetry ($\\pm$) and is therefore misleading.
 Please rely on the **",conf_perc,"% Confidence Intervals (lower.CL and upper.CL)** to
-quantify uncertainty.
+quantify uncertainty. Pairwise contrasts (stored in `$post_hoc[[term]]$pairs`) are on the
+transformed scale.
 "))
         }
       }
@@ -1917,7 +1945,7 @@ quantify uncertainty.
       # plots (2-/3-/4-way, with facet panels beyond two factors), matching
       # f_glm(). Plots are stored as ggplot objects in output_list and the
       # explanatory caption is emitted as markdown text below each figure.
-      if (isTRUE(interaction_plots)) {
+      if (isTRUE(effect_plots)) {
         bt_fn   <- output_list[[response_name]][["back_transform_fn"]]
         if (is.null(bt_fn)) bt_fn <- identity
         emm_obj <- output_list[[response_name]][["emm"]]
@@ -2033,6 +2061,32 @@ quantify uncertainty.
               "so collapsed grouping letters could mislead. See the ",
               "cell-means post hoc table for grouped significance.")
             return(list(safe = FALSE, letters_df = NULL, banner = banner))
+          }
+
+          # Letters come from the post hoc table that answers the same
+          # question as the figure: the factor's own marginal-means table, or
+          # the interaction's cell-means table. A non-significant term's table
+          # holds "ns", which draws no letters.
+          own_key <- NULL
+          if (length(D) == 1L && D %in% names(posthoc_results)) {
+            own_key <- D
+          } else if (length(D) > 1L) {
+            hit <- names(posthoc_results)[vapply(names(posthoc_results), function(k)
+              identical(attr(posthoc_results[[k]], "kind"), "cells") &&
+                setequal(ph_parts(k), D), logical(1))]
+            if (length(hit)) own_key <- hit[1]
+          }
+          if (!is.null(own_key)) {
+            cl <- posthoc_results[[own_key]]$cld
+            if (is.null(cl) || !all(c(D, "Letter") %in% names(cl)))
+              return(list(safe = TRUE, letters_df = NULL, banner = NULL))
+            ld <- cl[, c(D, "Letter"), drop = FALSE]
+            names(ld)[names(ld) == "Letter"] <- "Letters"
+            for (f in D) ld[[f]] <- as.character(ld[[f]])
+            ld$Letters <- trimws(ld$Letters)
+            if (all(ld$Letters == "ns"))
+              return(list(safe = TRUE, letters_df = NULL, banner = NULL))
+            return(list(safe = TRUE, letters_df = ld, banner = NULL))
           }
 
           # Overall model not significant: the table already shows "ns" and no
@@ -2225,7 +2279,9 @@ quantify uncertainty.
         # any 3rd/4th = facet panels. emmip() supplies the estimated means; the
         # values are back-transformed with bt_fn so the figure is on the
         # original response scale, matching the means plot and post hoc table.
-        make_aov_interaction_plot <- function(factors, is_sig) {
+        make_aov_interaction_plot <- function(factors, is_sig,
+                                              letters_override = NULL,
+                                              letter_note = NULL) {
           x_var      <- factors[1]
           trace_var  <- factors[2]
           facet_vars <- if (length(factors) > 2L) factors[-(1:2)] else character(0)
@@ -2287,7 +2343,9 @@ quantify uncertainty.
           all_factors <- c(x_var, trace_var, facet_vars)
           ip_df$Letters <- NA_character_
           int_letter_banner <- NULL
-          lres <- aov_plot_letters(all_factors)
+          lres <- if (!is.null(letters_override))
+            list(letters_df = letters_override, banner = NULL)
+          else aov_plot_letters(all_factors)
           int_letter_banner <- lres$banner
           if (!is.null(lres$letters_df) &&
               all(all_factors %in% names(lres$letters_df))) {
@@ -2336,8 +2394,8 @@ quantify uncertainty.
           # in the interaction (line) note; it is returned separately and the
           # caption assembler groups it with the other letter text. Only set it
           # for faceted plots whose letters are actually shown.
-          cross_facet_note <- if (length(facet_vars) > 0L &&
-                                  is.null(int_letter_banner))
+          cross_facet_note <- if (!is.null(letter_note)) letter_note
+          else if (length(facet_vars) > 0L && is.null(int_letter_banner))
             paste0("Letters can be compared across all panels: they group ",
                    "every cell shown, not only the cells within one panel.")
           else NULL
@@ -2430,8 +2488,8 @@ quantify uncertainty.
         # skipped with a warning.
         MAX_PLOT_FACTORS <- 4L
         int_cat <- character(0)
-        if (length(sig_ints_pl) > 0) {
-          for (it in sig_ints_pl) {
+        if (length(ph_ints) > 0) {
+          for (it in ph_ints) {
             parts <- trimws(strsplit(it, ":", fixed = TRUE)[[1]])
             n_f <- length(parts)
             if (n_f >= 2L && all(parts %in% cat_preds_pl)) {
@@ -2468,7 +2526,8 @@ quantify uncertainty.
             for (pi in seq_along(orientations)) {
               ord <- orientations[[pi]]
               p_ip <- tryCatch(
-                make_aov_interaction_plot(ord, is_sig = TRUE),
+                make_aov_interaction_plot(
+                  ord, is_sig = isTRUE(p_of(it) < alpha)),
                 error = function(e) {
                   warning("f_aov: interaction plot for '", it,
                           "' (orientation ", pi, ") could not be built: ",
@@ -2518,8 +2577,64 @@ quantify uncertainty.
               }
             }
           }
-        } else if (length(cat_preds_pl) > 0) {
-          for (vn in cat_preds_pl) {
+        }
+        # One means plot per marginal-means table (blocks left out of
+        # post_hoc get no plot), and one interaction-style plot per
+        # simple-effects table with letters per level of `by`.
+        means_vars <- names(posthoc_results)[vapply(posthoc_results, function(x)
+          identical(attr(x, "kind"), "marginal"), logical(1))]
+        simple_keys <- names(posthoc_results)[vapply(posthoc_results, function(x)
+          identical(attr(x, "kind"), "simple"), logical(1))]
+        for (sk in simple_keys) {
+          s_term <- trimws(sub("\\|.*", "", sk))
+          s_by   <- trimws(sub(".*\\|", "", sk))
+          cl <- posthoc_results[[sk]]$cld
+          lo <- NULL
+          if (!is.null(cl) && all(c(s_term, s_by, "Letter") %in% names(cl))) {
+            lo <- cl[, c(s_term, s_by, "Letter"), drop = FALSE]
+            names(lo)[names(lo) == "Letter"] <- "Letters"
+            lo[[s_term]] <- as.character(lo[[s_term]])
+            lo[[s_by]]   <- as.character(lo[[s_by]])
+          }
+          int_by <- intersect(c(paste(s_term, s_by, sep = ":"),
+                                paste(s_by, s_term, sep = ":")), term_names_sig)
+          p_sp <- tryCatch(
+            make_aov_interaction_plot(
+              c(s_by, s_term),
+              is_sig = length(int_by) > 0 && isTRUE(any(p_of(int_by) < alpha)),
+              letters_override = lo,
+              letter_note = paste0("Letters compare ", s_term, " within each ",
+                                   "level of ", s_by, " only; do not compare ",
+                                   "letters across levels of ", s_by, ".")),
+            error = function(e) {
+              warning("f_aov: simple-effects plot for '", sk, "' could not be ",
+                      "built: ", conditionMessage(e), call. = FALSE,
+                      immediate. = TRUE)
+              NULL
+            })
+          if (!is.null(p_sp)) {
+            key <- paste0("by_plot_", s_term, "_", s_by)
+            output_list[[response_name]][[key]] <- p_sp
+            tmp_sp <- tempfile(fileext = ".png")
+            ok_sp <- tryCatch({
+              suppressMessages(ggplot2::ggsave(filename = tmp_sp, plot = p_sp,
+                                               width = 7, height = 5.5,
+                                               units = "in", dpi = 200))
+              file.exists(tmp_sp)
+            }, error = function(e) FALSE)
+            cat(paste0("\n## Simple-Effects Plot of: ", response_name,
+                       "  (", sk, ")  \n"))
+            if (isTRUE(ok_sp)) cat(paste0("![](", tmp_sp, ")"), "   \n  \n")
+            cap <- make_fig_caption(
+              banner       = attr(p_sp, "letter_banner"),
+              int_note     = attr(p_sp, "int_caption"),
+              letter_extra = attr(p_sp, "cross_facet_note"),
+              has_letters  = isTRUE(attr(p_sp, "has_letters")))
+            cat(paste0("*", gsub("\n", "  \n", cap), "*", "   \n  \n"))
+          }
+        }
+        if (length(means_vars) > 0) {
+          for (vn in means_vars) {
             p_eff <- tryCatch(make_aov_means_plot(vn),
                               error = function(e) {
                                 warning("f_aov: means plot for '", vn,
@@ -2564,7 +2679,7 @@ quantify uncertainty.
       # --------------------------------------------------------------------
 
       # ---- Pairwise contrast forest plots (opt-in) -----------------------
-      # Independent of interaction_plots: one row per pairwise difference with
+      # Independent of effect_plots: one row per pairwise difference with
       # its adjusted CI and a zero reference line, drawn with the shared
       # forest helper (helper_contrast_forest.R) so the look matches f_glm()
       # and f_lmer(). Only drawn when the overall F-test is significant (so the
@@ -2579,14 +2694,12 @@ quantify uncertainty.
         # Interaction present -> cell-contrast forest(s); else main-effect
         # contrast forest per categorical predictor. This mirrors f_lmer's
         # split into interaction_contrast_plot_* and contrast_plot_*.
-        int_cat_cf <- character(0)
-        if (length(sig_ints_cf) > 0) {
-          for (it in sig_ints_cf) {
-            parts <- trimws(strsplit(it, ":", fixed = TRUE)[[1]])
-            if (length(parts) >= 2L && all(parts %in% cat_preds_cf))
-              int_cat_cf <- c(int_cat_cf, it)
-          }
-        }
+        # Follow the post hoc tables: cell contrasts for each tabulated
+        # interaction, main-effect contrasts for each marginal-means table.
+        int_cat_cf <- ph_ints[vapply(ph_ints, function(it)
+          all(ph_parts(it) %in% cat_preds_cf), logical(1))]
+        cat_preds_cf <- names(posthoc_results)[vapply(posthoc_results, function(x)
+          identical(attr(x, "kind"), "marginal"), logical(1))]
 
         if (length(int_cat_cf) > 0) {
           for (it in int_cat_cf) {
@@ -2694,6 +2807,7 @@ quantify uncertainty.
   # Execute analysis ONCE: capture both the output_list and the markdown text.
   # Caching avoids running every ANOVA/transformation/emmeans calculation a second
   # time (which could give different results if bestNormalize uses random search).
+  na_notes <- character(0)  # filled by generate_report(), sent below
   cached_markdown <- NULL
   suppressMessages(
     cached_markdown <- utils::capture.output(
@@ -2701,6 +2815,7 @@ quantify uncertainty.
     )
   )
   class(output_list) <- "f_aov"
+  for (na_msg in unique(na_notes)) message(na_msg)
 
   # Helper so word/pdf/rmd paths all use the same already-generated markdown.
   get_cached_markdown <- function() cached_markdown
@@ -2802,12 +2917,29 @@ header-includes:
     # show the location were the file is saved
     message(paste0("Saving output in: ", output_path))
 
-    # Extract all post_hoc_summary_table tables and keep their names
-    post_hoc_tables <- lapply(output_list, function(obj) {
-      tab <- obj$post_hoc_summary_table
-      if (is.data.frame(tab)) tab else data.frame(note = "No post-hoc test performed")
-    })
-    names(post_hoc_tables) <- response_names
+    # One sheet per response and post hoc table ("<response> <term>").
+    # Excel sheet names: at most 31 characters, none of []:*?/\ ; made unique.
+    post_hoc_tables <- list()
+    for (rn in response_names) {
+      obj <- output_list[[rn]]
+      ph  <- if (is.list(obj)) obj$post_hoc else NULL
+      if (length(ph) == 0L) {
+        post_hoc_tables[[rn]] <- data.frame(note = "No post-hoc test performed")
+        next
+      }
+      for (k in names(ph)) {
+        tab <- attr(ph[[k]], "display")
+        if (!is.data.frame(tab)) tab <- ph[[k]]$cld
+        if (!is.data.frame(tab)) tab <- data.frame(note = "Letters unavailable")
+        post_hoc_tables[[paste(rn, k)]] <- tab
+      }
+    }
+    sheet_names <- gsub("[*?/\\\\:]|\\[|\\]", "_", names(post_hoc_tables))
+    sheet_names <- gsub("\\s*\\|\\s*", " by ", sheet_names)
+    sheet_names <- substr(sheet_names, 1, 31)
+    sheet_names <- make.unique(sheet_names, sep = "_")
+    sheet_names <- substr(sheet_names, 1, 31)
+    names(post_hoc_tables) <- sheet_names
 
     writexl::write_xlsx(post_hoc_tables, path = output_path)
 
@@ -2853,6 +2985,39 @@ header-includes:
 }
 
 
+# Print the per-term post hoc tables of one f_aov response (console).
+# Falls back to the single (deprecated) table for objects from rfriend < 3.2.1.
+print_aov_post_hoc <- function(sublist, header) {
+  ph <- sublist$post_hoc
+  if (length(ph) == 0L) {
+    if (!is.null(sublist$post_hoc_summary_table)) {
+      cat("\n--- ", header, " ---\n", sep = "")
+      print(sublist$post_hoc_summary_table, row.names = FALSE, quote = FALSE)
+      cat(sublist$cld_text)
+    }
+    return(invisible(NULL))
+  }
+  cat("\n--- ", header, " ---\n", sep = "")
+  for (k in names(ph)) {
+    kind <- attr(ph[[k]], "kind")
+    kind_lbl <- if (is.null(kind)) "" else switch(kind,
+      cells = " (cell means)", marginal = " (marginal means)",
+      simple = " (simple effects)", "")
+    by_k <- if (identical(kind, "simple")) trimws(sub(".*\\|", "", k)) else NULL
+    cat("\n* ", k, kind_lbl,
+        if (isTRUE(attr(ph[[k]], "term_ns"))) "  (not significant)" else "",
+        " *\n", sep = "")
+    cat(ph_caption(by_k), "\n", sep = "")
+    if (!is.null(ph[[k]]$caution))
+      cat(paste(strwrap(ph[[k]]$caution, width = 76), collapse = "\n"), "\n", sep = "")
+    tab <- attr(ph[[k]], "display")
+    if (is.null(tab)) tab <- ph[[k]]$cld
+    if (!is.null(tab)) print(tab, row.names = FALSE, quote = FALSE)
+    cat(ph[[k]]$cld_text)
+  }
+  invisible(NULL)
+}
+
 #' @export
 print.f_aov <- function(x, ...) {
 
@@ -2877,7 +3042,7 @@ print.f_aov <- function(x, ...) {
     if (isTRUE(sublist$force_aov_used)) {
       message(paste0(
         "\n", strrep("!", 60), "\n",
-        "  DIAGNOSTIC ONLY: ", category, " \u2014 saturated model (n=1 cell).\n",
+        "  DIAGNOSTIC ONLY: ", category, ": saturated model (residual df = 0).\n",
         "  F-statistics and p-values are undefined. Do not report.\n",
         strrep("!", 60)
       ))
@@ -2903,15 +3068,15 @@ print.f_aov <- function(x, ...) {
       cat(paste("\n aov call: ", sublist$aov_call, "\n"))
 
       .at <- if (is.null(sublist$anova_type)) 2 else sublist$anova_type
-      cat("\nTRANSFORMED Type ", as.character(as.roman(.at)),
-          " ANOVA Table (car::Anova):\n", sep = "")
-      print(sublist$aov_summary)
+      cat("\nType ", as.character(as.roman(.at)), " ",
+          if (!is.null(sublist$anova_heading)) sublist$anova_heading
+          else "ANOVA on the TRANSFORMED response", " (car::Anova):\n", sep = "")
+      print(if (!is.null(sublist$transformed_aov_summary))
+        sublist$transformed_aov_summary else sublist$aov_summary)
 
 
-      cat("\n--- BACK TRANSFORMED Post hoc Comparisons of:", category, "---\n")
-      print(sublist$post_hoc_summary_table, row.names = FALSE, quote=FALSE)
-      cat("___________________________\n")
-      cat(sublist$cld_text)
+      print_aov_post_hoc(sublist, paste0("BACK TRANSFORMED Post hoc Comparisons of: ",
+                                         category))
       cat("\n")
       message("Note: 'median (BT)' = back-transformed estimated marginal mean. ",
               "Back-transforming a mean from a transformed scale returns the MEDIAN ",
@@ -2958,29 +3123,41 @@ print.f_aov <- function(x, ...) {
       cat(paste("\n aov call: ", sublist$aov_call, "\n"))
 
       .at <- if (is.null(sublist$anova_type)) 2 else sublist$anova_type
-      cat("\nType ", as.character(as.roman(.at)),
-          " ANOVA Table (car::Anova):\n", sep = "")
+      cat("\nType ", as.character(as.roman(.at)), " ",
+          if (!is.null(sublist$anova_heading)) sublist$anova_heading
+          else paste0("ANOVA on ", category, " (untransformed)"),
+          " (car::Anova):\n", sep = "")
       print(sublist$aov_summary)
+      if (!is.null(sublist$transformation_rejected))
+        message("Note: ", sublist$transformation_rejected$reason,
+                " The untransformed analysis is reported.")
 
 
-      cat("\n--- Post hoc Comparisons of:", category, "---\n")
-      cat("_________________________________________\n")
-      print(sublist$post_hoc_summary_table, row.names = FALSE, quote=FALSE)
+      print_aov_post_hoc(sublist, paste0("Post hoc Comparisons of: ", category))
 
       if (!is.null(sublist$min_cell_n) && sublist$min_cell_n <= 3) {
         warning(call. = FALSE, immediate. = TRUE, "\nNote: Minimum cell size = ", sublist$min_cell_n,
                 ". Levene's Test has very low power with such small groups; ",
                 "interpret its result with caution.  \n")
       }
+      # Same advice as the report: do not tell the user to enable a
+      # transformation that was tried and not kept, or that is already on.
+      advice <- if (!is.null(sublist$transformation_rejected)) {
+        "A transformation was tried but not kept (see above); resort to other statistical tests."
+      } else if (isFALSE(sublist$transformation_option)) {
+        "Enable the transformation option (`transformation = TRUE`) or resort to other statistical tests."
+      } else {
+        "Resort to other statistical tests."
+      }
       if (isTRUE(sublist$Levene_test_on_res$p <= sublist$alpha)) {
         warning(call. = FALSE, immediate. = TRUE, "   \nBased on the 'Levene's Test' (",
-                round(sublist$Levene_test_on_res$p, digits = 4), " \u2264 ", sublist$alpha, ")\nthe residuals do NOT have equal variance (heteroskedasticity).\nANOVA results can be misleading. \nENABLE the transformation option or resort to other statistical tests.  \n"
+                round(sublist$Levene_test_on_res$p, digits = 4), " \u2264 ", sublist$alpha, ")\nthe residuals do NOT have equal variance (heteroskedasticity).\nANOVA results can be misleading. \n", advice, "  \n"
         )
       }
 
       if (isTRUE(sublist$shapiro_test_residuals$p.value <= sublist$alpha)) {
         warning(call. = FALSE, immediate. = TRUE, "  \nBased on the Shapiro-Wilk Test (",
-                round(sublist$shapiro_test_residuals$p.value, digits = 4), " \u2264 ", sublist$alpha,")\n the residuals are **NOT** normally distributed. \nANOVA results can be misleading. \nENABLE the transformation option or resort to other statistical tests.  \n"
+                round(sublist$shapiro_test_residuals$p.value, digits = 4), " \u2264 ", sublist$alpha,")\n the residuals are **NOT** normally distributed. \nANOVA results can be misleading. \n", advice, "  \n"
         )
       }
     }

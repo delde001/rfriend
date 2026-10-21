@@ -185,6 +185,16 @@ test_that("stops if outliers is an unsupported type", {
 })
 
 
+test_that("NULL outliers (f_outliers found none) returns data unchanged", {
+  df <- data.frame(y = c(10, 11, 12, 13, 14), g = rep("a", 5))
+  found <- suppressMessages(f_outliers(df, columns = "y"))
+  expect_null(found)
+  expect_message(clean <- f_remove_outliers(df, found), "No outliers to remove")
+  expect_identical(clean, df)
+  expect_silent(f_remove_outliers(df, NULL, verbose = FALSE))
+})
+
+
 # ---------------------------------------------------------------------------
 # 10. Round-trip: f_outliers |> f_remove_outliers
 # ---------------------------------------------------------------------------

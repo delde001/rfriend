@@ -11,6 +11,18 @@
 #' Multivariate responses (e.g. \code{cbind(y1, y2) ~ x}) and transformed responses
 #' (e.g. \code{log(y) ~ x}) are not supported.
 #'
+#' \strong{Ordinal responses.} A response stored as an ordered factor
+#' (\code{factor(y, ordered = TRUE)}) with three or more levels is treated as
+#' ordinal: the wizard recommends rank-based tests (\code{f_wilcox_test()},
+#' \code{f_kruskal_test()}, \code{f_friedman()}) or a Spearman correlation,
+#' applied to the rank codes of the levels (\code{as.integer()}), because these
+#' tests use only the order of the values. With several predictors or random
+#' effects it points to ordinal (cumulative link) regression, which has no
+#' rfriend wrapper. A numeric response of whole numbers on a short scale
+#' (at most 10 distinct values, maximum at most 10) cannot be told apart from
+#' a count; it is analysed as count data, with a note to store it as an
+#' ordered factor if it is a score (for example 1 to 5).
+#'
 #' @param x A formula (e.g., \code{y ~ x}) or a data frame. When a formula is
 #'   provided, \code{data} must also be supplied. When a data frame is provided,
 #'   \code{formula} must be supplied as the second argument.
@@ -52,8 +64,8 @@
 #'     \item{id_col}{Character. Name of the subject/block column supplied, or \code{NULL}.}
 #'     \item{y_var}{Name of the response variable.}
 #'     \item{y_type}{Detected type of the response: \code{"binary"}, \code{"count"},
-#'       \code{"multinomial"}, \code{"ratio_normal"}, \code{"ratio_non_normal"},
-#'       \code{"ratio_unknown"}, or \code{"unsupported"}.}
+#'       \code{"multinomial"}, \code{"ordinal"}, \code{"ratio_normal"},
+#'       \code{"ratio_non_normal"}, \code{"ratio_unknown"}, or \code{"unsupported"}.}
 #'     \item{x_vars}{Character vector of explanatory variable names.}
 #'     \item{x_types}{Character vector of detected types (\code{"nominal"},
 #'       \code{"ordinal"}, \code{"ratio"}).}
@@ -141,6 +153,11 @@ f_stat_wizard.formula <- function(formula, data, id_col = NULL, run = FALSE,
                                   plots = FALSE, output_type = "word",
                                   interactive = FALSE, data_name = NULL, ...) {
 
+  check_known_dots(...names(), ...length(),
+                   allowed    = character(0),
+                   fun_name   = "f_stat_wizard",
+                   valid_args = names(formals(sys.function())))
+
   if (missing(data) || !is.data.frame(data)) {
     stop("When using the formula interface, 'data' must be a data frame.")
   }
@@ -170,6 +187,13 @@ f_stat_wizard.formula <- function(formula, data, id_col = NULL, run = FALSE,
 f_stat_wizard.data.frame <- function(x, formula, id_col = NULL, run = FALSE,
                                      plots = FALSE, output_type = "word",
                                      interactive = FALSE, data_name = NULL, ...) {
+
+  check_known_dots(...names(), ...length(),
+                   allowed    = character(0),
+                   fun_name   = "f_stat_wizard",
+                   valid_args = names(formals(sys.function())))
+
+
   data <- x
   if (missing(formula) || !inherits(formula, "formula")) {
     stop("When passing a data frame, you must also provide a formula (e.g., y ~ x).")
@@ -368,20 +392,20 @@ f_stat_wizard.data.frame <- function(x, formula, id_col = NULL, run = FALSE,
       # Check 1: every subject x group cell == 1
       if (all(tab == 1)) {
         add_txt(paste0("   OK: Pairing structure verified (",
-                       n_subjects, " subjects \u00d7 ", n_grp_levels, " groups, one observation per cell)."))
+                       n_subjects, " subjects x ", n_grp_levels, " groups, one observation per cell)."))
         pairing_verified <- TRUE
       } else {
         # Check what's wrong
         missing_cells <- sum(tab == 0)
         multi_cells   <- sum(tab > 1)
         if (missing_cells > 0) {
-          add_txt(paste0("   WARN: Unbalanced pairing \u2014 ", missing_cells,
-                         " subject\u00d7group combination(s) are missing."))
+          add_txt(paste0("   WARN: Unbalanced pairing: ", missing_cells,
+                         " subject x group combination(s) are missing."))
           add_txt("   Not every subject appears in every group. Pairing may be incomplete.")
         }
         if (multi_cells > 0) {
           add_txt(paste0("   WARN: ", multi_cells,
-                         " subject\u00d7group combination(s) have multiple observations."))
+                         " subject x group combination(s) have multiple observations."))
           add_txt("   True repeated measures may need averaging or a mixed model (f_lmer).")
         }
       }
@@ -518,7 +542,17 @@ f_stat_wizard.data.frame <- function(x, formula, id_col = NULL, run = FALSE,
 
   # --- CLASSIFY Y (RESPONSE) ---
 
-  if (is.factor(y_data) || is.character(y_data)) {
+  if (is.ordered(y_data) && length(unique(y_data)) >= 3) {
+    # Ordered factor with 3+ levels: an ordinal response (a score or ranked
+    # categories). Only the order of the levels carries information, so the
+    # recommendations below use rank-based tests on the level codes.
+    y_type <- "ordinal"
+    ord_lv <- levels(droplevels(y_data))
+    add_txt(paste0("-> Response: Ordered factor (ORDINAL, ", length(ord_lv), " levels: ",
+                   paste(ord_lv, collapse = " < "), ")."))
+    add_txt("   Rank-based tests use only the order of the levels.")
+
+  } else if (is.factor(y_data) || is.character(y_data)) {
     n_levels <- length(unique(y_data))
     if (n_levels < 2) {
       y_type <- "unsupported"
@@ -546,10 +580,17 @@ f_stat_wizard.data.frame <- function(x, formula, id_col = NULL, run = FALSE,
                max(y_data) < 1000 && length(unique_vals) >= 3) {
       y_type <- "count"
       add_txt("-> Response: Numeric (detected as COUNT data: non-negative integers).")
+      if (length(unique_vals) <= 10 && max(y_data) <= 10) {
+        add_txt(paste0("   Note: whole numbers on a short scale (", min(y_data), " to ",
+                       max(y_data), "). If '", y_col, "' is a SCORE on a fixed scale"))
+        add_txt("   (e.g. 1 to 5), it is ORDINAL, not a count. Store it as an ordered factor")
+        add_txt(paste0("   and rerun the wizard for rank-based tests: ", data_name, "$", y_col,
+                       " <- factor(", data_name, "$", y_col, ", ordered = TRUE)"))
+      }
 
       # Skip overdispersion check for intercept-only models -- there's nothing to fit a GLM against
       if (n_x == 0) {
-        add_txt("   (Overdispersion check skipped \u2014 no predictors in intercept-only model.)")
+        add_txt("   (Overdispersion check skipped: no predictors in intercept-only model.)")
       } else {
       # Model-based overdispersion check using DHARMa
       tryCatch({
@@ -765,10 +806,122 @@ f_stat_wizard.data.frame <- function(x, formula, id_col = NULL, run = FALSE,
            ", output_type=\"", output_type, "\")")
   }
 
+  # A factor/character binary response needs f_glm(..., event = ): the level
+  # coded 1. The wizard suggests the second level (what glm() would use) and
+  # says so, so the user can switch it to the outcome their question is about.
+  glm_event_level <- NULL
+  if (y_type == "binary" && (is.factor(y_data) || is.character(y_data))) {
+    ev_lv <- if (is.factor(y_data)) levels(droplevels(y_data))
+             else sort(unique(y_data[!is.na(y_data)]))
+    glm_event_level <- ev_lv[2]
+  }
+  glm_bin_args <- if (is.null(glm_event_level)) ", family='binomial'" else
+    paste0(", family='binomial', event='", glm_event_level, "'")
+  # Chi-square: f_chisq_test() takes a contingency table (or two vectors);
+  # build it from the two columns. f_chisq_test() has no output_type.
+  chisq_code <- if (length(x_cols_vars) >= 1) paste0(
+    "Code: f_chisq_test(table(", data_name, "$", x_cols_vars[1], ", ",
+    data_name, "$", y_col, "))") else NULL
+  chisq_call <- if (length(x_cols_vars) >= 1)
+    bquote(f_chisq_test(table(data[[.(x_cols_vars[1])]], data[[.(y_col)]])))
+    else NULL
+
+  add_event_note <- function() {
+    if (!is.null(glm_event_level)) {
+      add_txt(paste0("   Note: event='", glm_event_level, "' models P(", y_col,
+                     " = '", glm_event_level, "'). Change it to '",
+                     setdiff(ev_lv, glm_event_level)[1],
+                     "' if your question is about that outcome."))
+    }
+  }
+
   # --- RECOMMENDATIONS ---
 
   if (y_type == "unsupported") {
     add_txt("No recommendation available for this response type.")
+
+  } else if (y_type == "ordinal") {
+    # Rank-based tests need a numeric response: use the rank codes of the
+    # ordered levels (1 = lowest). Only the order matters, so this is exact.
+    rank_col  <- paste0(y_col, "_rank")
+    step1     <- paste0("Step 1: ", data_name, "$", rank_col, " <- as.integer(",
+                        data_name, "$", y_col, ")   # 1 = '", ord_lv[1], "', ",
+                        length(ord_lv), " = '", ord_lv[length(ord_lv)], "'")
+    data_rank <- data
+    data_rank[[rank_col]] <- as.integer(data[[y_col]])
+    x1        <- if (length(x_cols_vars) >= 1) x_cols_vars[1] else NULL
+    rank_form <- if (!is.null(x1)) stats::as.formula(paste0(rank_col, " ~ ", x1)) else NULL
+    rank_txt  <- if (!is.null(x1)) paste0(rank_col, " ~ ", x1) else NULL
+
+    if (has_random_effects || n_x > 1) {
+      add_txt("Test: Ordinal (cumulative link) regression")
+      add_txt(paste0("   Your model has ", if (has_random_effects) "random effects" else
+                     "several predictors", "; rank tests handle one grouping factor only."))
+      if (has_random_effects) {
+        add_txt(paste0("Code: ordinal::clmm(", safe_deparse(formula), ", data=", data_name, ")"))
+        add_txt("   (No rfriend wrapper yet; requires the ordinal package)")
+      } else {
+        add_txt(paste0("Code: MASS::polr(", safe_deparse(formula), ", data=", data_name, ", Hess=TRUE)"))
+        add_txt("   (No rfriend wrapper yet; requires MASS package)")
+      }
+      add_txt("   Simpler alternative: test one factor at a time with a rank test")
+      add_txt(paste0("   (f_kruskal_test() on ", rank_col, "), as in a one-factor design."))
+
+    } else if (n_x == 0) {
+      add_txt("Note: No comparison without an explanatory variable.")
+      add_txt(paste0("Code: table(", data_name, "$", y_col, ")   # frequencies per level"))
+
+    } else if (x_types[1] == "ratio") {
+      add_txt("Test: Spearman rank correlation (ordinal Y, numeric X)")
+      add_txt(step1)
+      add_txt(paste0("Step 2: cor.test(", data_name, "$", x1, ", ", data_name, "$", rank_col,
+                     ", method='spearman')"))
+
+    } else if (is.null(n_groups) || n_groups < 2) {
+      add_txt("   Note: < 2 groups found. Cannot compare groups.")
+
+    } else if (paired && !pairing_verified) {
+      add_txt("RECOMMENDATION SUPPRESSED: pairing structure failed verification.")
+      add_txt("   Fix the data so each subject appears exactly once per group,")
+      add_txt("   or drop id_col to run an independent-samples rank test.")
+      recommended_call <- NULL
+
+    } else if (n_groups == 2) {
+      if (paired) {
+        add_txt("Test: Wilcoxon Signed-Rank Test (paired, ordinal response)")
+        add_txt(step1)
+        add_txt(paste0("Step 2: f_wilcox_test(", rank_txt, ", data=", data_name,
+                       ", paired=TRUE, output_type=\"", output_type, "\")"))
+        recommended_call <- bquote(f_wilcox_test(.(rank_form), data = data_rank, paired = TRUE,
+                                                 output_type = .(output_type)))
+      } else {
+        add_txt("Test: Mann-Whitney U / Wilcoxon Rank-Sum Test (ordinal response)")
+        add_txt(step1)
+        add_txt(paste0("Step 2: f_wilcox_test(", rank_txt, ", data=", data_name,
+                       ", output_type=\"", output_type, "\")"))
+        recommended_call <- bquote(f_wilcox_test(.(rank_form), data = data_rank,
+                                                 output_type = .(output_type)))
+      }
+
+    } else {
+      if (paired) {
+        add_txt("Test: Friedman Rank-Sum Test (repeated ordinal measurements)")
+        add_txt(step1)
+        add_txt(paste0("Step 2: f_friedman(", rank_txt, " | ", id_col, ", data=", data_name,
+                       ", output_type=\"", output_type, "\")"))
+        recommended_call <- bquote(f_friedman(
+          .(stats::as.formula(paste0(rank_col, " ~ ", x1, " | ", id_col))),
+          data = data_rank, output_type = .(output_type)))
+      } else {
+        add_txt("Test: Kruskal-Wallis Test (ordinal response, 3+ groups)")
+        add_txt(step1)
+        add_txt(paste0("Step 2: f_kruskal_test(", rank_txt, ", data=", data_name,
+                       ", output_type=\"", output_type, "\")"))
+        add_txt("   Post-hoc: f_kruskal_test() includes Dunn's test")
+        recommended_call <- bquote(f_kruskal_test(.(rank_form), data = data_rank,
+                                                  output_type = .(output_type)))
+      }
+    }
 
   } else if (has_random_effects) {
     add_txt("Test: Linear Mixed-Effects Model (LMM)")
@@ -803,13 +956,17 @@ f_stat_wizard.data.frame <- function(x, formula, id_col = NULL, run = FALSE,
   } else if (n_x > 1) {
     if (y_type == "binary") {
       add_txt("Test: Multiple Logistic Regression")
-      add_txt(paste0("Code: ", cf("f_glm", ", family='binomial'")))
-      recommended_call <- bquote(f_glm(.(formula), data = data, family = "binomial", output_type = .(output_type)))
+      add_txt(paste0("Code: ", cf("f_glm", glm_bin_args)))
+      add_event_note()
+      recommended_call <- if (is.null(glm_event_level))
+        bquote(f_glm(.(formula), data = data, family = "binomial", output_type = .(output_type)))
+      else
+        bquote(f_glm(.(formula), data = data, family = "binomial", event = .(glm_event_level), output_type = .(output_type)))
     } else if (y_type == "count") {
       if (is_overdispersed) {
         add_txt("Test: Negative Binomial GLM (overdispersion detected)")
         add_txt(paste0("Code: MASS::glm.nb(", safe_deparse(formula), ", data=", data_name, ")"))
-        add_txt("   (No rfriend wrapper yet \u2014 requires MASS package)")
+        add_txt("   (No rfriend wrapper yet; requires MASS package)")
       } else {
         add_txt("Test: Poisson GLM")
         add_txt(paste0("Code: ", cf("f_glm", ", family='poisson'")))
@@ -817,15 +974,23 @@ f_stat_wizard.data.frame <- function(x, formula, id_col = NULL, run = FALSE,
     } else if (y_type == "multinomial") {
       add_txt("Test: Multinomial Logistic Regression")
       add_txt(paste0("Code: nnet::multinom(", safe_deparse(formula), ", data=", data_name, ")"))
-      add_txt("   (No rfriend wrapper yet \u2014 requires nnet package)")
+      add_txt("   (No rfriend wrapper yet; requires nnet package)")
     } else if (y_type == "ratio_normal") {
       if (is_ancova) {
         add_txt("Test: ANCOVA (Analysis of Covariance)")
         add_txt("   Your model combines categorical and continuous predictors.")
         add_txt(paste0("Code: ", cf("f_aov", ", ANCOVA=TRUE")))
         recommended_call <- bquote(f_aov(.(formula), data = data, ANCOVA = TRUE, output_type = .(output_type)))
+        add_txt("   Alternative (regression view, coefficient table + forest plot):")
+        add_txt(paste0("   Code: ", cf("f_lm")))
+      } else if (has_ratio_x) {
+        # Numeric predictors only: f_aov() would turn them into factors.
+        add_txt("Test: Multiple Linear Regression")
+        add_txt(paste0("Code: ", cf("f_lm")))
+        recommended_call <- bquote(f_lm(.(formula), data = data, output_type = .(output_type)))
+        add_txt(paste0("  (Base R: lm(", safe_deparse(formula), ", data=", data_name, "))"))
       } else {
-        add_txt("Test: Multi-way ANOVA or Linear Regression")
+        add_txt("Test: Multi-way ANOVA")
         add_txt(paste0("Code: ", cf("f_aov")))
         recommended_call <- bquote(f_aov(.(formula), data = data, output_type = .(output_type)))
       }
@@ -833,6 +998,11 @@ f_stat_wizard.data.frame <- function(x, formula, id_col = NULL, run = FALSE,
         add_txt("   Post-hoc: f_aov() includes post-hoc tests (adjust='sidak' by default)")
         add_txt("   Alternative: emmeans::emmeans() for custom contrasts")
       }
+    } else if (can_be_normalized && has_ratio_x && !has_nominal_x) {
+      add_txt("Test: Multiple Linear Regression with automatic Box-Cox transformation")
+      add_txt(paste0("Code: ", cf("f_lm")))
+      add_txt("   Note: f_lm() auto-applies Box-Cox when residuals are non-normal.")
+      recommended_call <- bquote(f_lm(.(formula), data = data, output_type = .(output_type)))
     } else if (can_be_normalized) {
       add_txt("Test: ANOVA with automatic Box-Cox transformation")
       add_txt(paste0("Code: ", cf("f_aov")))
@@ -847,10 +1017,14 @@ f_stat_wizard.data.frame <- function(x, formula, id_col = NULL, run = FALSE,
     } else if (y_type == "ratio_unknown") {
       add_txt("Note: Normality could not be assessed (too few observations).")
       add_txt("Option 1: Linear Regression (if normality is plausible)")
-      add_txt(paste0("   Code: ", cf("f_aov")))
+      lin_fn <- if (has_ratio_x) "f_lm" else "f_aov"
+      add_txt(paste0("   Code: ", cf(lin_fn)))
       add_txt("Option 2: Non-parametric or GLM approach (safer)")
       add_txt(paste0("   Code: ", cf("f_glm")))
-      recommended_call <- bquote(f_aov(.(formula), data = data, output_type = .(output_type)))
+      recommended_call <- if (has_ratio_x)
+        bquote(f_lm(.(formula), data = data, output_type = .(output_type)))
+      else
+        bquote(f_aov(.(formula), data = data, output_type = .(output_type)))
     } else {
       add_txt("Test: Generalized Linear Model (GLM)")
       if (all(y_data > 0, na.rm = TRUE)) {
@@ -867,12 +1041,13 @@ f_stat_wizard.data.frame <- function(x, formula, id_col = NULL, run = FALSE,
     if (x_types[1] == "ratio") {
       if (y_type == "binary") {
         add_txt("Test: Logistic Regression")
-        add_txt(paste0("Code: ", cf("f_glm", ", family='binomial'")))
+        add_txt(paste0("Code: ", cf("f_glm", glm_bin_args)))
+        add_event_note()
       } else if (y_type == "count") {
         if (is_overdispersed) {
           add_txt("Test: Negative Binomial Regression (overdispersion detected)")
           add_txt(paste0("Code: MASS::glm.nb(", safe_deparse(formula), ", data=", data_name, ")"))
-          add_txt("   (No rfriend wrapper yet \u2014 requires MASS package)")
+          add_txt("   (No rfriend wrapper yet; requires MASS package)")
         } else {
           add_txt("Test: Poisson Regression")
           add_txt(paste0("Code: ", cf("f_glm", ", family='poisson'")))
@@ -880,24 +1055,21 @@ f_stat_wizard.data.frame <- function(x, formula, id_col = NULL, run = FALSE,
       } else if (y_type == "multinomial") {
         add_txt("Test: Multinomial Logistic Regression")
         add_txt(paste0("Code: nnet::multinom(", safe_deparse(formula), ", data=", data_name, ")"))
-        add_txt("   (No rfriend wrapper yet \u2014 requires nnet package)")
+        add_txt("   (No rfriend wrapper yet; requires nnet package)")
       } else if (y_type == "ratio_normal" || can_be_normalized) {
-        if (can_be_normalized) {
-          add_txt("Note: f_glm() does NOT auto-transform like f_t_test/f_aov. Apply Box-Cox manually:")
-          add_txt(paste0("   Step 1: ", data_name, "$", y_col, "_t <- f_boxcox(", data_name, "$", y_col, ")$transformed_data"))
-          add_txt(paste0("   Step 2: f_glm(", y_col, "_t ~ ", safe_deparse(formula[[3]]), ", data=", data_name, ")"))
-          add_txt("Otherwise, untransformed:")
-        }
         add_txt("Test: Linear Regression / Pearson Correlation")
-        add_txt(paste0("Code: ", cf("f_glm")))
-        recommended_call <- bquote(f_glm(.(formula), data = data, output_type = .(output_type)))
+        add_txt(paste0("Code: ", cf("f_lm")))
+        if (can_be_normalized) {
+          add_txt("   Note: f_lm() auto-applies Box-Cox when residuals are non-normal.")
+        }
+        recommended_call <- bquote(f_lm(.(formula), data = data, output_type = .(output_type)))
         add_txt(paste0("  (Base R: lm(", safe_deparse(formula), ", data=", data_name, "))"))
         add_txt(paste0("   Visualise: f_corplot(", data_name, ")"))
         add_txt(paste0("   Test: cor.test(", data_name, "$", x_cols_vars[1], ", ", data_name, "$", y_col, ", method='pearson')"))
       } else if (y_type == "ratio_unknown") {
         add_txt("Note: Normality could not be assessed.")
         add_txt("Test: Linear Regression (if plausible) or Spearman Correlation (non-parametric)")
-        add_txt(paste0("Code: ", cf("f_glm")))
+        add_txt(paste0("Code: ", cf("f_lm")))
         add_txt(paste0("   Visualise: f_corplot(", data_name, ")"))
         add_txt(paste0("   Test: cor.test(", data_name, "$", x_cols_vars[1], ", ", data_name, "$", y_col, ", method='spearman')"))
       } else {
@@ -911,12 +1083,13 @@ f_stat_wizard.data.frame <- function(x, formula, id_col = NULL, run = FALSE,
     } else if (x_types[1] == "ordinal") {
       if (y_type == "binary") {
         add_txt("Test: Logistic Regression with ordinal contrast")
-        add_txt(paste0("Code: ", cf("f_glm", ", family='binomial'")))
+        add_txt(paste0("Code: ", cf("f_glm", glm_bin_args)))
+        add_event_note()
       } else if (y_type == "count") {
         if (is_overdispersed) {
           add_txt("Test: Negative Binomial GLM with ordinal predictor")
           add_txt(paste0("Code: MASS::glm.nb(", safe_deparse(formula), ", data=", data_name, ")"))
-          add_txt("   (No rfriend wrapper yet \u2014 requires MASS package)")
+          add_txt("   (No rfriend wrapper yet; requires MASS package)")
         } else {
           add_txt("Test: Poisson GLM with ordinal predictor")
           add_txt(paste0("Code: ", cf("f_glm", ", family='poisson'")))
@@ -924,7 +1097,7 @@ f_stat_wizard.data.frame <- function(x, formula, id_col = NULL, run = FALSE,
       } else if (y_type == "multinomial") {
         add_txt("Test: Multinomial Logistic Regression")
         add_txt(paste0("Code: nnet::multinom(", safe_deparse(formula), ", data=", data_name, ")"))
-        add_txt("   (No rfriend wrapper yet \u2014 requires nnet package)")
+        add_txt("   (No rfriend wrapper yet; requires nnet package)")
       } else if (y_type == "ratio_normal") {
         add_txt("Test: Linear Regression with polynomial contrasts (ordinal X)")
         add_txt(paste0("Code: ", cf("f_glm")))
@@ -951,7 +1124,7 @@ f_stat_wizard.data.frame <- function(x, formula, id_col = NULL, run = FALSE,
       } else if (paired && !pairing_verified) {
         add_txt("RECOMMENDATION SUPPRESSED: pairing structure failed verification.")
         add_txt("   The id_col was supplied but the data does not form a clean")
-        add_txt("   one-row-per-(subject \u00d7 group) layout required by paired tests.")
+        add_txt("   one-row-per-(subject x group) layout required by paired tests.")
         add_txt("   Options:")
         add_txt("   1. Fix the data so each subject appears exactly once per group, then re-run.")
         add_txt("   2. Drop id_col to run an independent-samples test instead.")
@@ -970,18 +1143,19 @@ f_stat_wizard.data.frame <- function(x, formula, id_col = NULL, run = FALSE,
           if (paired) {
             add_txt("Test: Paired binary data requires McNemar's Test")
             add_txt("   McNemar's test needs a 2x2 table of before/after outcomes per subject.")
-            add_txt("   This requires wide-format data with subject IDs \u2014 the wizard cannot")
+            add_txt("   This requires wide-format data with subject IDs; the wizard cannot")
             add_txt("   construct this automatically from a formula.")
             add_txt("   See: ?mcnemar.test for usage once your data is structured.")
           } else {
             add_txt("Test: Chi-square / Fisher's Exact")
-            add_txt(paste0("Code: f_chisq_test(", data_name, ", '", y_col, "', '", x_cols_vars[1], "', output_type=\"", output_type, "\")"))
+            add_txt(chisq_code)
+          recommended_call <- chisq_call
           }
         } else if (y_type == "count") {
           if (is_overdispersed) {
             add_txt("Test: Negative Binomial GLM (overdispersion detected)")
             add_txt(paste0("Code: MASS::glm.nb(", safe_deparse(formula), ", data=", data_name, ")"))
-            add_txt("   (No rfriend wrapper yet \u2014 requires MASS package)")
+            add_txt("   (No rfriend wrapper yet; requires MASS package)")
           } else {
             add_txt("Test: Poisson GLM")
             add_txt(paste0("Code: ", cf("f_glm", ", family='poisson'")))
@@ -989,7 +1163,8 @@ f_stat_wizard.data.frame <- function(x, formula, id_col = NULL, run = FALSE,
           if (paired) add_txt("   Note: For paired count data, consider a mixed model approach.")
         } else if (y_type == "multinomial") {
           add_txt("Test: Chi-square / Fisher's Exact")
-          add_txt(paste0("Code: f_chisq_test(", data_name, ", '", y_col, "', '", x_cols_vars[1], "', output_type=\"", output_type, "\")"))
+          add_txt(chisq_code)
+          recommended_call <- chisq_call
           if (paired) add_txt("   Note: For paired multinomial data, consider marginal homogeneity test.")
         } else if (y_type == "ratio_normal") {
           if (paired) {
@@ -1059,37 +1234,57 @@ f_stat_wizard.data.frame <- function(x, formula, id_col = NULL, run = FALSE,
             add_txt("   Consider a mixed model for flexibility:")
             add_txt(paste0("   Code: f_lmer(", y_col, " ~ ", x_cols_vars[1], " + (1|", id_name, "), data=", data_name,
                            ", output_type=\"", output_type, "\")"))
-            add_txt("   Alternative (rfriend): f_aov with Error() term")
-            add_txt(paste0("   Code: f_aov(", safe_deparse(formula), " + Error(", id_name, "/", x_cols_vars[1], "), data=", data_name, ", output_type=\"", output_type, "\")"))
+            recommended_call <- bquote(f_lmer(
+              .(stats::as.formula(paste0(y_col, " ~ ", x_cols_vars[1], " + (1|", id_name, ")"))),
+              data = data, output_type = .(output_type)))
             add_txt("   Alternative (base R): aov() with Error() term")
             add_txt(paste0("   Code: aov(", safe_deparse(formula), " + Error(", id_name, "/", x_cols_vars[1], "), data=", data_name, ")"))
           } else {
             add_txt("Test: Friedman Rank-Sum Test (non-parametric repeated measures)")
-            add_txt(paste0("Code: friedman.test(", y_col, " ~ ", x_cols_vars[1],
-                           " | ", id_name, ", data=", data_name, ")"))
-            add_txt("   Post-hoc: rstatix::wilcox_test() with pairwise paired comparisons")
+            add_txt(paste0("Code: f_friedman(", y_col, " ~ ", x_cols_vars[1],
+                           " | ", id_name, ", data=", data_name,
+                           ", output_type=\"", output_type, "\")"))
+            add_txt("   Post-hoc: f_friedman() includes pairwise paired Wilcoxon tests")
+            add_txt(paste0("   (Base R: friedman.test(", y_col, " ~ ", x_cols_vars[1],
+                           " | ", id_name, ", data=", data_name, "))"))
+            recommended_call <- bquote(f_friedman(
+              .(stats::as.formula(paste0(y_col, " ~ ", x_cols_vars[1], " | ", id_name))),
+              data = data, output_type = .(output_type)))
+            if (isTRUE(can_be_normalized)) {
+              # The normality check found that Box-Cox fixes the residuals:
+              # offer the parametric repeated-measures route as well.
+              add_txt("Alternative: f_boxcox() fixes normality, so a mixed model on the")
+              add_txt("   transformed response is also defensible:")
+              add_txt(paste0("   Step 1: ", data_name, "$", y_col, "_t <- f_boxcox(",
+                             data_name, "$", y_col, ")$transformed_data"))
+              add_txt(paste0("   Step 2: f_lmer(", y_col, "_t ~ ", x_cols_vars[1], " + (1|",
+                             id_name, "), data=", data_name, ", output_type=\"",
+                             output_type, "\")"))
+            }
           }
         } else if (y_type == "binary") {
           add_txt("Test: Chi-square Test")
-          add_txt(paste0("Code: f_chisq_test(", data_name, ", '", y_col, "', '", x_cols_vars[1], "', output_type=\"", output_type, "\")"))
+          add_txt(chisq_code)
+          recommended_call <- chisq_call
         } else if (y_type == "count") {
           if (is_overdispersed) {
             add_txt("Test: Negative Binomial GLM (overdispersion detected)")
             add_txt(paste0("Code: MASS::glm.nb(", safe_deparse(formula), ", data=", data_name, ")"))
-            add_txt("   (No rfriend wrapper yet \u2014 requires MASS package)")
+            add_txt("   (No rfriend wrapper yet; requires MASS package)")
           } else {
             add_txt("Test: Poisson GLM")
             add_txt(paste0("Code: ", cf("f_glm", ", family='poisson'")))
           }
         } else if (y_type == "multinomial") {
           add_txt("Test: Chi-square Test")
-          add_txt(paste0("Code: f_chisq_test(", data_name, ", '", y_col, "', '", x_cols_vars[1], "', output_type=\"", output_type, "\")"))
+          add_txt(chisq_code)
+          recommended_call <- chisq_call
         } else if (y_type == "ratio_normal") {
           if (variance_equal) {
             add_txt("Test: One-Way ANOVA")
             add_txt(paste0("Code: ", cf("f_aov")))
           } else {
-            add_txt("Test: One-Way ANOVA (variances unequal \u2014 see note)")
+            add_txt("Test: One-Way ANOVA (variances unequal, see note)")
             add_txt(paste0("Code: ", cf("f_aov")))
             add_txt("   Note: Levene flagged unequal variances. f_aov() is reasonably robust")
             add_txt("   for balanced designs; for strict correctness use Welch's ANOVA:")
@@ -1131,21 +1326,23 @@ f_stat_wizard.data.frame <- function(x, formula, id_col = NULL, run = FALSE,
   add_txt("Disclaimer:")
   add_txt("- This wizard checks data properties, not experimental design.")
   add_txt("- Always verify if your data is Paired or Independent!")
-  add_txt("- BETA: f_stat_wizard is new and under active development \u2014 verify recommendations.")
+  add_txt("- BETA: f_stat_wizard is new and under active development: verify recommendations.")
   add_txt("- Other tests than the recommended one could be more suitable.")
   add_txt("The WIZARD recommends exclusively from these rfriend functions:")
-  add_txt("   f_t_test, f_aov, f_glm, f_chisq_test,")
-  add_txt("   f_kruskal_test, f_wilcox_test, f_corplot,")
+  add_txt("   f_t_test, f_aov, f_lm, f_glm, f_chisq_test,")
+  add_txt("   f_kruskal_test, f_wilcox_test, f_friedman, f_lmer, f_corplot,")
   add_txt("   f_boxcox (transformation), f_scan (diagnostics)")
   add_txt("And these external packages (when no rfriend wrapper exists):")
   add_txt("   oneway.test (Welch ANOVA), MASS::glm.nb (Neg. Binomial),")
-  add_txt("   nnet::multinom (Multinomial), cor.test (correlation test).")
+  add_txt("   nnet::multinom (Multinomial), cor.test (correlation test),")
+  add_txt("   MASS::polr / ordinal::clmm (ordinal regression).")
 
   # Check recommended packages
   report_text <- paste(report_lines, collapse = " ")
   missing_pkgs <- unique(c(
     if (grepl("nnet::multinom", report_text, fixed = TRUE) && !requireNamespace("nnet", quietly = TRUE)) "nnet",
-    if (grepl("MASS::glm.nb", report_text, fixed = TRUE) && !requireNamespace("MASS", quietly = TRUE)) "MASS",
+    if (grepl("MASS::glm.nb|MASS::polr", report_text) && !requireNamespace("MASS", quietly = TRUE)) "MASS",
+    if (grepl("ordinal::clmm", report_text, fixed = TRUE) && !requireNamespace("ordinal", quietly = TRUE)) "ordinal",
     if (grepl("emmeans::", report_text, fixed = TRUE) && !requireNamespace("emmeans", quietly = TRUE)) "emmeans",
     if (grepl("rstatix::", report_text, fixed = TRUE) && !requireNamespace("rstatix", quietly = TRUE)) "rstatix"
   ))

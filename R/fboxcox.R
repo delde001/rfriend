@@ -104,7 +104,7 @@
 #'
 #' \strong{Note}: For sample sizes greater than 5000, Shapiro-Wilk test results are not provided due to limitations in its applicability.
 #'
-#' This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
+#' This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or higher), a universal document converter.
 #'\itemize{
 #' \item \bold{Windows:} Install Pandoc and ensure the installation folder \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
 #' \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.
@@ -182,6 +182,15 @@ f_boxcox <- function(
   ########## Reset initial settings on exit #################################
   .session_state <- save_session_state()  # Helper function: helper_session_state
   on.exit(restore_session_state(.session_state), add = TRUE) # Helper function: helper_session_state
+
+  # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  # check_dots to prevent ignoring typos
+  # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  check_known_dots(...names(), ...length(),
+                   allowed    = 	character(0),
+                   fun_name   = "f_boxcox",
+                   valid_args = names(formals(sys.function())))
+
 
 
   # Parameter validation

@@ -50,6 +50,11 @@
 #'     \item \strong{One-sample:} \code{response ~ 1} or \code{response ~ NULL}.
 #'   }
 #'   More response variables can be added using \code{+} (e.g., \code{y1 + y2 ~ group}).
+#'   The response must be numeric or an ordered factor (an ordinal score,
+#'   e.g. \code{factor(score, ordered = TRUE)}). An ordered factor is tested
+#'   on the rank codes of its levels (1 = lowest level), which is exact for a
+#'   rank test; a message shows the coding. Other non-numeric responses stop
+#'   with an error.
 #' @param data A data frame containing the variables when using the formula interface.
 #' @param paired Logical. If \code{TRUE}, performs a paired Wilcoxon test.
 #'   \strong{Note on row order:} For the formula interface, data must be
@@ -74,8 +79,13 @@
 #'   location shift (paired/two-sample) under H0. Default is 0.
 #' @param alternative Character string. \code{"two.sided"} (default),
 #'   \code{"greater"}, or \code{"less"}.
-#' @param norm_plots Logical. If \code{TRUE}, descriptive diagnostic plots are
+#' @param diagnostic_plots Logical. If \code{TRUE}, descriptive diagnostic plots are
 #'   included in the output. Default is \code{TRUE}.
+#' @param effect_plots Logical. If \code{TRUE} (default), the main effect
+#'   plot (\code{main_effect_plot}) is built, stored and included in the
+#'   output files. With \code{FALSE} it is not built.
+#' @param norm_plots \strong{Deprecated} in 3.2.1. Use \code{diagnostic_plots} instead. If
+#'   supplied, its value is passed to \code{diagnostic_plots} with a warning.
 #' @param alpha Numeric. Significance level. Default is \code{0.05}.
 #' @param conf.level Numeric. Confidence level of the interval.
 #'   Default is \code{1 - alpha}. If \code{conf.level} is specified, then
@@ -116,6 +126,9 @@
 #'   call (\code{y1 + y2 ~ group}) are then tested on the identical row
 #'   set. For the default (vector) method, \code{...} is currently
 #'   unused.
+#'   \code{subset} can also pick two groups of a factor with more
+#'   levels (e.g. \code{subset = treatment \%in\% c("control", "high_N")});
+#'   the check for exactly two groups runs after the subset.
 #'
 #' @return An object of class \code{'f_wilcox_test'}, a named list with one
 #'   element per response variable. Each element contains the
@@ -154,14 +167,16 @@ f_wilcox_test.formula <- function(formula,
                                   conf.level           = NULL,
                                   mu                   = 0,
                                   alternative          = "two.sided",
-                                  norm_plots           = TRUE,
+                                  diagnostic_plots           = TRUE,
+                                  effect_plots               = TRUE,
                                   alpha                = 0.05,
                                   intro_text           = TRUE,
                                   close_generated_files  = FALSE,
-                                  open_generated_files   = TRUE,
+                                  open_generated_files   = interactive(),
                                   output_type          = "default",
                                   save_as              = NULL,
                                   save_in_wdir         = FALSE,
+                                  norm_plots = lifecycle::deprecated(),
                                   ...) {
 
   # ------------------------------------------------------------------
@@ -170,6 +185,28 @@ f_wilcox_test.formula <- function(formula,
 
   .session_state <- save_session_state()  # Helper function: helper_session_state
   on.exit(restore_session_state(.session_state), add = TRUE) # Helper function: helper_session_state
+
+  ########## Deprecated arguments ##########################################
+  # Renamed in 3.2.1 so that all test functions use the same names for the
+  # same report parts: `diagnostic_plots` (assumption and residual checks)
+  # and `effect_plots` (effect, estimated-means and interaction plots).
+  # The old name still works for one release, with a warning.
+  if (lifecycle::is_present(norm_plots)) {
+    lifecycle::deprecate_warn(
+      when = "3.2.1",
+      what = "f_wilcox_test(norm_plots)",
+      with = "f_wilcox_test(diagnostic_plots)"
+    )
+    diagnostic_plots <- norm_plots
+  }
+
+  # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  # check_dots to prevent ignoring typos
+  # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  check_known_dots(...names(), ...length(),
+                   allowed    = c("subset", "na.action", ".original_name"),
+                   fun_name   = "f_wilcox_test",
+                   valid_args = names(formals(sys.function())))
 
   # ------------------------------------------------------------------
   # 2.  Data & formula parsing
@@ -186,9 +223,11 @@ f_wilcox_test.formula <- function(formula,
     formula <- clean_formula(formula)
   }
 
-  dots <- list(...)
-  if (".original_name" %in% names(dots)) {
-    data_name <- dots[[".original_name"]]
+  # Read only .original_name. list(...) would force every dot, including
+  # `subset`, which must be evaluated inside `data` (done further below).
+  dot_nms <- ...names()
+  if (".original_name" %in% dot_nms) {
+    data_name <- ...elt(which(dot_nms == ".original_name"))
   }
 
   temp_output_dir  <- tempdir()
@@ -319,15 +358,14 @@ f_wilcox_test.formula <- function(formula,
   for (response in lhs) {
     if (!(response %in% names(data)))
       stop(paste("Response variable", response, "not found in data."))
-    if (!is.numeric(data[[response]]))
-      stop(paste("Response variable", response, "must be numeric."))
+    # Ordered factor -> rank codes (with a message); other non-numeric
+    # responses stop with a clear message (helper_rank_response.R).
+    data <- prepare_rank_response(data, response, "f_wilcox_test")
   }
   if (!is_one_sample) {
     if (!(predictor_name %in% names(data)))
       stop(paste("Predictor", predictor_name, "not found in data."))
     data[[predictor_name]] <- as.factor(data[[predictor_name]])
-    if (nlevels(data[[predictor_name]]) != 2)
-      stop("Grouping variable must have exactly 2 levels for a Wilcoxon test.")
   }
 
   ########## Build master analysis frame (one row set, all responses) #######
@@ -357,10 +395,10 @@ f_wilcox_test.formula <- function(formula,
     subset_vec <- eval(dots_exprs$subset, envir = data, enclos = caller_env)
     if (is.logical(subset_vec)) subset_vec[is.na(subset_vec)] <- FALSE
   }
-  n_before_master <- nrow(data)
   if (!is.null(subset_vec)) {
     data <- data[subset_vec, , drop = FALSE]
   }
+  n_before_master <- nrow(data)            # after subset, before NA drop
 
   # Resolve na.action (a function, defaults to na.omit)
   na_action_fn <- stats::na.omit
@@ -375,8 +413,23 @@ f_wilcox_test.formula <- function(formula,
     na.action          = na_action_fn
   )
 
+  data_before_na <- data
   data <- do.call(stats::model.frame, mf_args)
+  message_na_removed(data_before_na, nrow(data), all.vars(master_formula))
+  rm(data_before_na)
   n_after_master  <- nrow(data)
+  # Two groups are needed. Checked here, after `subset` and the NA drop
+  # (model.frame drops unused levels), so `subset` can pick two groups.
+  if (!is_one_sample) {
+    levs <- levels(data[[predictor_name]])
+    if (length(levs) != 2)
+      stop("Grouping variable must have exactly 2 levels for a Wilcoxon test; '",
+           predictor_name, "' has ", length(levs),
+           if (length(levs) > 0) paste0(" (", paste(levs, collapse = ", "), ")") else "",
+           " after subset and removing missing values. ",
+           "Select two groups with `subset` or subset the data first.",
+           call. = FALSE)
+  }
   ###########################################################################
 
   # Reconcile alpha / conf.level
@@ -580,7 +633,7 @@ f_wilcox_test.formula <- function(formula,
       }
       dev.off()
 
-      if (isTRUE(norm_plots)) {
+      if (isTRUE(diagnostic_plots)) {
         cat("\n     \n&nbsp;  \n Check the diagnostic plots below.  \n")
         cat(paste0("![](", temp_file, ")"), "  \n \n")
         cat("&nbsp;\n  \n")
@@ -1055,7 +1108,7 @@ f_wilcox_test.formula <- function(formula,
         p
       }
 
-      main_effect_plot <- tryCatch(build_main_effect_plot(),
+      main_effect_plot <- if (!isTRUE(effect_plots)) NULL else tryCatch(build_main_effect_plot(),
                                     error = function(e) {
                                       warning("f_wilcox_test: main effect plot ",
                                               "for '", response_name,
@@ -1253,15 +1306,31 @@ f_wilcox_test.default <- function(x,
                                   conf.level           = NULL,
                                   mu                   = 0,
                                   alternative          = "two.sided",
-                                  norm_plots           = TRUE,
+                                  diagnostic_plots           = TRUE,
+                                  effect_plots               = TRUE,
                                   alpha                = 0.05,
                                   intro_text           = TRUE,
                                   close_generated_files  = FALSE,
-                                  open_generated_files   = TRUE,
+                                  open_generated_files   = interactive(),
                                   output_type          = "default",
                                   save_as              = NULL,
                                   save_in_wdir         = FALSE,
+                                  norm_plots = lifecycle::deprecated(),
                                   ...) {
+
+  ########## Deprecated arguments ##########################################
+  # Renamed in 3.2.1 so that all test functions use the same names for the
+  # same report parts: `diagnostic_plots` (assumption and residual checks)
+  # and `effect_plots` (effect, estimated-means and interaction plots).
+  # The old name still works for one release, with a warning.
+  if (lifecycle::is_present(norm_plots)) {
+    lifecycle::deprecate_warn(
+      when = "3.2.1",
+      what = "f_wilcox_test(norm_plots)",
+      with = "f_wilcox_test(diagnostic_plots)"
+    )
+    diagnostic_plots <- norm_plots
+  }
 
   if (!is.null(y) && paired && length(x) != length(y))
     stop("For a paired test, 'x' and 'y' must have the same length.")
@@ -1300,7 +1369,8 @@ f_wilcox_test.default <- function(x,
     conf.level            = conf.level,
     mu                    = mu,
     alternative           = alternative,
-    norm_plots            = norm_plots,
+    diagnostic_plots            = diagnostic_plots,
+    effect_plots          = effect_plots,
     alpha                 = alpha,
     intro_text            = intro_text,
     close_generated_files = close_generated_files,

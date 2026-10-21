@@ -7,7 +7,8 @@
 f_kruskal_test(
   formula,
   data = NULL,
-  plot = TRUE,
+  diagnostic_plots = TRUE,
+  effect_plots = TRUE,
   alpha = 0.05,
   output_type = "default",
   save_as = NULL,
@@ -16,17 +17,27 @@ f_kruskal_test(
   adjust = "bonferroni",
   close_generated_files = FALSE,
   open_generated_files = interactive(),
+  plot = lifecycle::deprecated(),
   ...
 )
 }
 \arguments{
 \item{formula}{A formula specifying the response and predictor variable (e.g., \code{response ~ predictor)}.
-more response variables and predictors can be added using \code{-} or \code{+} (e.g., \code{response1 + response2 ~ predictor1 + predictor2)}. The function iterates through these combinations or response and predictors, because the Kruskal-Wallis test itself only allows one response and one predictor combination to be tested simultaneously.}
+more response variables and predictors can be added using \code{-} or \code{+} (e.g., \code{response1 + response2 ~ predictor1 + predictor2)}. The function iterates through these combinations or response and predictors, because the Kruskal-Wallis test itself only allows one response and one predictor combination to be tested simultaneously.
+  The response must be numeric or an ordered factor (an ordinal score,
+  e.g. \code{factor(score, ordered = TRUE)}). An ordered factor is tested
+  on the rank codes of its levels (1 = lowest level), which is exact for a
+  rank test; a message shows the coding. Other non-numeric responses stop
+  with an error.}
 
 \item{data}{A \code{data.frame} containing the variables referenced in the formula.}
 
-\item{plot}{Logical. If \code{TRUE}, generates plots (e.g., density plots and boxplots)
-in the output files. Default is \code{TRUE}.}
+\item{diagnostic_plots}{Logical. If \code{TRUE} (default), the density plot
+of the groups (visual check on similarity of distributions) is included
+in the output files.}
+
+\item{effect_plots}{Logical. If \code{TRUE} (default), the boxplot with the
+Dunn's test compact letter display is included in the output files.}
 
 \item{alpha}{Numeric. The significance level for the Kruskal-Wallis test and Dunn's
 test. Default is  \code{0.05}.}
@@ -67,6 +78,9 @@ files after creation. Defaults to \code{TRUE} in an interactive R session
 and \code{FALSE} otherwise (e.g. in scripts or automated pipelines).
 Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.}
 
+\item{plot}{\strong{Deprecated} in 3.2.1. Use \code{diagnostic_plots} and \code{effect_plots} instead. If
+supplied, its value is passed to \code{diagnostic_plots} and \code{effect_plots} with a warning.}
+
 \item{...}{Additional arguments forwarded to \code{\link[stats]{kruskal.test}}.
 The arguments \code{subset} and \code{na.action} are honored: when
 supplied, they are applied via \code{\link[stats]{model.frame}} so
@@ -83,8 +97,8 @@ An object of class 'f_kruskal_test' (a named list, one entry per
     \item{summary_table}{Descriptive statistics with compact letter display (Letters column).}
     \item{alpha}{The significance level used.}
     \item{DunnTest_adjust}{The p-value adjustment method used.}
-    \item{distributions}{ggplot density plot (if \code{plot = TRUE}).}
-    \item{Boxplot}{ggplot boxplot with CLD letters (if \code{plot = TRUE}).}
+    \item{distributions}{ggplot density plot (if \code{diagnostic_plots = TRUE}).}
+    \item{Boxplot}{ggplot boxplot with CLD letters (if \code{effect_plots = TRUE}).}
   }
 
 Using the option \code{output_type}, it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and plot methods for 'f_kruskal_test' objects.
@@ -103,7 +117,7 @@ This function offers a comprehensive workflow for non-parametric analysis using 
 
 Output files are generated in the format specified by \code{output_type =} and saved to the working directory, options are \code{"pdf", "word"} or \code{"excel"}. If \code{output_type = "rmd"} is used it is advised to use it in a chunk with \{r, echo=FALSE, results='asis'\}
 
-This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
+This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or higher), a universal document converter.
 \itemize{
 \item \bold{Windows:} Install Pandoc and ensure the installation folder \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
 \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.
@@ -137,7 +151,8 @@ data(iris)
 output <- f_kruskal_test(
                Sepal.Width + Sepal.Length ~ Species,
                data = iris,
-               plot = FALSE,
+               diagnostic_plots = FALSE,
+               effect_plots = FALSE,
                output_type = "word",
                adjust = "holm"
                )
@@ -146,7 +161,8 @@ output <- f_kruskal_test(
 f_kruskal_out <- f_kruskal_test(
                      Sepal.Width + Sepal.Length ~ Species,
                      data = iris,
-                     plot = FALSE,
+                     diagnostic_plots = FALSE,
+                     effect_plots = FALSE,
                      output_type = "excel",
                      adjust = "holm"
                      )

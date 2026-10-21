@@ -16,8 +16,9 @@
 #'   converted factors to the console. Default \code{FALSE}.
 #' @param factor_select A character vector specifying the names of the columns to convert into factors. If \code{NULL}, the function automatically detects columns that should be factors based on their data type and unique value count. Default is \code{NULL}.
 #' @param factor_exclude A character vector specifying the names of the columns NOT to convert into factors. If \code{NULL}, no columns are excluded. Default is \code{NULL}.
-#' @param unique_num_treshold  Numeric. A threshold of the amount of unique numbers a numeric column should have to keep it numeric, i.e. omit factor conversion. Default \code{8}.
-#' @param repeats_threshold  Numeric. A threshold of the minimal number of repeats a numeric column should have to convert it to a factor. Default \code{2}.
+#' @param unique_num_threshold  Numeric. A threshold of the amount of unique numbers a numeric column should have to keep it numeric, i.e. omit factor conversion. A numeric column is a factor candidate only when it has fewer than \code{unique_num_threshold} unique values. Default \code{8}.
+#' @param repeats_threshold  Numeric. A numeric column is converted to a factor only when at least one of its values occurs more than \code{repeats_threshold} times. Default \code{2}, so a value has to occur at least three times.
+#' @param unique_num_treshold  Alternative spelling of \code{unique_num_threshold}, accepted so that existing scripts keep working. Default \code{NULL} (not used). Supplying both spellings with different values is an error.
 #' @param color_factor Character. Name of the factor variable used for point
 #'   colours; \code{"auto"} selects automatically. Default \code{"auto"}.
 #' @param shape_factor Character. Name of the factor variable used for point
@@ -71,7 +72,7 @@
 #'     in all correlation panels.
 #' }
 #'
-#' This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
+#' This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or higher), a universal document converter.
 #'\itemize{
 #' \item \bold{Windows:} Install Pandoc and ensure the installation folder \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
 #' \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.
@@ -110,7 +111,7 @@ f_corplot <- function(data,
                       factor_table          = FALSE,
                       factor_exclude        = NULL,
                       factor_select         = NULL,
-                      unique_num_treshold   = 8,
+                      unique_num_threshold  = 8,
                       repeats_threshold     = 2,
                       color_factor          = "auto",
                       shape_factor          = "auto",
@@ -125,7 +126,12 @@ f_corplot <- function(data,
                       open_generated_files  = interactive(),
                       output_type           = "word",
                       save_as               = NULL,
-                      save_in_wdir          = FALSE) {
+                      save_in_wdir          = FALSE,
+                      unique_num_treshold   = NULL) {
+
+  unique_num_threshold <- resolve_unique_num_threshold(
+    unique_num_threshold, unique_num_treshold,
+    missing(unique_num_threshold), "f_corplot")
 
   ##########################################################################
   # Save and restore settings on exit
@@ -244,7 +250,7 @@ f_corplot <- function(data,
   if (!is.null(ordinal_vars)) {
     for (ov in ordinal_vars) {
       if (!ov %in% names(data)) {
-        warning("ordinal_vars: '", ov, "' not found in data \u2014 ignored.")
+        warning("ordinal_vars: '", ov, "' not found in data; ignored.")
         ordinal_vars <- setdiff(ordinal_vars, ov)
         next
       }
@@ -272,8 +278,8 @@ f_corplot <- function(data,
         properties          = factor_table,
         exclude             = factor_exclude,
         select              = factor_select,
-        unique_num_treshold = unique_num_treshold,
-        repeats_threshold   = repeats_threshold
+        unique_num_threshold = unique_num_threshold,
+        repeats_threshold    = repeats_threshold
       )
     }
 

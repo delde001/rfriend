@@ -50,7 +50,7 @@
 #'
 #' Note that there is an optional \code{jitter} option to plot all individual data points over the boxplots.
 #'
-#' This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
+#' This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or higher), a universal document converter.
 #'
 #' \bold{Windows:} Install Pandoc and ensure the installation folder \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
 #'
@@ -475,6 +475,13 @@ f_boxplot_worker <- function(formula = NULL, data, fancy_names = NULL,
 
 )
 {
+
+  check_known_dots(...names(), ...length(),
+                   allowed    = ".data_name",
+                   fun_name   = "f_boxplot",
+                   valid_args = names(formals(sys.function())))
+
+
 
     # Internal backchannel set by f_boxplot.formula and f_boxplot.numeric.
     # Not part of the public API; deliberately read from `...` so it does

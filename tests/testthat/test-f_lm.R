@@ -569,3 +569,64 @@ test_that("f_lm plot method runs without error", {
   )
   expect_no_error(suppressWarnings(plot(out)))
 })
+
+# =============================================================================
+# Per-term post hoc tables, post_hoc and by (rfriend 3.2.1)
+# =============================================================================
+# Before 3.2.1 f_lm() built ONE post hoc table over every combination of the
+# categorical predictors, also in additive models (same bug as f_aov, #13).
+
+pt_lmph <- local({ d <- plant_trial; d$week <- factor(d$time_weeks); d })
+wk6_lmph <- subset(plant_trial, time_weeks == 6)
+
+test_that("f_lm: additive model gives one table per factor, none for the covariate", {
+  out <- quiet_f_lm(height_cm ~ treatment + week + chloroplast_count,
+                    data = pt_lmph, transformation = FALSE)
+  ph <- out$height_cm$post_hoc
+  expect_setequal(names(ph), c("treatment", "week"))
+  expect_equal(nrow(ph$treatment$cld), 4)
+  expect_equal(nrow(ph$week$cld), 3)
+  expect_named(ph$treatment, c("emmeans", "pairs", "cld", "cld_text", "caution"))
+  ref <- as.data.frame(emmeans::emmeans(out$height_cm$lm_fit,
+                                        ~ treatment))
+  m <- merge(ref, ph$treatment$emmeans, by = "treatment")
+  expect_equal(m$emmean.x, m$emmean.y)
+  expect_match(ph$treatment$cld_text, "4 estimates / 6 tests", fixed = TRUE)
+})
+
+test_that("f_lm: significant interaction gives a cell table plus cautioned main effects", {
+  out <- quiet_f_lm(breaks ~ wool * tension, data = warpbreaks,
+                    transformation = FALSE)
+  ph <- out$breaks$post_hoc
+  expect_equal(names(ph)[1], "wool:tension")
+  expect_match(ph$tension$caution, "Interpret with caution", fixed = TRUE)
+})
+
+test_that("f_lm: post_hoc and by select the tables; bad names error", {
+  out <- quiet_f_lm(height_cm ~ block + treatment, data = wk6_lmph,
+                    post_hoc = "treatment")
+  expect_identical(names(out$height_cm$post_hoc), "treatment")
+  expect_false("effect_plot_block" %in% names(out$height_cm))
+  out2 <- quiet_f_lm(height_cm ~ treatment * week, data = pt_lmph,
+                     transformation = FALSE, post_hoc = "treatment", by = "week")
+  ph <- out2$height_cm$post_hoc[["treatment | week"]]
+  ref <- as.data.frame(emmeans::emmeans(out2$height_cm$lm_fit, ~ treatment | week))
+  m <- merge(ref, ph$emmeans, by = c("treatment", "week"))
+  expect_equal(nrow(m), 12)
+  expect_equal(m$emmean.x, m$emmean.y)
+  expect_error(quiet_f_lm(height_cm ~ treatment + week, data = pt_lmph,
+                          post_hoc = "treatmnt"), "did you mean 'treatment'")
+  expect_error(quiet_f_lm(height_cm ~ treatment + week, data = pt_lmph,
+                          post_hoc = "chloroplast_count"), "not a categorical")
+  expect_length(quiet_f_lm(height_cm ~ treatment, data = pt_lmph,
+                           post_hoc = FALSE)$height_cm$post_hoc, 0)
+})
+
+test_that("f_lm: deprecated single-table elements are still present", {
+  out <- quiet_f_lm(height_cm ~ treatment + week, data = pt_lmph,
+                    transformation = FALSE)
+  expect_true(is.data.frame(out$height_cm$post_hoc_summary_table))
+  expect_equal(nrow(out$height_cm$post_hoc_summary_table), 4)
+  expect_type(out$height_cm$cld_text, "character")
+  expect_true(is.data.frame(out$height_cm$emmeans_table))
+})

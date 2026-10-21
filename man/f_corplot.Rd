@@ -10,7 +10,7 @@ f_corplot(
   factor_table = FALSE,
   factor_exclude = NULL,
   factor_select = NULL,
-  unique_num_treshold = 8,
+  unique_num_threshold = 8,
   repeats_threshold = 2,
   color_factor = "auto",
   shape_factor = "auto",
@@ -25,7 +25,8 @@ f_corplot(
   open_generated_files = interactive(),
   output_type = "word",
   save_as = NULL,
-  save_in_wdir = FALSE
+  save_in_wdir = FALSE,
+  unique_num_treshold = NULL
 )
 }
 \arguments{
@@ -42,9 +43,9 @@ converted factors to the console. Default \code{FALSE}.}
 
 \item{factor_select}{A character vector specifying the names of the columns to convert into factors. If \code{NULL}, the function automatically detects columns that should be factors based on their data type and unique value count. Default is \code{NULL}.}
 
-\item{unique_num_treshold}{Numeric. A threshold of the amount of unique numbers a numeric column should have to keep it numeric, i.e. omit factor conversion. Default \code{8}.}
+\item{unique_num_threshold}{Numeric. A threshold of the amount of unique numbers a numeric column should have to keep it numeric, i.e. omit factor conversion. A numeric column is a factor candidate only when it has fewer than \code{unique_num_threshold} unique values. Default \code{8}.}
 
-\item{repeats_threshold}{Numeric. A threshold of the minimal number of repeats a numeric column should have to convert it to a factor. Default \code{2}.}
+\item{repeats_threshold}{Numeric. A numeric column is converted to a factor only when at least one of its values occurs more than \code{repeats_threshold} times. Default \code{2}, so a value has to occur at least three times.}
 
 \item{color_factor}{Character. Name of the factor variable used for point
 colours; \code{"auto"} selects automatically. Default \code{"auto"}.}
@@ -90,6 +91,8 @@ Default saves to \code{tempdir()}.}
 
 \item{save_in_wdir}{Logical. If \code{TRUE}, saves to the working directory.
 Overridden by \code{save_as}. Default \code{FALSE}.}
+
+\item{unique_num_treshold}{Alternative spelling of \code{unique_num_threshold}, accepted so that existing scripts keep working. Default \code{NULL} (not used). Supplying both spellings with different values is an error.}
 }
 \value{
 No value is returned to the R environment. Output files are saved
@@ -125,7 +128,7 @@ the grouping factors and the meaning of all three correlation symbols.
     in all correlation panels.
 }
 
-This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
+This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or higher), a universal document converter.
 \itemize{
 \item \bold{Windows:} Install Pandoc and ensure the installation folder \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
 \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.

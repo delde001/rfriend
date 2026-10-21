@@ -21,7 +21,8 @@ Returns \code{x} invisibly.
 \description{
 Displays the within-block trace plot and/or the boxplot stored in an
 \code{f_friedman} object. Plots are only available when the original
-call used \code{plot = TRUE}.
+call used \code{diagnostic_plots = TRUE} (trace plot) or
+\code{effect_plots = TRUE} (boxplot).
 }
 \examples{
 set.seed(1)

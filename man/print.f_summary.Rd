@@ -20,7 +20,9 @@
 
 \item{table_width}{Integer or \code{NULL}. Characters after which table splits. Default \code{90}.}
 
-\item{digits}{Integer. Number of decimal digits to use in formatting. Default is \code{3}.}
+\item{digits}{Integer. Number of decimal digits to use in formatting. By
+default the \code{digits} given to \code{f_summary()} (2 unless set);
+\code{NULL} prints unrounded values.}
 
 \item{allow_integer_decimal_mix}{Logical. If \code{TRUE}, each individual cell is evaluated: integer values are displayed without decimal places, and non-integer values are displayed with the specified number of decimal places, i.e. \code{digits}. Default is \code{FALSE}, when a column contains a mix of integers and decimal values, all values are displayed with the specified number of decimal places. Note: columns containing only integers are **always** displayed without decimal places, regardless of \code{allow_integer_decimal_mix}.}
 

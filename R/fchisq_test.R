@@ -140,8 +140,11 @@ f_chisq_test <-
         bquote(stats::chisq.test(.(as.name(x_name)), ...))
       }
     } else {
-      env[["y"]] <- y
-      bquote(stats::chisq.test(.(as.name(x_name)), y = y, ...))
+      # Store y under the caller's expression so the "data:" line of the
+      # test reads e.g. "df$a and df$b" instead of "df$a and y".
+      y_name <- paste(deparse(substitute(y)), collapse = " ")
+      env[[y_name]] <- y
+      bquote(stats::chisq.test(.(as.name(x_name)), y = .(as.name(y_name)), ...))
     }
 
     probe <- tryCatch(suppressWarnings(eval(chisq_call_expr, envir = env)),
@@ -284,6 +287,6 @@ print.f_chisq_test <- function(x, ...) {
 
   } else {
 
-    cat(paste0("No post hoc test was performed. \nChi-squared test p value = ", round(x$chisq_test_output$p.value, digits = x$settings$digits), " which is higher than alpha = ", x$settings$alpha, "\n(NOTE: a post hoc can be forced with option: 'force_posthoc = TRUE')"))
+    cat(paste0("No post hoc test was performed. \nChi-squared test p value = ", round(x$chisq_test_output$p.value, digits = x$settings$digits), " which is higher than alpha = ", x$settings$alpha, "\n(NOTE: a post hoc can be forced with option: 'force_posthoc = TRUE')\n"))
   }
 }

@@ -16,13 +16,14 @@
 #'   present in a given factor is skipped with a warning. Default \code{NULL}
 #'   (leave the reference as the first level).
 #' @param properties Logical. If \code{TRUE}, prints a detailed table about the properties of the new data frame to the console. If \code{FALSE} no property table will be printed to the console. Default is \code{FALSE}.
-#' @param unique_num_treshold  Numeric. A threshold of the amount of unique numbers a numeric column should have to keep it numeric, i.e. omit factor conversion. Default \code{8}.
-#' @param repeats_threshold  Numeric. A threshold of the minimal number of repeats a numeric column should have to convert it to a factor. Default \code{2}.
+#' @param unique_num_threshold  Numeric. A threshold of the amount of unique numbers a numeric column should have to keep it numeric, i.e. omit factor conversion. A numeric column is a factor candidate only when it has fewer than \code{unique_num_threshold} unique values. Default \code{8}.
+#' @param repeats_threshold  Numeric. A numeric column is converted to a factor only when at least one of its values occurs more than \code{repeats_threshold} times. Default \code{2}, so a value has to occur at least three times.
+#' @param unique_num_treshold  Alternative spelling of \code{unique_num_threshold}, accepted so that existing scripts keep working. Default \code{NULL} (not used). Supplying both spellings with different values is an error.
 #' @param ... Additional arguments passed to the \code{factor()} function of baseR.
 #'
 #' @details
 #' \itemize{
-#' \item If \code{select} is \code{NULL}, the function identifies columns with character data or numeric data with fewer than 8 unique values as candidates for conversion to factors.
+#' \item If \code{select} is \code{NULL}, the function identifies columns with character data, and numeric columns with fewer than \code{unique_num_threshold} (default 8) unique values of which at least one value occurs more than \code{repeats_threshold} (default 2) times, as candidates for conversion to factors.
 #' \item The function checks if all specified columns exist in the data frame and stops execution if any are missing.
 #' \item Converts specified columns into factors, applying any additional arguments provided.
 #' \item Outputs a summary data frame with details about each column, including its type, class, number of observations, missing values, factor levels, and labels.
@@ -71,10 +72,11 @@
 #' levels(df_ref$c)[1] # reference is now "kiwi"
 #' levels(df_ref$a)[1] # reference is now "yes" (was "no")
 #'
-#' # In example above col b was converted to a factor as the number of repeats = 2
-#' # and the amount of unique numbers < 8. In order to keep b numeric we can also
-#' # adjust the unique_num_treshold and/or repeats_threshold:
-#' df5 <- f_factors(df, unique_num_treshold = 2)
+#' # In example above col b was converted to a factor as each value occurs 3 times
+#' # (more than repeats_threshold = 2) and there are fewer than 8 unique numbers.
+#' # In order to keep b numeric we can also adjust the unique_num_threshold
+#' # and/or repeats_threshold:
+#' df5 <- f_factors(df, unique_num_threshold = 2)
 #' str(df5)
 #'
 #' # Use `properties = TRUE` to view the data frame's structure.
@@ -93,15 +95,20 @@ f_factors <- function(data,
                       properties = FALSE,
                       force_factors = FALSE,
                       ref = NULL,
-                      unique_num_treshold = 8,
+                      unique_num_threshold = 8,
                       repeats_threshold = 2,
+                      unique_num_treshold = NULL,
                       ...) {
+
+    unique_num_threshold <- resolve_unique_num_threshold(
+      unique_num_threshold, unique_num_treshold,
+      missing(unique_num_threshold), "f_factors")
 
 
     if (is.null(select) && force_factors == FALSE) {
       select <- names(data)[vapply(data, function(col) {
         is.character(col) ||
-          (is.numeric(col) && length(unique(col)) < unique_num_treshold) && any(table(col) > repeats_threshold)
+          (is.numeric(col) && length(unique(col)) < unique_num_threshold) && any(table(col) > repeats_threshold)
       }, logical(1))]
     }
 
@@ -193,4 +200,31 @@ f_factors <- function(data,
   }
 
   return(data)
+}
+
+
+#' Resolve the two accepted spellings of unique_num_threshold
+#'
+#' Internal helper for \code{f_factors()} and \code{f_corplot()}. The
+#' argument was originally spelled \code{unique_num_treshold}; both
+#' spellings are accepted. Supplying both with different values is an error.
+#'
+#' @param new Value of \code{unique_num_threshold}.
+#' @param old Value of \code{unique_num_treshold} (\code{NULL} if unused).
+#' @param new_missing Logical, \code{missing(unique_num_threshold)} in the caller.
+#' @param fun_name Name of the user-facing function, used in the message.
+#' @return The threshold to use.
+#' @keywords internal
+#' @noRd
+resolve_unique_num_threshold <- function(new, old, new_missing, fun_name) {
+  if (is.null(old)) {
+    return(new)
+  }
+  if (!new_missing && !identical(new, old)) {
+    stop(fun_name, "(): 'unique_num_threshold' (", format(new),
+         ") and 'unique_num_treshold' (", format(old),
+         ") are two spellings of the same argument and were given ",
+         "different values. Supply only one.", call. = FALSE)
+  }
+  old
 }

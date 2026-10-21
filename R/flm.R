@@ -19,10 +19,12 @@
 #'
 #' @param formula A formula specifying the model to be fitted. More response variables can be added using \code{-} or \code{+} (e.g., \code{response1 + response2 ~ predictor}) to do a sequential \code{lm()} for each response parameter.
 #' @param data A data frame containing the variables in the model.
-#' @param norm_plots Logical. If \code{TRUE}, diagnostic residual plots are included in the output files. Default is \code{TRUE}.
+#' @param diagnostic_plots Logical. If \code{TRUE}, diagnostic residual plots are included in the output files. Default is \code{TRUE}.
 #' @param effect_plots Logical. If \code{TRUE}, regression / effect plots are
 #'   included in the output files after the post hoc table. See Details for what
 #'   is drawn and how the plots are stored. Default is \code{TRUE}.
+#' @param norm_plots \strong{Deprecated} in 3.2.1. Use \code{diagnostic_plots} instead. If
+#'   supplied, its value is passed to \code{diagnostic_plots} with a warning.
 #' @param contrast_plots Logical. If \code{TRUE}, a contrast forest plot is added
 #'   for each categorical post hoc term: one row per pairwise comparison, showing
 #'   the estimated difference between two levels with its confidence interval and
@@ -34,6 +36,12 @@
 #'   \code{out$y1$interaction_contrast_plot_<term>}. Contrast CIs use the same
 #'   \code{adjust} method as the post hoc p-values, so figure and table agree.
 #' @param transformation Logical or character string. If \code{TRUE}, or if \code{"boxcox"} applies an \code{f_boxcox()} transformation if residuals are not normal. If \code{"bestnormalize"}, applies \code{f_bestNormalize()} transformation. If \code{FALSE} no transformation will be applied. Default is \code{TRUE}.
+#'   A transformation is kept only when it improves the residual check
+#'   that triggered it: normality (Shapiro-Wilk, or Anderson-Darling when
+#'   Shapiro-Wilk is unavailable) or, when only the variance check failed, equal
+#'   variance (Breusch-Pagan test). Otherwise the untransformed analysis is reported, the
+#'   report says so, and the attempt is recorded in \code{transformation_rejected}.
+#'   Responses named in \code{force_transformation} are always transformed.
 #' @param force_transformation Character string. A vector containing the names of response variables that should be transformed regardless of the normality test. Default is \code{NULL}.
 #' @param alpha Numeric. Significance level for tests, post hoc comparisons, and Shapiro-Wilk test. Default is \code{0.05}.
 #' @param adjust Character string specifying the method used to adjust p-values
@@ -45,6 +53,24 @@
 #'     \item{"none"}{No adjustment.}
 #'     \item{"fdr"}{False Discovery Rate adjustment.}
 #'   } Default is \code{"sidak"}.
+#' @param post_hoc Which post hoc tables to build; the same syntax and rules as
+#'   \code{\link{f_aov}}. \code{NULL} or \code{TRUE} (default): a cell-means
+#'   table for each significant interaction of categorical predictors and a
+#'   marginal-means table for each categorical main effect (letters \code{"ns"}
+#'   when the term is not significant, an "Interpret with caution" note when the
+#'   factor takes part in a significant interaction); numeric predictors get no
+#'   table, their slope is in the coefficient table. \code{FALSE}: no post hoc.
+#'   A character vector of terms: only those tables, e.g.
+#'   \code{post_hoc = "treatment"} (leave blocks out of the comparisons) or
+#'   \code{post_hoc = "treatment:week"}. Unknown names stop with a "did you mean"
+#'   error. Letters and the \code{adjust} method apply within each table, and
+#'   each table has its own footer.
+#' @param by \code{NULL} (default) or one categorical predictor, used with
+#'   \code{post_hoc} for simple effects: \code{post_hoc = "treatment",
+#'   by = "week"} compares the treatments within each week
+#'   (\code{emmeans(model, ~ treatment | week)}), stored as
+#'   \code{out$y$post_hoc[["treatment | week"]]}. The rules are those of
+#'   \code{\link{f_aov}}.
 #' @param intro_text Logical. If \code{TRUE}, includes a short explanation about linear regression assumptions in the output file. Default is \code{TRUE}.
 #' @param close_generated_files Logical. Closes open Excel or Word (NOT pdf) files before writing, depending on the output format. Works on Windows (taskkill), macOS (pkill) and Linux (pkill/soffice). Default \code{FALSE}. \strong{WARNING:} Always save your work before using this option!!
 #' @param open_generated_files Logical. Whether to open the generated output
@@ -74,6 +100,30 @@
 #'   same row set as \code{lm()} itself.
 #'
 #' @return An object of class 'f_lm' containing results from \code{lm()}, normality tests, transformations, coefficient tables, Type II ANOVA, and post hoc tests. Using the option "output_type", it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and plot methods for 'f_lm' objects.
+#'   Post hoc tables: \code{out$y$post_hoc[[term]]}, each a list with
+#'   \code{emmeans}, \code{pairs}, \code{cld} (the letters), \code{cld_text}
+#'   (the footer) and \code{caution}, the same structure as \code{\link{f_aov}}
+#'   and \code{\link{f_lmer}}. The elements \code{post_hoc_summary_table},
+#'   \code{emmeans_table} and \code{cld_text} are \strong{deprecated} and will
+#'   be removed in the next release: they hold the cell-means table when a
+#'   significant interaction is tabulated, otherwise the first table. (Before
+#'   3.2.1 this single table compared every combination of all categorical
+#'   predictors, also in additive models.)
+#'   \code{Response_Transformed}: \code{TRUE} when the response was
+#'   transformed (Box-Cox or bestNormalize) because the residuals were not normal (or, alone, had unequal variances) and
+#'   the transformation was kept (see \code{transformation}).
+#'   \code{anova}: Type II ANOVA table of the untransformed response.
+#'   \code{transformed_anova}: Type II ANOVA table of the transformed response, or
+#'   \code{NULL} when no transformation was applied. The printed and reported
+#'   result is \code{transformed_anova} when \code{Response_Transformed} is
+#'   \code{TRUE}, otherwise \code{anova}. To pick it in code:
+#'   \code{tab <- if (out$y$Response_Transformed) out$y$transformed_anova else out$y$anova}.
+#'   When a transformation was tried but not kept, \code{transformation_rejected}
+#'   records the method, the reason and the p-values before and after.
+#'   The same convention holds for \code{summary} / \code{transformed_summary}
+#'   and \code{coefficients} / \code{transformed_coefficients}. Since rfriend
+#'   3.2.1 the plain names always hold the untransformed fit (in 3.2.0 they held
+#'   the transformed fit when a transformation was applied).
 #'
 #' @details
 #' The function performs the following steps:
@@ -140,7 +190,7 @@
 #'
 #' Outputs can be generated in multiple formats ("pdf", "word", "excel" and "rmd") as specified by \code{output_type}. If \code{output_type = "rmd"} is used it is advised to use it in a chunk with \{r, echo=FALSE, results='asis'\}.
 #'
-#' This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
+#' This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or higher), a universal document converter.
 #'
 #' @section Multiple Testing Across Response Variables:
 #' When several response variables are analysed in a single call
@@ -170,7 +220,7 @@
 #' # Two responses analysed in sequence, captured in one output file.
 #' f_lm(Sepal.Width + Sepal.Length ~ Petal.Length * Species,
 #'            effect_plots = FALSE,
-#'            norm_plots = FALSE,
+#'            diagnostic_plots = FALSE,
 #'            data = iris)
 #'
 #' # To print rmd output set chunk option to results = 'asis' and use cat().
@@ -181,19 +231,22 @@
 #' @export
 f_lm <- function(formula,
                  data = NULL,
-                 norm_plots = TRUE,
+                 diagnostic_plots = TRUE,
                  effect_plots = TRUE,
                  contrast_plots = FALSE,
                  transformation = TRUE,
                  force_transformation = NULL,
                  alpha = 0.05,
                  adjust = "sidak",
+                 post_hoc = NULL,
+                 by = NULL,
                  intro_text = TRUE,
                  close_generated_files = FALSE,
                  open_generated_files = interactive(),
                  output_type = "default",
                  save_as = NULL,
                  save_in_wdir = FALSE,
+                 norm_plots = lifecycle::deprecated(),
                  ...
 )
 {
@@ -202,12 +255,35 @@ f_lm <- function(formula,
   .session_state <- save_session_state()  # Helper function: helper_session_state
   on.exit(restore_session_state(.session_state), add = TRUE)
 
+  ########## Deprecated arguments ##########################################
+  # Renamed in 3.2.1 so that all test functions use the same names for the
+  # same report parts: `diagnostic_plots` (assumption and residual checks)
+  # and `effect_plots` (effect, estimated-means and interaction plots).
+  # The old name still works for one release, with a warning.
+  if (lifecycle::is_present(norm_plots)) {
+    lifecycle::deprecate_warn(
+      when = "3.2.1",
+      what = "f_lm(norm_plots)",
+      with = "f_lm(diagnostic_plots)"
+    )
+    diagnostic_plots <- norm_plots
+  }
+
   ########## Capture ... UNEVALUATED at f_lm's own frame ##################
   # Must be done HERE (in f_lm's body), not inside generate_report(),
   # because match.call() captures the call to whatever function it is called
   # from. The closure makes dots_exprs visible inside generate_report().
   .mc        <- match.call(expand.dots = FALSE)
   dots_exprs <- as.list(.mc[["..."]])
+
+  # Fail loud on misspelled arguments: `...` is forwarded to lm(), so its own
+  # arguments (subset, weights, na.action, contrasts, offset, ...) are the
+  # legitimate dot names. See check_known_dots() in helper_check_dots.R.
+  check_known_dots(...names(), ...length(),
+                   allowed    = setdiff(names(formals(stats::lm)),
+                                        c("formula", "data", "...")),
+                   fun_name   = "f_lm",
+                   valid_args = names(formals(sys.function())))
   caller_env <- parent.frame()
 
   ####### Save dataframe name and Handle input from vectors #####
@@ -466,6 +542,8 @@ Checking the assumptions of ordinary least squares (OLS) linear regression is cr
 
     n_before_master <- nrow(data)
     n_after_master  <- nrow(data_master)
+    na_notes <<- c(na_notes, na_removed_note(data, n_after_master,
+                                             all.vars(combined_formula)))
 
     # Extra args for lm(): only safe pass-throughs (drop subset/weights which
     # are baked in). weights re-supplied from the model frame each iteration.
@@ -586,7 +664,7 @@ Checking the assumptions of ordinary least squares (OLS) linear regression is cr
       f_qqnorm(res_lm)
       grDevices::dev.off()
 
-      if (norm_plots == TRUE) {
+      if (diagnostic_plots == TRUE) {
         cat("Check the plots in the figure below to assess normality and homoscedasticity.  \n")
         cat(paste0("![](", temp_file, ")"), "   \n")
       }
@@ -736,7 +814,7 @@ Checking the assumptions of ordinary least squares (OLS) linear regression is cr
           grDevices::dev.off()
 
           output_list[[response_name]][["transformed_normality_plots"]] <- temp_file
-          if (norm_plots == TRUE) {
+          if (diagnostic_plots == TRUE) {
             cat("  \nCheck the **residual** plots of the **transformed data** in the figure below.  \n")
             cat(paste0("![](", temp_file, ")"), "   \n")
           }
@@ -752,6 +830,44 @@ Checking the assumptions of ordinary least squares (OLS) linear regression is cr
           }
         }
       }
+
+      # Keep the transformation only if it improved the check that triggered
+      # it (helper_transform_decision.R); otherwise report the untransformed
+      # fit and say so.
+      transformation_label_txt <- NULL
+      if (!is.null(aov_summary_transformed)) {
+        is_bn <- identical(transformation, "bestnormalize")
+        t_lab <- transformation_label(if (is_bn) "bestnormalize" else "boxcox",
+                                      lambda  = if (!is_bn) transformed_var$lambda else NULL,
+                                      bn_name = if (is_bn) transformed_var$transformation_name else NULL)
+        nb <- norm_check_p(shapiro_res, adt_res)
+        na <- norm_check_p(shapiro_res_transformed, adt_res_transformed)
+        dec <- keep_transformation(
+          trigger_normality = trigger_normality,
+          trigger_variance  = trigger_bp,
+          trigger_forced    = trigger_forced,
+          norm_before = nb$p, norm_after = na$p, norm_test = nb$test,
+          var_before = bp_res$p.value, var_after = bp_res_transformed$p.value,
+          var_test = "Breusch-Pagan test",
+          method_label = if (is_bn) "bestNormalize" else "Box-Cox")
+        if (!isTRUE(dec$keep)) {
+          cat(transformation_rejected_note(dec$reason))
+          output_list[[response_name]][["transformation_rejected"]] <- list(
+            method = t_lab, reason = dec$reason,
+            normality_p_before = nb$p, normality_p_after = na$p,
+            variance_p_before = bp_res$p.value,
+            variance_p_after = bp_res_transformed$p.value)
+          for (nm in c("boxcox", "bestNormalize", "transformed_lm_fit",
+                       "transformed_shapiro_test", "transformed_adt_test",
+                       "transformed_breusch_pagan", "transformed_normality_plots"))
+            output_list[[response_name]][[nm]] <- NULL
+          data_complete[[response_name]] <- original_response
+          aov_summary_transformed <- NULL
+        } else {
+          transformation_label_txt <- t_lab
+        }
+      }
+      output_list[[response_name]][["transformation_label"]] <- transformation_label_txt
 
       # Pick the active model (transformed where applicable)
       if (!is.null(aov_summary_transformed)) {
@@ -834,21 +950,19 @@ Checking the assumptions of ordinary least squares (OLS) linear regression is cr
 # \\newpage
 #         ")
 #       }
-      if (Response_Transformed) {
-        if (transformation == "bestnormalize") {
-          cat("## Regression Summary of '", transformed_var$transformation_name,
-              "TRANSFORMED' response variable:", response_name, "  \n")
-        } else {
-          cat("## Regression Summary of 'Box-Cox TRANSFORMED' response variable:", response_name, "  \n")
-        }
-      } else {
-        cat("## Regression Summary of ", response_name, "  \n")
-      }
+      cat("## ", scale_heading("Linear regression", response_name,
+                               transformation_label_txt), "  \n", sep = "")
       cat("&nbsp;\n  \n")
       cat(paste("\n**Table** of lm call: ", deparse(current_formula), "  \n"))
 
       lm_sum   <- summary(lm_fit_out)
-      output_list[[response_name]][["summary"]] <- lm_sum
+      # Plain names hold the untransformed fit; transformed_* hold the
+      # transformed fit, or NULL when no transformation was applied. The
+      # reported (printed) results are transformed_* when
+      # Response_Transformed is TRUE (see ?f_lm, Value).
+      output_list[[response_name]][["summary"]] <- summary(lm_fit)
+      output_list[[response_name]]["transformed_summary"] <-
+        list(if (Response_Transformed) lm_sum else NULL)
       coef_mat <- lm_sum$coefficients
 
       # Number of model terms (predictors), excluding the intercept. A
@@ -876,7 +990,10 @@ Checking the assumptions of ordinary least squares (OLS) linear regression is cr
       coef_df[["Pr(>|t|)"]]   <- ifelse(coef_df[["Pr(>|t|)"]] < 0.001, "< 0.001",
                                         as.character(round(coef_df[["Pr(>|t|)"]], 4)))
       f_pander(coef_df)
-      output_list[[response_name]][["coefficients"]] <- as.data.frame(coef_mat)
+      output_list[[response_name]][["coefficients"]] <-
+        as.data.frame(summary(lm_fit)$coefficients)
+      output_list[[response_name]]["transformed_coefficients"] <-
+        list(if (Response_Transformed) as.data.frame(coef_mat) else NULL)
 
       # Overall model fit line
       fstat <- lm_sum$fstatistic
@@ -973,8 +1090,11 @@ Checking the assumptions of ordinary least squares (OLS) linear regression is cr
 # \\newpage
 #         ")
 #       }
-      cat("\n## ", if (single_term) "Analysis of Variance of: " else "Type II Analysis of Variance of: ",
-          response_name, "  \n\n", sep = "")
+      anova_heading <- scale_heading(if (single_term) "Analysis of Variance"
+                                     else "Type II Analysis of Variance",
+                                     response_name, transformation_label_txt)
+      output_list[[response_name]][["anova_heading"]] <- anova_heading
+      cat("\n## ", anova_heading, "  \n\n", sep = "")
       if (single_term) {
         cat("The table below tests the significance of the predictor term via an F-test. ",
             "With a single predictor this is equivalent to the coefficient t-test above ",
@@ -985,15 +1105,19 @@ Checking the assumptions of ordinary least squares (OLS) linear regression is cr
             "interactions, lower-order terms are tested respecting marginality.  \n\n")
       }
 
-      anova_tbl <- tryCatch(
+      type2_table <- function(fit) tryCatch(
         if (requireNamespace("car", quietly = TRUE)) {
-          as.data.frame(car::Anova(lm_fit_out, type = 2))
+          as.data.frame(car::Anova(fit, type = 2))
         } else {
-          as.data.frame(stats::drop1(lm_fit_out, test = "F"))
+          as.data.frame(stats::drop1(fit, test = "F"))
         },
         error = function(e) NULL
       )
-      output_list[[response_name]][["anova"]] <- anova_tbl
+      anova_tbl <- type2_table(lm_fit_out)
+      output_list[[response_name]][["anova"]] <-
+        if (Response_Transformed) type2_table(lm_fit) else anova_tbl
+      output_list[[response_name]]["transformed_anova"] <-
+        list(if (Response_Transformed) anova_tbl else NULL)
 
       if (!is.null(anova_tbl)) {
         anova_disp <- cbind(Term = rownames(anova_tbl), anova_tbl)
@@ -1064,10 +1188,68 @@ Checking the assumptions of ordinary least squares (OLS) linear regression is cr
             "%) with missing values.*", sep = "")
       }
 
-      # ---- Post hoc (emmeans + CLD) for categorical predictors -----------
+      # ---- Post hoc: one table per term (helper_post_hoc.R) --------------
+      # Same rules and syntax as f_aov(): a cell-means table per significant
+      # categorical interaction, a marginal-means table per categorical main
+      # effect ("ns" when not significant, a caution when the factor is in a
+      # significant interaction), no table for numeric predictors; or only
+      # the terms named in post_hoc (with by = for simple effects).
+      ph_spec <- resolve_post_hoc_spec(
+        post_hoc, by,
+        cat_predictors     = cat_preds,
+        numeric_predictors = num_preds,
+        model_terms        = attr(stats::terms(lm_fit_out), "term.labels"),
+        fun_name           = "f_lm")
+      p_lookup_lm <- numeric(0)
+      if (!is.null(anova_tbl)) {
+        pc <- grep("^Pr|^p", names(anova_tbl), ignore.case = TRUE, value = TRUE)[1]
+        if (!is.na(pc)) {
+          p_lookup_lm <- stats::setNames(anova_tbl[[pc]], trimws(rownames(anova_tbl)))
+          p_lookup_lm <- p_lookup_lm[names(p_lookup_lm) != "Residuals" &
+                                       !is.na(p_lookup_lm)]
+        }
+      }
+      p_of <- function(trm) {
+        if (!trm %in% names(p_lookup_lm)) return(NA_real_)
+        unname(p_lookup_lm[[trm]])
+      }
+      ph_ints <- if (identical(ph_spec$mode, "default")) sig_cat_interactions else ph_spec$ints
+      posthoc_results <- if (identical(ph_spec$mode, "none") || length(cat_preds) == 0L)
+        list() else build_post_hoc_tables(
+          model = lm_fit_out, mains = ph_spec$mains, ints = ph_ints,
+          by = ph_spec$by, sig_interactions = sig_interactions,
+          cat_sig_ints = sig_cat_interactions, p_of = p_of,
+          term_names = names(p_lookup_lm), adjust = adjust, alpha = alpha,
+          conf_level = conf_level, bt_fn = bt_fn,
+          transformed = Response_Transformed, data_complete = data_complete,
+          fun_name = "f_lm")
+      output_list[[response_name]][["post_hoc"]] <- posthoc_results
+      emm_is_cells <- length(sig_cat_interactions) > 0
+
+      # Full-grid emmeans over the categorical predictors (kept for the
+      # plots and for backward compatibility).
+      emm <- if (length(cat_preds) > 0) tryCatch(
+        emmeans::emmeans(lm_fit_out, specs = cat_preds, level = conf_level),
+        error = function(e) NULL) else NULL
+      output_list[[response_name]][["emm"]] <- emm
+
+      # ---- Deprecated (kept for one release, see ?f_lm) ------------------
+      # post_hoc_summary_table / emmeans_table / cld_text used to hold the
+      # single post hoc table. They now hold the cell-means table when a
+      # significant interaction is tabulated, otherwise the first table.
       post_hoc_summary_table <- NULL
       cld_text <- ""
-      if (length(cat_preds) > 0) {
+      dep_key <- if (length(ph_ints) && ph_ints[1] %in% names(posthoc_results)) ph_ints[1]
+                 else if (length(posthoc_results)) names(posthoc_results)[1] else NULL
+      if (!is.null(dep_key)) {
+        post_hoc_summary_table <- attr(posthoc_results[[dep_key]], "display")
+        cld_text <- posthoc_results[[dep_key]]$cld_text
+        output_list[[response_name]][["emmeans_table"]]          <- posthoc_results[[dep_key]]$cld
+        output_list[[response_name]][["post_hoc_summary_table"]] <- post_hoc_summary_table
+        output_list[[response_name]][["cld_text"]]               <- cld_text
+      }
+
+      if (length(posthoc_results) > 0) {
 
         if (output_type != "rmd") {
           cat("
@@ -1076,104 +1258,61 @@ Checking the assumptions of ordinary least squares (OLS) linear regression is cr
           ")
         }
 
-        emm_specs <- if (length(sig_cat_interactions) > 0) {
-          unique(unlist(strsplit(sig_cat_interactions, ":")))
-        } else {
-          cat_preds
-        }
-        emm_is_cells <- length(sig_cat_interactions) > 0
-
         cat("\n## Model post hoc Analysis (Estimated Marginal Means) of: ", response_name, "\n   \n")
-        if (emm_is_cells) {
+        if (emm_is_cells && identical(ph_spec$mode, "default")) {
           cat(paste0("\n**NOTE: Significant categorical interaction(s): ",
                      paste(sig_cat_interactions, collapse = ", "), "**  \n",
-                     "The post hoc table shows **cell means** for every combination of ",
-                     paste(emm_specs, collapse = " \u00d7 "),
-                     ". Letters compare all cells simultaneously. ",
-                     "These cell-means letters are the reference grouping: any ",
-                     "effect plot that averages over a factor interacting with ",
-                     "the one shown omits its own letters and refers back to ",
-                     "this table.  \n\n"))
+                     "The cell-means table compares every combination of ",
+                     paste(unique(unlist(lapply(sig_cat_interactions, ph_parts))),
+                           collapse = " \u00d7 "),
+                     " and is the reference grouping for this response. The ",
+                     "main-effect tables after it average over the interacting ",
+                     "factor(s); read them with the caution printed above each one.  \n\n"))
         }
+        cat(paste0(
+          "\nEach table below answers one question and has its own letters, ",
+          "adjustment and footer. Marginal means are equal-weighted emmeans: ",
+          "every level of the other factors counts equally, so in unbalanced ",
+          "designs they can differ from the raw group means in the Observed ",
+          "Descriptives Table. The $n$ column is the raw observed count.  \n\n"))
         if (length(num_preds) > 0) {
           cat(paste0("\n*Continuous predictor(s) ", paste(num_preds, collapse = ", "),
                      " are held at their mean for the estimated means below; their effect is ",
                      "reported as a slope in the coefficient table and the partial-effect plot.*  \n\n"))
         }
-
-        emm <- tryCatch(
-          emmeans::emmeans(lm_fit_out, specs = emm_specs, level = conf_level),
-          error = function(e) NULL)
-        output_list[[response_name]][["emm"]] <- emm
-
-        if (!is.null(emm)) {
-          mult_cld <- tryCatch(
-            cld_emmeans(emm, alpha = alpha, Letters = letters,
-                        adjust = adjust, decreasing = TRUE),
-            error = function(e) NULL)
-
-          if (!is.null(mult_cld)) {
-            summary_table <- as.data.frame(mult_cld)
-
-            # Back-transform if needed
-            if (Response_Transformed) {
-              bt_cols <- intersect(c("emmean", "lower.CL", "upper.CL"), names(summary_table))
-              summary_table[bt_cols] <- lapply(summary_table[bt_cols], bt_fn)
-            }
-            output_list[[response_name]][["emmeans_table"]] <- summary_table
-
-            rownames(summary_table) <- NULL
-            names(summary_table)[names(summary_table) == ".group"] <- "Letter"
-            if (overall_p_value >= alpha) summary_table$Letter <- "ns"
-
-            # Merge n from descriptive table where keys match
-            common_cols <- intersect(names(summary_table), names(data_summary_table))
-            emm_cols    <- c(common_cols, "emmean", "SE", "lower.CL", "upper.CL", "Letter")
-            emm_cols    <- intersect(emm_cols, names(summary_table))
-            emm_subset  <- summary_table[, emm_cols, drop = FALSE]
-
-            if (length(common_cols) > 0 && !is.null(data_summary_table)) {
-              n_df    <- as.data.frame(data_summary_table[common_cols])
-              n_df$n  <- data_summary_table$n
-              post_hoc_summary_table <- merge(x = emm_subset, y = n_df,
-                                              by = common_cols, all.x = TRUE, sort = FALSE)
-            } else {
-              post_hoc_summary_table <- emm_subset
-            }
-
-            if (Response_Transformed) {
-              names(post_hoc_summary_table)[names(post_hoc_summary_table) == "emmean"] <- "median (BT)"
-              post_hoc_summary_table$SE <- NULL
-            } else {
-              names(post_hoc_summary_table)[names(post_hoc_summary_table) == "emmean"] <- "emmean.."
-            }
-            output_list[[response_name]][["post_hoc_summary_table"]] <- post_hoc_summary_table
-
-            # CLD footnote
-            raw_msg   <- attr(mult_cld, "mesg")
-            bad_lines <- grep("NOTE:|share the same|show them to be", raw_msg)
-            if (length(bad_lines) > 0) raw_msg <- raw_msg[-bad_lines]
-            raw_msg <- c(raw_msg, paste0(
-              "\n**Note:** Groups in the \"Letters\" column sharing the same letter are ",
-              "**not** significantly different (\u03b1 = ", alpha, "). Groups with different ",
-              "letters are significantly different.\n"))
-            cld_text <- paste(raw_msg, collapse = "  \n")
-            output_list[[response_name]][["cld_text"]] <- cld_text
-
-            cat(paste0("\n**Post Hoc ", if (emm_is_cells) "Cell Means" else "Marginal Means",
-                       " Table** of lm call: ", deparse(current_formula), "  \n"))
-            f_pander(f_conditional_round(post_hoc_summary_table, digits = 3, replace_na = FALSE))
-            cat(cld_text)
-            if (Response_Transformed) {
-              cat(paste0("\n**Note on back-transformation:** The column **'median (BT)'** contains ",
-                         "back-transformed estimated marginal means, which estimate the **median** on ",
-                         "the original scale, not the arithmetic mean. SE is omitted (asymmetric on the ",
-                         "original scale); rely on the **", conf_perc,
-                         "% Confidence Intervals (lower.CL, upper.CL)**.\n"))
-            }
+        for (k in names(posthoc_results)) {
+          ph_k   <- posthoc_results[[k]]
+          kind_k <- attr(ph_k, "kind")
+          by_k   <- if (identical(kind_k, "simple")) trimws(sub(".*\\|", "", k)) else NULL
+          cat(paste0("\n### Post hoc: ", k, " (",
+                     switch(kind_k, cells = "cell means", marginal = "marginal means",
+                            simple = "simple effects"), ")",
+                     if (isTRUE(attr(ph_k, "term_ns"))) "  (not significant)" else "",
+                     "  \n\n"))
+          cat(paste0("*", ph_caption(by_k), "*  \n\n"))
+          if (isTRUE(attr(ph_k, "term_ns")))
+            cat("Term not significant at \u03b1 = ", alpha,
+                ": letters collapsed to `ns`.  \n\n", sep = "")
+          if (!is.null(ph_k$caution)) cat(ph_k$caution, "  \n\n", sep = "")
+          disp <- attr(ph_k, "display")
+          if (!is.null(disp)) {
+            f_pander(f_conditional_round(disp, digits = 3, replace_na = FALSE))
+          } else {
+            cat("*Letters could not be computed for this table.*  \n\n")
           }
+          cat(ph_k$cld_text)
         }
-      } else {
+        if (Response_Transformed) {
+          cat(paste0("\n**Note on back-transformation:** The column **'median (BT)'** contains ",
+                     "back-transformed estimated marginal means, which estimate the **median** on ",
+                     "the original scale, not the arithmetic mean. SE is omitted (asymmetric on the ",
+                     "original scale); rely on the **", conf_perc,
+                     "% Confidence Intervals (lower.CL, upper.CL)**. Pairwise contrasts ",
+                     "(`$post_hoc[[term]]$pairs`) are on the transformed scale.\n"))
+        }
+      } else if (length(cat_preds) > 0 && identical(ph_spec$mode, "none")) {
+        cat("\n*Post hoc comparisons switched off (`post_hoc = FALSE`).*  \n   \n")
+      } else if (length(cat_preds) == 0) {
         cat("\n*No categorical predictors were included, so no estimated marginal means or post hoc comparisons were produced. See the coefficient table and ",
             if (single_term) "the regression plot" else "the partial-effect plots",
             " for the continuous predictor effect",
@@ -1299,6 +1438,21 @@ Checking the assumptions of ordinary least squares (OLS) linear regression is cr
               "so collapsed grouping letters could mislead. See the ",
               "cell-means post hoc table for grouped significance.")
             return(list(safe = FALSE, letters_df = NULL, banner = banner))
+          }
+
+          # Letters come from the factor's own post hoc table (the one that
+          # answers the same question as the figure); "ns" draws no letters.
+          if (length(D) == 1L && D %in% names(posthoc_results)) {
+            cl <- posthoc_results[[D]]
+            if (is.null(cl) || !all(c(D, "Letter") %in% names(cl)))
+              return(list(safe = TRUE, letters_df = NULL, banner = NULL))
+            ld <- cl[, c(D, "Letter"), drop = FALSE]
+            names(ld)[names(ld) == "Letter"] <- "Letters"
+            ld[[D]] <- as.character(ld[[D]])
+            ld <- trimws(ld)
+            if (all(ld == "ns"))
+              return(list(safe = TRUE, letters_df = NULL, banner = NULL))
+            return(list(safe = TRUE, letters_df = ld, banner = NULL))
           }
 
           # Overall model not significant: the table already shows "ns" and
@@ -1590,8 +1744,10 @@ Checking the assumptions of ordinary least squares (OLS) linear regression is cr
         #    withholds the letters and the caption carries a banner that
         #    points back to the cell-means post hoc table. Mirrors f_aov()'s
         #    "draw the means, withhold letters" rule.
-        if (length(cat_preds) > 0) {
-          for (vn in cat_preds) {
+        means_vars <- names(posthoc_results)[vapply(posthoc_results, function(x)
+          identical(attr(x, "kind"), "marginal"), logical(1))]
+        if (length(means_vars) > 0) {
+          for (vn in means_vars) {
             emit_plot(make_means_plot(vn), paste0("effect_plot_", vn),
                       paste0("Estimated Means Plot of: ", response_name, "  (", vn, ")"),
                       w = 6, h = 5, use_fig_caption = TRUE)
@@ -1620,8 +1776,10 @@ Checking the assumptions of ordinary least squares (OLS) linear regression is cr
       # ---- Contrast forest plots (opt-in) --------------------------------
       if (isTRUE(contrast_plots) && length(cat_preds) > 0 && overall_p_value < alpha &&
           !is.null(output_list[[response_name]][["emm"]])) {
-        if (length(sig_cat_interactions) > 0) {
-          for (it in sig_cat_interactions) {
+        cf_mains <- names(posthoc_results)[vapply(posthoc_results, function(x)
+          identical(attr(x, "kind"), "marginal"), logical(1))]
+        if (length(ph_ints) > 0) {
+          for (it in ph_ints) {
             parts <- trimws(strsplit(it, ":", fixed = TRUE)[[1]])
             cf_tbl <- tryCatch(
               as.data.frame(emmeans::emmeans(lm_fit_out, specs = parts, level = conf_level) |>
@@ -1648,7 +1806,7 @@ Checking the assumptions of ordinary least squares (OLS) linear regression is cr
             }
           }
         } else {
-          for (vn in cat_preds) {
+          for (vn in cf_mains) {
             cf_tbl <- tryCatch(
               as.data.frame(emmeans::emmeans(lm_fit_out, specs = vn, level = conf_level) |>
                               pairs(adjust = adjust) |> confint(level = conf_level)),
@@ -1689,6 +1847,7 @@ Checking the assumptions of ordinary least squares (OLS) linear regression is cr
   } # end generate_report
 
   # Execute analysis ONCE: capture both the output_list and the markdown text.
+  na_notes <- character(0)  # filled by generate_report(), sent below
   cached_markdown <- NULL
   suppressMessages(
     cached_markdown <- utils::capture.output(
@@ -1696,6 +1855,7 @@ Checking the assumptions of ordinary least squares (OLS) linear regression is cr
     )
   )
   class(output_list) <- "f_lm"
+  for (na_msg in unique(na_notes)) message(na_msg)
   get_cached_markdown <- function() cached_markdown
 
   # ---- Build documents -------------------------------------------------
@@ -1762,11 +1922,27 @@ header-includes:
 
   } else if (output_type == "excel") {
     message(paste0("Saving output in: ", output_path))
-    post_hoc_tables <- lapply(output_list, function(obj) {
-      tab <- obj$post_hoc_summary_table
-      if (is.data.frame(tab)) tab else data.frame(note = "No categorical post-hoc test performed")
-    })
-    names(post_hoc_tables) <- response_names
+    # One sheet per response and post hoc table; Excel sheet names: at most
+    # 31 characters, none of []:*?/\\ ; made unique.
+    post_hoc_tables <- list()
+    for (rn in response_names) {
+      obj <- output_list[[rn]]
+      ph  <- if (is.list(obj)) obj$post_hoc else NULL
+      if (length(ph) == 0L) {
+        post_hoc_tables[[rn]] <- data.frame(note = "No categorical post-hoc test performed")
+        next
+      }
+      for (k in names(ph)) {
+        tab <- attr(ph[[k]], "display")
+        if (!is.data.frame(tab)) tab <- ph[[k]]$cld
+        if (!is.data.frame(tab)) tab <- data.frame(note = "Letters unavailable")
+        post_hoc_tables[[paste(rn, k)]] <- tab
+      }
+    }
+    sheet_names <- gsub("[*?/\\\\:]|\\[|\\]", "_", names(post_hoc_tables))
+    sheet_names <- gsub("\\s*\\|\\s*", " by ", sheet_names)
+    sheet_names <- substr(make.unique(substr(sheet_names, 1, 31), sep = "_"), 1, 31)
+    names(post_hoc_tables) <- sheet_names
     writexl::write_xlsx(post_hoc_tables, path = output_path)
     if (open_generated_files == TRUE) f_open_file(output_path)
     return(invisible(output_list))
@@ -1843,23 +2019,28 @@ print.f_lm <- function(x, ...) {
     cat("===========================================================\n")
     cat(paste("\n lm call: ", sublist$lm_call, "\n"))
 
-    cat("\nCoefficients:\n")
-    if (!is.null(sublist$summary)) print(sublist$summary$coefficients)
+    rep_coef  <- if (transformed && !is.null(sublist$transformed_summary))
+      sublist$transformed_summary$coefficients else sublist$summary$coefficients
+    rep_anova <- if (transformed && !is.null(sublist$transformed_anova))
+      sublist$transformed_anova else sublist$anova
+    cat("\nCoefficients of the ",
+        scale_heading("linear regression", category, sublist$transformation_label),
+        ":\n", sep = "")
+    if (!is.null(rep_coef)) print(rep_coef)
 
     if (!is.null(sublist$r_squared)) {
       cat("\nModel fit: R-squared =", round(sublist$r_squared, 4),
           " Adjusted R-squared =", round(sublist$adj_r_squared, 4), "\n")
     }
 
-    cat("\n--- Type II Analysis of Variance ---\n")
-    if (!is.null(sublist$anova)) print(sublist$anova) else cat("(not available)\n")
+    cat("\n--- ", if (!is.null(sublist$anova_heading)) sublist$anova_heading
+        else "Type II Analysis of Variance", " ---\n", sep = "")
+    if (!is.null(rep_anova)) print(rep_anova) else cat("(not available)\n")
+    if (!is.null(sublist$transformation_rejected))
+      message("Note: ", sublist$transformation_rejected$reason,
+              " The untransformed fit is reported.")
 
-    if (!is.null(sublist$post_hoc_summary_table)) {
-      cat("\n--- Post hoc Comparisons of:", category, "---\n")
-      cat("_________________________________________\n")
-      print(sublist$post_hoc_summary_table, row.names = FALSE, quote = FALSE)
-      if (!is.null(sublist$cld_text)) cat("\n", sublist$cld_text, "\n")
-    }
+    print_aov_post_hoc(sublist, paste0("Post hoc Comparisons of: ", category))
 
     if (transformed) {
       message("Note: post hoc 'median (BT)' values are back-transformed estimated marginal means ",

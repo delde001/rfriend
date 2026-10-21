@@ -32,7 +32,7 @@
 #   8.  Missing values (NAs)
 #   9.  Interaction models
 #  10.  rmd output type
-#  11.  norm_plots = FALSE
+#  11.  diagnostic_plots = FALSE
 #  12.  Input validation / error handling
 #  13.  intro_text = FALSE
 #  14.  Large n (Shapiro-Wilk guard)
@@ -64,7 +64,7 @@
 quiet_f_aov_typed <- function(output_type, ...) {
   suppressMessages(
     f_aov(..., output_type = output_type,
-          norm_plots = FALSE, intro_text = FALSE,
+          diagnostic_plots = FALSE, intro_text = FALSE,
           open_generated_files = FALSE)
   )
 }
@@ -419,28 +419,28 @@ test_that("f_aov output_type rmd: rmd string contains expected section markers",
   out <- quiet_f_aov_typed("rmd", y ~ grp, data = df,
                            transformation = FALSE)
   expect_match(out[["rmd"]], "Analysis of:")
-  expect_match(out[["rmd"]], "ANOVA Summary")
+  expect_match(out[["rmd"]], "ANOVA on y (untransformed)", fixed = TRUE)
 })
 
 # =============================================================================
-# 11. norm_plots = FALSE
+# 11. diagnostic_plots = FALSE
 # =============================================================================
 df <- make_normal_data()
 
-test_that("f_aov norm_plots = FALSE: runs without error when norm_plots is FALSE", {
+test_that("f_aov diagnostic_plots = FALSE: runs without error when diagnostic_plots is FALSE", {
   expect_no_error(
     suppressMessages(
       f_aov(y ~ grp, data = df,
-            norm_plots = FALSE, transformation = FALSE,
+            diagnostic_plots = FALSE, transformation = FALSE,
             output_type = "default", open_generated_files = FALSE)
     )
   )
 })
 
-test_that("f_aov norm_plots = FALSE: normality_plots path is still stored (file written even if not cat'd)", {
+test_that("f_aov diagnostic_plots = FALSE: normality_plots path is still stored (file written even if not cat'd)", {
   out <- suppressMessages(
     f_aov(y ~ grp, data = df,
-          norm_plots = FALSE, transformation = FALSE,
+          diagnostic_plots = FALSE, transformation = FALSE,
           output_type = "default", open_generated_files = FALSE)
   )
   expect_true("normality_plots" %in% names(out[["y"]]))
@@ -494,7 +494,7 @@ df  <- make_normal_data()
 faov_direct <- function(intro, ...) {
   suppressMessages(
     f_aov(..., intro_text = intro,
-          output_type = "rmd", norm_plots = FALSE,
+          output_type = "rmd", diagnostic_plots = FALSE,
           transformation = FALSE, open_generated_files = FALSE)
   )
 }
@@ -788,15 +788,14 @@ test_that("f_aov output text correctness: Shapiro-Wilk is spelled correctly (not
 test_that("f_aov output text correctness: back-transformed description text does not mention SE as present", {
   out <- quiet_f_aov_typed("rmd", y ~ grp, data = make_skewed_data(),
                            transformation = TRUE)
-  if (out[["y"]][["Response_Transformed"]]) {
-    rmd <- out[["rmd"]]
-    bt_section_start <- regexpr("Back-transformed Post Hoc Table", rmd)
-    if (bt_section_start > 0) {
-      bt_section <- substr(rmd, bt_section_start, bt_section_start + 500)
-      # SE should only appear in the "SE are omitted" note, not as a column claim
-      expect_false(grepl("SE values are identical", bt_section))
-    }
-  }
+  skip_if_not(isTRUE(out[["y"]][["Response_Transformed"]]))
+  rmd <- out[["rmd"]]
+  # Back-transformed tables show medians without SE; SE is only mentioned
+  # in the "Standard Errors (SE) are omitted" note.
+  expect_match(rmd, "median (BT)", fixed = TRUE)
+  expect_match(rmd, "Standard Errors (SE) are omitted", fixed = TRUE)
+  expect_false(grepl("SE values are identical", rmd))
+  expect_false("SE" %in% names(out[["y"]][["post_hoc"]][["grp"]][["cld"]]))
 })
 
 # =============================================================================
@@ -815,7 +814,7 @@ test_that("subset argument drops rows before the ANOVA is fit", {
       res <- f_aov(y ~ grp, data = df,
                    subset = grp != "A",
                    output_type = "default",
-                   norm_plots = FALSE, intro_text = FALSE,
+                   diagnostic_plots = FALSE, intro_text = FALSE,
                    open_generated_files = FALSE),
       file = nullfile()
     )
@@ -834,7 +833,7 @@ test_that("na.action = na.omit drops rows with NA in any variable", {
       res <- f_aov(y ~ grp, data = df,
                    na.action = na.omit,
                    output_type = "default",
-                   norm_plots = FALSE, intro_text = FALSE,
+                   diagnostic_plots = FALSE, intro_text = FALSE,
                    open_generated_files = FALSE),
       file = nullfile()
     )
@@ -852,7 +851,7 @@ test_that("weights argument is applied by aov() when passed via dots", {
     utils::capture.output(
       res_w <- f_aov(y ~ grp, data = df, weights = wts,
                      output_type = "default",
-                     norm_plots = FALSE, intro_text = FALSE,
+                     diagnostic_plots = FALSE, intro_text = FALSE,
                      open_generated_files = FALSE),
       file = nullfile()
     )
@@ -861,7 +860,7 @@ test_that("weights argument is applied by aov() when passed via dots", {
     utils::capture.output(
       res_u <- f_aov(y ~ grp, data = df,
                      output_type = "default",
-                     norm_plots = FALSE, intro_text = FALSE,
+                     diagnostic_plots = FALSE, intro_text = FALSE,
                      open_generated_files = FALSE),
       file = nullfile()
     )
@@ -884,7 +883,7 @@ test_that("subset is honored by downstream steps, not just aov()", {
       res <- f_aov(y ~ grp, data = df,
                    subset = grp != "A",
                    output_type = "default",
-                   norm_plots = FALSE, intro_text = FALSE,
+                   diagnostic_plots = FALSE, intro_text = FALSE,
                    open_generated_files = FALSE),
       file = nullfile()
     )
@@ -902,7 +901,7 @@ test_that("contrasts argument is forwarded to aov()", {
       res <- f_aov(y ~ grp, data = df,
                    contrasts = list(grp = "contr.sum"),
                    output_type = "default",
-                   norm_plots = FALSE, intro_text = FALSE,
+                   diagnostic_plots = FALSE, intro_text = FALSE,
                    open_generated_files = FALSE),
       file = nullfile()
     )
@@ -1183,7 +1182,7 @@ test_that("f_aov anova_type: anova_type = 3 with user-supplied contrasts emits a
         f_aov(y ~ A * B, data = df_twoway,
               transformation = FALSE, anova_type = 3,
               contrasts = list(A = "contr.helmert", B = "contr.helmert"),
-              output_type = "default", norm_plots = FALSE,
+              output_type = "default", diagnostic_plots = FALSE,
               intro_text = FALSE, open_generated_files = FALSE),
         file = nullfile()
       )
@@ -1210,7 +1209,7 @@ test_that("f_aov anova_type: anova_type = 3 with user-supplied contrasts does NO
       f_aov(y ~ A * B, data = df_twoway,
             transformation = FALSE, anova_type = 3,
             contrasts = list(A = "contr.helmert", B = "contr.helmert"),
-            output_type = "default", norm_plots = FALSE,
+            output_type = "default", diagnostic_plots = FALSE,
             intro_text = FALSE, open_generated_files = FALSE),
       file = nullfile()
     )
@@ -1288,21 +1287,42 @@ test_that("f_aov anova_type: rmd ANOVA table blanks NA cells in the Residuals ro
 # =============================================================================
 # 25. force_aov (saturated-model handling)
 # =============================================================================
-# When at least one factorial cell has n = 1, the ANOVA model is saturated
-# (zero residual df). Default behavior (force_aov = FALSE) is to skip that
-# response with a clear message and store skipped = TRUE / skipped_reason.
-# force_aov = TRUE overrides the skip for diagnostic use only; the result
-# should not be reported. These tests pin both halves of the contract.
+# A model is saturated when it leaves zero residual df (e.g. a fully crossed
+# design with n = 1 in every cell). Default behavior (force_aov = FALSE) is to
+# skip that response with a clear message and store skipped = TRUE /
+# skipped_reason. force_aov = TRUE overrides the skip for diagnostic use
+# only; the result should not be reported. These tests pin both halves of the
+# contract. (Before 3.2.1 any cell with n = 1 triggered the skip, which also
+# skipped unsaturated designs such as y ~ block + treatment.)
 
 make_saturated_data <- function(seed = 1) {
   set.seed(seed)
-  # 2x2 design with cell (a2, b2) having n = 1 -> saturates the A*B model
+  # 2x3 design with n = 1 in every cell -> the A*B model has 0 residual df
+  data.frame(
+    y = rnorm(6, 10),
+    A = factor(rep(c("a1", "a2"), each = 3)),
+    B = factor(rep(c("b1", "b2", "b3"), times = 2))
+  )
+}
+
+# One cell with n = 1 but residual df > 0: NOT saturated, must be analysed.
+make_one_small_cell_data <- function(seed = 1) {
+  set.seed(seed)
   data.frame(
     y = c(rnorm(3, 10), rnorm(3, 12), rnorm(3, 14), rnorm(1, 16)),
     A = factor(c(rep("a1", 3), rep("a1", 3), rep("a2", 3), rep("a2", 1))),
     B = factor(c(rep("b1", 3), rep("b2", 3), rep("b1", 3), rep("b2", 1)))
   )
 }
+
+test_that("f_aov: one n = 1 cell with residual df > 0 is analysed, not skipped", {
+  skip_on_cran()
+  out <- quiet_f_aov(y ~ A * B, data = make_one_small_cell_data(),
+                     transformation = FALSE)
+  expect_false(isTRUE(out[["y"]][["skipped"]]))
+  expect_equal(out[["y"]][["resid_df"]], 6)
+  expect_equal(out[["y"]][["min_cell_n"]], 1L)
+})
 
 test_that("f_aov force_aov: saturated model is skipped by default (force_aov = FALSE)", {
   skip_on_cran()
@@ -1322,18 +1342,12 @@ test_that("f_aov force_aov: skipped response stores a skipped_reason that mentio
   expect_match(out[["y"]][["skipped_reason"]], "force_aov")
 })
 
-test_that("f_aov force_aov: force_aov = TRUE fits the saturated model and stores force_aov_used", {
+test_that("f_aov force_aov: force_aov = TRUE on a truly saturated model stops with an explanation", {
   skip_on_cran()
   df_sat <- make_saturated_data()
-  # force_aov = TRUE deliberately fits a saturated model; aov() emits warnings
-  # about zero residual df which are expected and not the subject of the test.
-  out <- suppressWarnings(
-    quiet_f_aov(y ~ A * B, data = df_sat,
-                transformation = FALSE, force_aov = TRUE)
-  )
-  expect_true(isTRUE(out[["y"]][["force_aov_used"]]))
-  expect_false(isTRUE(out[["y"]][["skipped"]]))
-  expect_s3_class(out[["y"]][["aov_test"]], "aov")
+  expect_error(quiet_f_aov(y ~ A * B, data = df_sat,
+                           transformation = FALSE, force_aov = TRUE),
+               "residual df = 0.*no F-test exists")
 })
 
 test_that("f_aov force_aov: balanced designs are unaffected by force_aov", {
@@ -1356,13 +1370,210 @@ test_that("f_aov force_aov: rmd output flags the skip and points to force_aov", 
   expect_match(out[["rmd"]], "force_aov")
 })
 
-test_that("f_aov force_aov: rmd output under force_aov = TRUE warns the result is diagnostic only", {
+test_that("f_aov force_aov: the skip message for a saturated model suggests dropping the interaction", {
   skip_on_cran()
   df_sat <- make_saturated_data()
-  out <- suppressWarnings(
-    quiet_f_aov_typed("rmd", y ~ A * B, data = df_sat,
-                      transformation = FALSE, force_aov = TRUE)
-  )
-  expect_match(out[["rmd"]], "Saturated")
-  expect_match(out[["rmd"]], "diagnostic")
+  out <- quiet_f_aov_typed("rmd", y ~ A * B, data = df_sat,
+                           transformation = FALSE)
+  expect_match(out[["rmd"]], "no residual degrees of freedom")
+  expect_match(out[["rmd"]], "y ~ A + B", fixed = TRUE)
+})
+
+test_that("Error() terms stop with a pointer to f_lmer()", {
+  d <- data.frame(y = rnorm(12), time = factor(rep(1:3, 4)),
+                  subject = factor(rep(1:4, each = 3)))
+  expect_error(f_aov(y ~ time + Error(subject/time), data = d),
+               "does not support Error\\(\\) terms.*f_lmer")
+})
+
+# =============================================================================
+# 26. Per-term post hoc tables, post_hoc and by (rfriend 3.2.1)
+# =============================================================================
+# Before 3.2.1 a multi-factor model got ONE post hoc table over every
+# combination of all predictors, labelled "Marginal Means" (BUGS #13), and a
+# randomised complete block design was skipped as saturated (BUGS #8).
+
+pt_ph <- local({
+  d <- plant_trial
+  d$week <- factor(d$time_weeks)
+  d
+})
+wk6_ph <- subset(plant_trial, time_weeks == 6)
+
+test_that("additive two-factor model gives one table per factor, not a cell grid", {
+  out <- quiet_f_aov(height_cm ~ treatment + week, data = pt_ph,
+                     transformation = FALSE)
+  ph <- out$height_cm$post_hoc
+  expect_setequal(names(ph), c("treatment", "week"))
+  expect_equal(nrow(ph$treatment$cld), 4)
+  expect_equal(nrow(ph$week$cld), 3)
+  expect_false("week" %in% names(ph$treatment$cld))
+  expect_match(ph$treatment$cld_text, "4 estimates / 6 tests", fixed = TRUE)
+  expect_match(ph$week$cld_text, "3 estimates / 3 tests", fixed = TRUE)
+  # same structure as f_lmer()
+  expect_named(ph$treatment, c("emmeans", "pairs", "cld", "cld_text", "caution"))
+})
+
+test_that("marginal table equals emmeans(model, ~ factor) with the chosen adjust", {
+  out <- quiet_f_aov(height_cm ~ treatment + week, data = pt_ph,
+                     transformation = FALSE, adjust = "tukey")
+  ref <- as.data.frame(emmeans::emmeans(out$height_cm$aov_test, ~ treatment))
+  got <- out$height_cm$post_hoc$treatment$emmeans
+  m <- merge(ref, got, by = "treatment")
+  expect_equal(m$emmean.x, m$emmean.y)
+  refp <- as.data.frame(pairs(emmeans::emmeans(out$height_cm$aov_test, ~ treatment),
+                              adjust = "tukey"))
+  expect_equal(sort(refp$p.value),
+               sort(out$height_cm$post_hoc$treatment$pairs$p.value))
+})
+
+test_that("significant interaction: cell table plus main-effect tables with the caution", {
+  out <- quiet_f_aov(breaks ~ wool * tension, data = warpbreaks,
+                     transformation = FALSE)
+  ph <- out$breaks$post_hoc
+  expect_equal(names(ph)[1], "wool:tension")
+  expect_setequal(names(ph), c("wool:tension", "wool", "tension"))
+  expect_equal(nrow(ph[["wool:tension"]]$cld), 6)
+  expect_null(ph[["wool:tension"]]$caution)
+  expect_match(ph$wool$caution, "Interpret with caution", fixed = TRUE)
+  expect_match(ph$tension$caution, "wool:tension", fixed = TRUE)
+  # wool alone is not significant -> "ns" letters, still tabulated
+  expect_true(all(ph$wool$cld$Letter == "ns"))
+})
+
+test_that("non-significant main effect is tabulated with ns", {
+  out <- quiet_f_aov(height_cm ~ block + treatment, data = wk6_ph,
+                     transformation = FALSE, alpha = 0.01)
+  expect_true(all(out$height_cm$post_hoc$block$cld$Letter == "ns"))
+  expect_false(all(out$height_cm$post_hoc$treatment$cld$Letter == "ns"))
+})
+
+test_that("post_hoc = 'treatment' limits the output to that table", {
+  out <- quiet_f_aov(height_cm ~ treatment + week, data = pt_ph,
+                     transformation = FALSE, post_hoc = "treatment")
+  expect_identical(names(out$height_cm$post_hoc), "treatment")
+  expect_false("effect_plot_week" %in% names(out$height_cm))
+  expect_true("effect_plot_treatment" %in% names(out$height_cm))
+})
+
+test_that("post_hoc = 'a:b' gives the cell table, even when not significant (ns)", {
+  out <- quiet_f_aov(height_cm ~ treatment * week, data = pt_ph,
+                     transformation = FALSE, post_hoc = "week:treatment")
+  ph <- out$height_cm$post_hoc
+  expect_identical(names(ph), "treatment:week")
+  expect_equal(nrow(ph[["treatment:week"]]$cld), 12)
+  expect_true(all(ph[["treatment:week"]]$cld$Letter == "ns"))  # p = 0.104
+})
+
+test_that("post_hoc + by matches emmeans(~ treatment | week), adjusted per level", {
+  out <- quiet_f_aov(height_cm ~ treatment * week, data = pt_ph,
+                     transformation = FALSE,
+                     post_hoc = "treatment", by = "week")
+  ph <- out$height_cm$post_hoc
+  expect_identical(names(ph), "treatment | week")
+  emm_ref <- emmeans::emmeans(out$height_cm$aov_test, ~ treatment | week)
+  ref  <- as.data.frame(emm_ref)
+  got  <- ph[["treatment | week"]]$emmeans
+  m <- merge(ref, got, by = c("treatment", "week"))
+  expect_equal(nrow(m), 12)
+  expect_equal(m$emmean.x, m$emmean.y)
+  refp <- as.data.frame(pairs(emm_ref, adjust = "sidak"))
+  mp <- merge(refp, ph[["treatment | week"]]$pairs, by = c("contrast", "week"))
+  expect_equal(nrow(mp), 18)
+  expect_equal(mp$p.value.x, mp$p.value.y)
+  expect_match(ph[["treatment | week"]]$cld_text, "6 tests per level of week",
+               fixed = TRUE)
+  expect_true("by_plot_treatment_week" %in% names(out$height_cm))
+})
+
+test_that("bad post_hoc / by names error with a suggestion", {
+  expect_error(quiet_f_aov(height_cm ~ treatment + week, data = pt_ph,
+                           post_hoc = "treatmnt"),
+               "did you mean 'treatment'")
+  expect_error(quiet_f_aov(height_cm ~ treatment + week, data = pt_ph,
+                           post_hoc = "treatment", by = "wek"),
+               "did you mean 'week'")
+  expect_error(quiet_f_aov(height_cm ~ treatment + week, data = pt_ph,
+                           post_hoc = "treatment:week"),
+               "not a categorical interaction in the model")
+})
+
+test_that("each by validation rule errors", {
+  # by without post_hoc
+  expect_error(quiet_f_aov(height_cm ~ treatment * week, data = pt_ph,
+                           by = "week"),
+               "'by' needs 'post_hoc'")
+  # by also in post_hoc
+  expect_error(quiet_f_aov(height_cm ~ treatment * week, data = pt_ph,
+                           post_hoc = c("treatment", "week"), by = "week"),
+               "cannot be both in 'post_hoc' and the 'by' factor")
+  # by with an interaction term in post_hoc
+  expect_error(quiet_f_aov(height_cm ~ treatment * week, data = pt_ph,
+                           post_hoc = "treatment:week", by = "week"),
+               "cannot be combined with an interaction")
+  # by must be ONE categorical predictor
+  expect_error(quiet_f_aov(height_cm ~ treatment * week, data = pt_ph,
+                           post_hoc = "treatment", by = c("week", "block")),
+               "must be the name of one categorical predictor")
+  expect_error(quiet_f_aov(height_cm ~ treatment + chloroplast_count,
+                           data = pt_ph, ANCOVA = TRUE,
+                           post_hoc = "treatment", by = "chloroplast_count"),
+               "numeric covariate")
+})
+
+test_that("RCBD (block + treatment) runs, matches car::Anova, and tabulates only treatment", {
+  out <- quiet_f_aov(height_cm ~ block + treatment, data = wk6_ph,
+                     transformation = FALSE, post_hoc = "treatment")
+  expect_false(isTRUE(out$height_cm$skipped))
+  expect_equal(out$height_cm$resid_df, 12)
+  ref <- car::Anova(lm(height_cm ~ block + treatment, data = wk6_ph), type = 2)
+  got <- out$height_cm$aov_summary
+  expect_equal(got["block", "F value"], ref["block", "F value"])
+  expect_equal(got["treatment", "Pr(>F)"], ref["treatment", "Pr(>F)"])
+  expect_equal(round(got["block", "F value"], 2), 3.29)
+  expect_equal(signif(got["treatment", "Pr(>F)"], 2), 8.8e-07)
+  expect_identical(names(out$height_cm$post_hoc), "treatment")
+})
+
+test_that("deprecated post_hoc_summary_table is still present", {
+  out <- quiet_f_aov(breaks ~ wool * tension, data = warpbreaks,
+                     transformation = FALSE)
+  expect_true(is.data.frame(out$breaks$post_hoc_summary_table))
+  expect_equal(nrow(out$breaks$post_hoc_summary_table), 6)  # the cell table
+  out2 <- quiet_f_aov(height_cm ~ treatment + week, data = pt_ph,
+                      transformation = FALSE)
+  expect_equal(nrow(out2$height_cm$post_hoc_summary_table), 4)  # first table
+})
+
+test_that("print() of a transformed response shows the transformed ANOVA table", {
+  out <- quiet_f_aov(biomass_g ~ treatment, data = plant_trial)
+  expect_true(isTRUE(out$biomass_g$Response_Transformed))
+  txt <- paste(utils::capture.output(suppressWarnings(suppressMessages(print(out)))),
+               collapse = "\n")
+  f_tr <- format(round(out$biomass_g$transformed_aov_summary["treatment", "F value"], 4),
+                 nsmall = 4)
+  expect_match(txt, f_tr, fixed = TRUE)
+})
+
+test_that("report has one heading per table with the within-table caption", {
+  out <- quiet_f_aov_typed("rmd", breaks ~ wool * tension, data = warpbreaks,
+                           transformation = FALSE)
+  rmd <- out[["rmd"]]
+  expect_match(rmd, "### Post hoc: wool:tension (cell means)", fixed = TRUE)
+  expect_match(rmd, "### Post hoc: tension (marginal means)", fixed = TRUE)
+  expect_equal(lengths(regmatches(rmd, gregexpr("Letters are compared within this table only",
+                                                rmd, fixed = TRUE))), 3)
+  expect_match(rmd, "equal-weighted emmeans", fixed = TRUE)
+})
+
+test_that("Excel output has one sheet per term with valid names", {
+  skip_on_cran()
+  f <- tempfile(fileext = ".xlsx")
+  suppressMessages(f_aov(height_cm ~ treatment * week, data = pt_ph,
+                         transformation = FALSE, post_hoc = "treatment",
+                         by = "week", output_type = "excel", save_as = f,
+                         open_generated_files = FALSE))
+  sh <- readxl::excel_sheets(f)
+  expect_identical(sh, "height_cm treatment by week")
+  expect_true(all(nchar(sh) <= 31))
 })

@@ -11,8 +11,9 @@ f_factors(
   properties = FALSE,
   force_factors = FALSE,
   ref = NULL,
-  unique_num_treshold = 8,
+  unique_num_threshold = 8,
   repeats_threshold = 2,
+  unique_num_treshold = NULL,
   ...
 )
 }
@@ -37,9 +38,11 @@ named character vector mapping column names to reference levels, e.g.
 present in a given factor is skipped with a warning. Default \code{NULL}
 (leave the reference as the first level).}
 
-\item{unique_num_treshold}{Numeric. A threshold of the amount of unique numbers a numeric column should have to keep it numeric, i.e. omit factor conversion. Default \code{8}.}
+\item{unique_num_threshold}{Numeric. A threshold of the amount of unique numbers a numeric column should have to keep it numeric, i.e. omit factor conversion. A numeric column is a factor candidate only when it has fewer than \code{unique_num_threshold} unique values. Default \code{8}.}
 
-\item{repeats_threshold}{Numeric. A threshold of the minimal number of repeats a numeric column should have to convert it to a factor. Default \code{2}.}
+\item{repeats_threshold}{Numeric. A numeric column is converted to a factor only when at least one of its values occurs more than \code{repeats_threshold} times. Default \code{2}, so a value has to occur at least three times.}
+
+\item{unique_num_treshold}{Alternative spelling of \code{unique_num_threshold}, accepted so that existing scripts keep working. Default \code{NULL} (not used). Supplying both spellings with different values is an error.}
 
 \item{...}{Additional arguments passed to the \code{factor()} function of baseR.}
 }
@@ -51,7 +54,7 @@ Converts multiple specified columns of a data frame into factors. If no columns 
 }
 \details{
 \itemize{
-\item If \code{select} is \code{NULL}, the function identifies columns with character data or numeric data with fewer than 8 unique values as candidates for conversion to factors.
+\item If \code{select} is \code{NULL}, the function identifies columns with character data, and numeric columns with fewer than \code{unique_num_threshold} (default 8) unique values of which at least one value occurs more than \code{repeats_threshold} (default 2) times, as candidates for conversion to factors.
 \item The function checks if all specified columns exist in the data frame and stops execution if any are missing.
 \item Converts specified columns into factors, applying any additional arguments provided.
 \item Outputs a summary data frame with details about each column, including its type, class, number of observations, missing values, factor levels, and labels.
@@ -96,10 +99,11 @@ df_ref <- f_factors(df, select = c("a", "c"),
 levels(df_ref$c)[1] # reference is now "kiwi"
 levels(df_ref$a)[1] # reference is now "yes" (was "no")
 
-# In example above col b was converted to a factor as the number of repeats = 2
-# and the amount of unique numbers < 8. In order to keep b numeric we can also
-# adjust the unique_num_treshold and/or repeats_threshold:
-df5 <- f_factors(df, unique_num_treshold = 2)
+# In example above col b was converted to a factor as each value occurs 3 times
+# (more than repeats_threshold = 2) and there are fewer than 8 unique numbers.
+# In order to keep b numeric we can also adjust the unique_num_threshold
+# and/or repeats_threshold:
+df5 <- f_factors(df, unique_num_threshold = 2)
 str(df5)
 
 # Use `properties = TRUE` to view the data frame's structure.

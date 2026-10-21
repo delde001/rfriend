@@ -30,7 +30,7 @@
 # is preferred over nzchar(Sys.which("pandoc")) because it also honours
 # RSTUDIO_PANDOC on systems where Pandoc ships with RStudio but is not on
 # the shell PATH.
-skip_if_no_pandoc <- function(min_version = "3.2") {
+skip_if_no_pandoc <- function(min_version = "3.1") {
   if (!requireNamespace("rmarkdown", quietly = TRUE)) {
     testthat::skip("rmarkdown not installed")
   }

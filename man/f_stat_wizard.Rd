@@ -84,8 +84,8 @@ An object of class \code{"f_stat_wizard"}: a list containing:
     \item{id_col}{Character. Name of the subject/block column supplied, or \code{NULL}.}
     \item{y_var}{Name of the response variable.}
     \item{y_type}{Detected type of the response: \code{"binary"}, \code{"count"},
-      \code{"multinomial"}, \code{"ratio_normal"}, \code{"ratio_non_normal"},
-      \code{"ratio_unknown"}, or \code{"unsupported"}.}
+      \code{"multinomial"}, \code{"ordinal"}, \code{"ratio_normal"},
+      \code{"ratio_non_normal"}, \code{"ratio_unknown"}, or \code{"unsupported"}.}
     \item{x_vars}{Character vector of explanatory variable names.}
     \item{x_types}{Character vector of detected types (\code{"nominal"},
       \code{"ordinal"}, \code{"ratio"}).}
@@ -122,6 +122,18 @@ Supports standard formulas including \code{y ~ .}, \code{y ~ as.factor(x)}, and 
 terms. Formulas with random effects (e.g. \code{(1|ID)}) are detected and handled separately.
 Multivariate responses (e.g. \code{cbind(y1, y2) ~ x}) and transformed responses
 (e.g. \code{log(y) ~ x}) are not supported.
+
+\strong{Ordinal responses.} A response stored as an ordered factor
+(\code{factor(y, ordered = TRUE)}) with three or more levels is treated as
+ordinal: the wizard recommends rank-based tests (\code{f_wilcox_test()},
+\code{f_kruskal_test()}, \code{f_friedman()}) or a Spearman correlation,
+applied to the rank codes of the levels (\code{as.integer()}), because these
+tests use only the order of the values. With several predictors or random
+effects it points to ordinal (cumulative link) regression, which has no
+rfriend wrapper. A numeric response of whole numbers on a short scale
+(at most 10 distinct values, maximum at most 10) cannot be told apart from
+a count; it is analysed as count data, with a note to store it as an
+ordered factor if it is a score (for example 1 to 5).
 }
 \examples{
 # Formula interface (recommended)

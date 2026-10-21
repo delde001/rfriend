@@ -239,7 +239,7 @@ test_that("subset drops rows before the lmer is fit", {
       res <- f_lmer(y ~ time + (1 | subj), data = df,
                     subset = df$time != "1",
                     output_type = "default",
-                    norm_plots = FALSE, intro_text = FALSE,
+                    diagnostic_plots = FALSE, intro_text = FALSE,
                     open_generated_files = FALSE),
       file = nullfile()
     )
@@ -259,7 +259,7 @@ test_that("na.action = na.omit strips NA rows before fitting", {
       res <- f_lmer(y ~ time + (1 | subj), data = df,
                     na.action = na.omit,
                     output_type = "default",
-                    norm_plots = FALSE, intro_text = FALSE,
+                    diagnostic_plots = FALSE, intro_text = FALSE,
                     open_generated_files = FALSE),
       file = nullfile()
     )
@@ -277,7 +277,7 @@ test_that("weights pass through to lmer without error", {
       utils::capture.output(
         res <- f_lmer(y ~ time + (1 | subj), data = df, weights = w,
                       output_type = "default",
-                      norm_plots = FALSE, intro_text = FALSE,
+                      diagnostic_plots = FALSE, intro_text = FALSE,
                       open_generated_files = FALSE),
         file = nullfile()
       )
@@ -297,7 +297,7 @@ test_that("multi-response share identical row set after subset", {
       res <- f_lmer(y + y2 ~ time + (1 | subj), data = df,
                     subset = df$time != "1",
                     output_type = "default",
-                    norm_plots = FALSE, intro_text = FALSE,
+                    diagnostic_plots = FALSE, intro_text = FALSE,
                     open_generated_files = FALSE),
       file = nullfile()
     )
@@ -319,7 +319,7 @@ test_that("contrasts argument flows through to the fitted model", {
       res <- f_lmer(y ~ trt + (1 | subj), data = df,
                     contrasts = list(trt = "contr.sum"),
                     output_type = "default",
-                    norm_plots = FALSE, intro_text = FALSE,
+                    diagnostic_plots = FALSE, intro_text = FALSE,
                     open_generated_files = FALSE),
       file = nullfile()
     )
@@ -418,7 +418,7 @@ test_that("intro_text = FALSE omits the intro section in rmd output", {
     f_lmer(y ~ time + (1 | subj), data = df,
            output_type = "rmd",
            intro_text = FALSE,
-           norm_plots = FALSE,
+           diagnostic_plots = FALSE,
            open_generated_files = FALSE)
   ))
   expect_true("rmd" %in% names(res))
@@ -433,7 +433,7 @@ test_that("intro_text = TRUE includes assumption text in rmd output", {
     f_lmer(y ~ time + (1 | subj), data = df,
            output_type = "rmd",
            intro_text = TRUE,
-           norm_plots = FALSE,
+           diagnostic_plots = FALSE,
            open_generated_files = FALSE)
   ))
   expect_true(grepl("assumption|random", res$rmd, ignore.case = TRUE))
@@ -451,7 +451,7 @@ test_that("rmd output_type stores the markdown string on result$rmd", {
     f_lmer(y ~ time + (1 | subj), data = df,
            output_type = "rmd",
            intro_text = FALSE,
-           norm_plots = FALSE,
+           diagnostic_plots = FALSE,
            open_generated_files = FALSE)
   ))
   expect_true(is.character(res$rmd))

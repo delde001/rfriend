@@ -28,7 +28,7 @@ f_summary(x, ...)
   show_Q3 = TRUE,
   show_skew = FALSE,
   show_kurtosis = FALSE,
-  digits = NULL,
+  digits = 2,
   export_to_excel = FALSE,
   close_generated_files = FALSE,
   open_generated_files = interactive(),
@@ -86,7 +86,8 @@ approximately normal or \code{n} is large; see Details.}
 \item{show_kurtosis}{Logical. Include Excess Kurtosis (measure of "tailedness"). Default \code{FALSE}.}
 
 \item{digits}{Integer. Number of decimal places for the R console output.
-Default is \code{2}. If \code{NULL}, no rounding is applied.
+Default is \code{2}. If \code{NULL}, no rounding is applied. Rounding
+only affects the printed table; the returned values are never rounded.
 (Note: This does not affect the raw numbers exported to Excel).}
 
 \item{export_to_excel}{Logical. If \code{TRUE}, exports results to an 'Excel' file. Default \code{FALSE}.}

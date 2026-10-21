@@ -19,7 +19,9 @@ Returns \code{x} invisibly.
 }
 \description{
 Displays the density plot and/or boxplot stored in an \code{f_kruskal_test}
-object. Plots are only available when the original call used \code{plot = TRUE}.
+object. Plots are only available when the original call used
+\code{diagnostic_plots = TRUE} (density plot) or \code{effect_plots = TRUE}
+(boxplot).
 }
 \examples{
 result <- f_kruskal_test(Sepal.Width ~ Species, data = iris,

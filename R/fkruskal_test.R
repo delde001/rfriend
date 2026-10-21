@@ -4,9 +4,19 @@
 #'
 #' @param formula A formula specifying the response and predictor variable (e.g., \code{response ~ predictor)}.
 #' more response variables and predictors can be added using \code{-} or \code{+} (e.g., \code{response1 + response2 ~ predictor1 + predictor2)}. The function iterates through these combinations or response and predictors, because the Kruskal-Wallis test itself only allows one response and one predictor combination to be tested simultaneously.
+#'   The response must be numeric or an ordered factor (an ordinal score,
+#'   e.g. \code{factor(score, ordered = TRUE)}). An ordered factor is tested
+#'   on the rank codes of its levels (1 = lowest level), which is exact for a
+#'   rank test; a message shows the coding. Other non-numeric responses stop
+#'   with an error.
 #' @param data A \code{data.frame} containing the variables referenced in the formula.
-#' @param plot Logical. If \code{TRUE}, generates plots (e.g., density plots and boxplots)
-#'   in the output files. Default is \code{TRUE}.
+#' @param diagnostic_plots Logical. If \code{TRUE} (default), the density plot
+#'   of the groups (visual check on similarity of distributions) is included
+#'   in the output files.
+#' @param effect_plots Logical. If \code{TRUE} (default), the boxplot with the
+#'   Dunn's test compact letter display is included in the output files.
+#' @param plot \strong{Deprecated} in 3.2.1. Use \code{diagnostic_plots} and \code{effect_plots} instead. If
+#'   supplied, its value is passed to \code{diagnostic_plots} and \code{effect_plots} with a warning.
 #' @param alpha Numeric. The significance level for the Kruskal-Wallis test and Dunn's
 #'   test. Default is  \code{0.05}.
 #' @param adjust Character string. Adjustment method for pairwise comparisons in Dunn's test. Options include \code{"holm", "hommel", "bonferroni", "hochberg", "bh", "by", "fdr"} or \code{"none"}. Default is \code{"bonferroni"}, if you don't want to adjust the p value (not recommended), use \code{adjust = "none"}.
@@ -53,8 +63,8 @@
 #'     \item{summary_table}{Descriptive statistics with compact letter display (Letters column).}
 #'     \item{alpha}{The significance level used.}
 #'     \item{DunnTest_adjust}{The p-value adjustment method used.}
-#'     \item{distributions}{ggplot density plot (if \code{plot = TRUE}).}
-#'     \item{Boxplot}{ggplot boxplot with CLD letters (if \code{plot = TRUE}).}
+#'     \item{distributions}{ggplot density plot (if \code{diagnostic_plots = TRUE}).}
+#'     \item{Boxplot}{ggplot boxplot with CLD letters (if \code{effect_plots = TRUE}).}
 #'   }
 #'
 #' Using the option \code{output_type}, it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and plot methods for 'f_kruskal_test' objects.
@@ -70,7 +80,7 @@
 #'
 #' Output files are generated in the format specified by \code{output_type =} and saved to the working directory, options are \code{"pdf", "word"} or \code{"excel"}. If \code{output_type = "rmd"} is used it is advised to use it in a chunk with \{r, echo=FALSE, results='asis'\}
 #'
-#' This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
+#' This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or higher), a universal document converter.
 #'\itemize{
 #' \item \bold{Windows:} Install Pandoc and ensure the installation folder \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
 #' \item \bold{macOS:} If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.
@@ -105,7 +115,8 @@
 #' output <- f_kruskal_test(
 #'                Sepal.Width + Sepal.Length ~ Species,
 #'                data = iris,
-#'                plot = FALSE,
+#'                diagnostic_plots = FALSE,
+#'                effect_plots = FALSE,
 #'                output_type = "word",
 #'                adjust = "holm"
 #'                )
@@ -114,7 +125,8 @@
 #' f_kruskal_out <- f_kruskal_test(
 #'                      Sepal.Width + Sepal.Length ~ Species,
 #'                      data = iris,
-#'                      plot = FALSE,
+#'                      diagnostic_plots = FALSE,
+#'                      effect_plots = FALSE,
 #'                      output_type = "excel",
 #'                      adjust = "holm"
 #'                      )
@@ -123,7 +135,8 @@
 f_kruskal_test <- function(
     formula,              # Kruskall-Wallis function formula
     data = NULL,          # data.frame used for Kruskall-Wallis
-    plot = TRUE,          # Show plots in output files
+    diagnostic_plots = TRUE, # Distribution / trace check plot in output files
+    effect_plots = TRUE,  # Boxplot with letters in output files
     alpha = 0.05,         # Set significance level alpha for Kruskall and dunn_test
     output_type = "default",
     save_as = NULL,       # Specify the name of the file.
@@ -132,6 +145,7 @@ f_kruskal_test <- function(
     adjust = "bonferroni",           # Correction Method for pairwise comparisson in dunn_test.
     close_generated_files = FALSE,   # Closes either open excel or word files depending on the output format.
     open_generated_files = interactive(),     # Open files after creation
+    plot = lifecycle::deprecated(),
     ...
     # Additional arguments forwarded to kruskal.test(). Currently the
     # arguments `subset` and `na.action` are honored: when supplied, they
@@ -146,6 +160,30 @@ f_kruskal_test <- function(
   ########## Reset initial settings on exit #################################
   .session_state <- save_session_state()  # Helper function: helper_session_state
   on.exit(restore_session_state(.session_state), add = TRUE) # Helper function: helper_session_state
+
+  ########## Deprecated arguments ##########################################
+  # Renamed in 3.2.1 so that all test functions use the same names for the
+  # same report parts: `diagnostic_plots` (assumption and residual checks)
+  # and `effect_plots` (effect, estimated-means and interaction plots).
+  # The old name still works for one release, with a warning.
+  if (lifecycle::is_present(plot)) {
+    lifecycle::deprecate_warn(
+      when = "3.2.1",
+      what = "f_kruskal_test(plot)",
+      with = "f_kruskal_test(diagnostic_plots)",
+      details = "`plot` is passed to both `diagnostic_plots` and `effect_plots`."
+    )
+    diagnostic_plots <- plot
+    effect_plots <- plot
+  }
+
+  # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  # check_dots to prevent ignoring typos
+  # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  check_known_dots(...names(), ...length(),
+                   allowed    = 	c("subset", "na.action"),
+                   fun_name   = "f_kruskal_test",
+                   valid_args = names(formals(sys.function())))
 
 
 
@@ -362,6 +400,9 @@ f_kruskal_test <- function(
     if (!(response %in% names(data))) {
       stop(paste("Response variable", response, "not found in the data."))
     }
+    # Ordered factor -> rank codes (with a message); other non-numeric
+    # responses stop with a clear message (helper_rank_response.R).
+    data <- prepare_rank_response(data, response, "f_kruskal_test")
   }
 
 
@@ -481,7 +522,10 @@ Each group should ideally include at least five observations for reliable result
       na.action          = na_action_fn
     )
 
+    data_before_na <- data
     data <- do.call(stats::model.frame, mf_args)
+    na_notes <<- c(na_notes, na_removed_note(data_before_na, nrow(data),
+                                             all.vars(combined_formula)))
 
     #Main loop starts here
     for (response_name in lhs) {
@@ -497,7 +541,7 @@ Each group should ideally include at least five observations for reliable result
         cat("   \n#  Analysis of: ", response_name, " by ", predictor_name,"\n   \n")
         # cat("   \n     \n&nbsp;  \n   \n ")
 
-        if(plot == TRUE){
+        if(isTRUE(diagnostic_plots)){
           cat("  \n## Visual check on similarity of distributions  \n")
 
           d <- ggplot(data, aes(x = !!sym(response_name), fill = factor(!!sym(predictor_name)))) +
@@ -682,7 +726,7 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 rep
       If shapes or spreads differ substantially (check side-by-side boxplots and density plots),
       the result reflects a difference in mean ranks rather than medians.
 \n  **Note 2 (Results):** Groups in the \"Letters\" column sharing the same letter are ",
-                           "**not** significantly different (\u03B1 = ", alpha, ".",
+                           "**not** significantly different (\u03B1 = ", alpha, "). ",
                            "Groups with different letters are significantly different. Sharing a letter ",
                            "indicates insufficient evidence to claim a difference; it does not ",
                            "prove the groups are identical.\n",
@@ -693,7 +737,7 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 rep
         # Store adjust method in output
         output_list[[paste0(response_name,"_",predictor_name)]][["adjust"]] <- adjust
 
-        if(plot == TRUE){
+        if(isTRUE(effect_plots)){
 
           cat("  \n## Boxplot of: ", response_name, " by ", predictor_name,"  and Dunn's  post hoc test  \n  \n")
           # Add the compact letter display to the data
@@ -849,6 +893,7 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 rep
     }
   } # End generate report function.
 
+  na_notes <- character(0)  # filled by generate_report(), sent below
   # Execute analysis and return results but hide this from console.
   suppressMessages(
     utils::capture.output(
@@ -857,6 +902,7 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 rep
     )
   )
   class(output_list) <- "f_kruskal_test"
+  for (na_msg in unique(na_notes)) message(na_msg)
 
 
 
@@ -1036,7 +1082,7 @@ print.f_kruskal_test <- function(x, ...) {
       dunnTest_used <- paste0("
 Note 1 (Assumptions): Dunn's test does not assume normality, but implies a test for difference in medians only if distribution shapes are similar across groups. If shapes or spreads differ substantially (check boxplots and density plots using, plot(...)), the result reflects a difference in mean ranks rather than medians.\n
 Note 2 (Results): Groups in the \"Letters\" column sharing the same letter are ",
-"**not** significantly different (\u03B1 = ", format(sublist$alpha, nsmall = 3), ".",
+"**not** significantly different (\u03B1 = ", format(sublist$alpha, nsmall = 3), "). ",
 "Groups with different letters are significantly different. Sharing a letter ",
 "indicates insufficient evidence to claim a difference; it does not ",
 "prove the groups are identical.\n",
@@ -1063,7 +1109,9 @@ Note 2 (Results): Groups in the \"Letters\" column sharing the same letter are "
 #' Plot method for f_kruskal_test objects
 #'
 #' Displays the density plot and/or boxplot stored in an \code{f_kruskal_test}
-#' object. Plots are only available when the original call used \code{plot = TRUE}.
+#' object. Plots are only available when the original call used
+#' \code{diagnostic_plots = TRUE} (density plot) or \code{effect_plots = TRUE}
+#' (boxplot).
 #'
 #' @param x An object of class \code{f_kruskal_test}.
 #' @param which Character vector indicating which plots to show. Options are

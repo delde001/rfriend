@@ -7,8 +7,8 @@
 f_aov(
   formula,
   data = NULL,
-  norm_plots = TRUE,
-  interaction_plots = TRUE,
+  diagnostic_plots = TRUE,
+  effect_plots = TRUE,
   contrast_plots = FALSE,
   ANCOVA = FALSE,
   transformation = TRUE,
@@ -16,6 +16,8 @@ f_aov(
   force_aov = FALSE,
   alpha = 0.05,
   adjust = "sidak",
+  post_hoc = NULL,
+  by = NULL,
   anova_type = 2,
   intro_text = TRUE,
   close_generated_files = FALSE,
@@ -23,6 +25,8 @@ f_aov(
   output_type = "default",
   save_as = NULL,
   save_in_wdir = FALSE,
+  norm_plots = lifecycle::deprecated(),
+  interaction_plots = lifecycle::deprecated(),
   ...
 )
 }
@@ -31,9 +35,9 @@ f_aov(
 
 \item{data}{A data frame containing the variables in the model.}
 
-\item{norm_plots}{Logical. If \code{TRUE}, diagnostic residual plots are included in the output files. Default is \code{TRUE}.}
+\item{diagnostic_plots}{Logical. If \code{TRUE}, diagnostic residual plots are included in the output files. Default is \code{TRUE}.}
 
-\item{interaction_plots}{Logical. If \code{TRUE}, estimated means / interaction plots are included in the output files after the post hoc table. Default is \code{TRUE}.}
+\item{effect_plots}{Logical. If \code{TRUE}, estimated means / interaction plots are included in the output files after the post hoc table. Default is \code{TRUE}.}
 
 \item{contrast_plots}{Logical. If \code{TRUE}, a \strong{contrast forest
 plot} is added for each categorical post hoc term: one row per pairwise
@@ -55,16 +59,27 @@ while interaction cell-contrast plots are stored as
 
 \item{ANCOVA}{Logical. If \code{TRUE}, prevents automatic conversion of predictors to factors, allowing for Analysis of Covariance (ANCOVA). Default is \code{FALSE}.}
 
-\item{transformation}{Logical or character string. If \code{TRUE}, or if \code{"boxcox"} applies a \code{f_boxcox()} transformation if residuals are not normal. If \code{"bestnormalize"}, applies \code{f_bestNormalize()} transformation. If \code{FALSE} no transformation will be applied. Default is \code{TRUE}.}
+\item{transformation}{Logical or character string. If \code{TRUE}, or if \code{"boxcox"} applies a \code{f_boxcox()} transformation if residuals are not normal. If \code{"bestnormalize"}, applies \code{f_bestNormalize()} transformation. If \code{FALSE} no transformation will be applied. Default is \code{TRUE}.
+A transformation is kept only when it improves the residual check
+that triggered it: normality (Shapiro-Wilk, or Anderson-Darling when
+Shapiro-Wilk is unavailable) or, when only the variance check failed, equal
+variance (Levene's test). Otherwise the untransformed analysis is reported, the
+report says so, and the attempt is recorded in \code{transformation_rejected}.
+Responses named in \code{force_transformation} are always transformed.}
 
 \item{force_transformation}{Character string. A vector containing the names of response variables that should be transformed regardless of the normality test. Default is \code{NULL}}
 
-\item{force_aov}{Logical. If \code{TRUE}, runs the ANOVA even when at least
-one cell has \eqn{n = 1} (saturated model). By default (\code{FALSE}),
-such responses are skipped with a warning because F-statistics and
-p-values are undefined for saturated models. Set to \code{TRUE} only for
-diagnostic purposes -- results should \strong{not} be reported or
-interpreted as valid. Default is \code{FALSE}.}
+\item{force_aov}{Logical. Default \code{FALSE}. A response is skipped (with a
+message) when its model is saturated: zero residual degrees of freedom, e.g.
+a fully crossed design with \eqn{n = 1} in every cell, where no F-test
+exists. Saturation is judged from the rank of the model matrix, so additive
+designs with one observation per cell, such as a randomised complete block
+design (\code{y ~ block + treatment}), are analysed normally. Since rfriend
+3.2.1, \code{force_aov = TRUE} on a saturated model stops with an
+explanation instead of fitting it, because the F-tests cannot be computed.
+(Before 3.2.1 the skip also fired for any cell with \eqn{n = 1}.)
+\code{Error()} terms are not supported; use \code{\link{f_lmer}} with
+random effects instead.}
 
 \item{alpha}{Numeric. Significance level for ANOVA, post hoc tests, and Shapiro-Wilk test. Default is \code{0.05}.}
 
@@ -81,6 +96,40 @@ for multiple comparisons. Available methods include:
   \item{"fdr"}{False Discovery Rate adjustment, controls the expected proportion
               of false positives among significant results.}
 } Default is \code{"sidak"}.}
+
+\item{post_hoc}{Which post hoc tables to build. \code{NULL} or \code{TRUE}
+  (default): one table per term, see Details, "Which post hoc tables you
+  get". \code{FALSE}: no post hoc. A character vector of model terms: only
+  those tables, e.g. \code{post_hoc = "treatment"} (the marginal means of one
+  factor, averaged over the others), \code{post_hoc = c("treatment",
+  "week")}, or \code{post_hoc = "treatment:week"} (the cell means of that
+  interaction, every combination compared). A requested term that is not
+  significant is still tabulated, with letters shown as \code{"ns"}.
+  Misspelled or unknown names stop with a "did you mean" error. The same
+  syntax is used by \code{\link{f_lmer}}.
+
+  \strong{Leaving blocks out of the post hoc.} A block belongs in the model
+  because it removes known variation (soil, bench, day) from the error term,
+  which makes the treatment comparison more precise. Comparing the blocks with
+  each other, however, is not a research question, and block letters invite
+  over-interpretation. So keep the block in the formula and name only the
+  factors you study in \code{post_hoc}:
+  \code{f_aov(y ~ block + treatment, data, post_hoc = "treatment")}. The ANOVA
+  table still reports the block effect. With five or more blocks that are a
+  random sample of possible blocks, consider a mixed model instead:
+  \code{f_lmer(y ~ treatment + (1 | block))}.}
+
+\item{by}{\code{NULL} (default) or the name of one categorical predictor,
+used together with \code{post_hoc} to get simple effects:
+\code{post_hoc = "treatment", by = "week"} answers "which treatments differ
+within each week?" with \code{emmeans(model, ~ treatment | week)}. Letters
+and the p-value adjustment are computed separately within each level of
+\code{by}. This makes fewer comparisons than the full cell-means table (for
+4 treatments x 3 weeks: 3 x 6 = 18 instead of 66), so each comparison has
+more power. The table is stored as
+\code{out$y$post_hoc[["treatment | week"]]}. \code{by} requires
+\code{post_hoc}, must not also be named in \code{post_hoc}, and cannot be
+combined with an interaction term (\code{"a:b"}) in \code{post_hoc}.}
 
 \item{anova_type}{Integer, either \code{2} or \code{3}. Sums of Squares
 type for the omnibus ANOVA table computed via \code{\link[car]{Anova}}.
@@ -143,6 +192,12 @@ Defaults to \code{file.path(tempdir(), "dataname_summary.pdf")}.}
 
 \item{save_in_wdir}{Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.}
 
+\item{norm_plots}{\strong{Deprecated} in 3.2.1. Use \code{diagnostic_plots} instead. If
+supplied, its value is passed to \code{diagnostic_plots} with a warning.}
+
+\item{interaction_plots}{\strong{Deprecated} in 3.2.1. Use \code{effect_plots} instead. If
+supplied, its value is passed to \code{effect_plots} with a warning.}
+
 \item{...}{Additional arguments forwarded to \code{\link[stats]{aov}}.
 The arguments \code{subset}, \code{na.action}, and \code{weights} are
 handled specially: when supplied, they are applied via
@@ -158,7 +213,24 @@ An object of class 'f_aov' containing the fitted model
   (\code{aov_test}), the \strong{Type II} omnibus ANOVA table from
   \code{\link[car]{Anova}} (\code{aov_summary}), normality and homogeneity
   diagnostics, optional transformation results, and the \code{emmeans}
-  post hoc tests. Using the option \code{output_type}, it can also
+  post hoc tests, one table per term in \code{out$y$post_hoc} (see
+  Details, "Which post hoc tables you get"). The elements
+  \code{post_hoc_summary_table}, \code{summary_table} and \code{cld_text} are
+  \strong{deprecated} and will be removed in the next release: they now hold
+  the cell-means table when a significant interaction is tabulated, otherwise
+  the first table; use \code{post_hoc} instead.
+  \code{Response_Transformed}: \code{TRUE} when the response was
+  transformed (Box-Cox or bestNormalize) because the residuals were not normal (or, alone, had unequal variances) and
+  the transformation was kept (see \code{transformation}).
+  \code{aov_summary}: ANOVA table of the untransformed response.
+  \code{transformed_aov_summary}: ANOVA table of the transformed response, or
+  \code{NULL} when no transformation was applied. The printed and reported
+  result is \code{transformed_aov_summary} when \code{Response_Transformed} is
+  \code{TRUE}, otherwise \code{aov_summary}. To pick it in code:
+  \code{tab <- if (out$y$Response_Transformed) out$y$transformed_aov_summary else out$y$aov_summary}.
+  When a transformation was tried but not kept, \code{transformation_rejected}
+  records the method, the reason and the p-values before and after.
+  Using the option \code{output_type}, it can also
   generate output as R Markdown, 'Word', 'pdf', or 'Excel' files.
   Includes \code{print} and \code{plot} methods for 'f_aov' objects.
 }
@@ -193,10 +265,32 @@ The function performs the following steps:
       sum / effect contrasts to be interpretable for main effects).
 \item Check normality of residuals using the Shapiro-Wilk test.
 \item If residuals are not normal and \code{transformation = TRUE} apply a data transformation.
-\item If significant differences are found in ANOVA, proceed with post hoc tests using estimated marginal means from \code{emmeans()} and Sidak adjustment (or another option of \code{adjust =}.
+\item Post hoc tests with estimated marginal means from \code{emmeans()}, one table per term, with Sidak adjustment (or another option of \code{adjust =}) within each table.
 }
 
-\strong{Effect and interaction plots.} When \code{interaction_plots = TRUE},
+\strong{Which post hoc tables you get.} With the default
+\code{post_hoc = NULL}, each term is handled on its own: every significant
+interaction of categorical factors gets one cell-means table (all
+combinations compared); every categorical main effect gets its own
+marginal-means table (\code{emmeans(model, ~ factor)}), with letters
+\code{"ns"} when the term is not significant and an "Interpret with caution"
+note when the factor takes part in a significant interaction; numeric
+covariates (ANCOVA) get no table, their slope is in the ANOVA table. The
+\code{adjust} method is applied within each table, and each table has its
+own footer with its own number of estimates and tests. Marginal means are
+equal-weighted estimated marginal means: every level of the other factors
+counts equally, so in unbalanced designs they can differ from the raw group
+means. All tables are stored in \code{out$y$post_hoc[[term]]} as a list
+with \code{emmeans}, \code{pairs}, \code{cld} (the letters), \code{cld_text}
+(the footer) and \code{caution}, the same structure as \code{\link{f_lmer}}.
+When the response was transformed, estimates and CIs are back-transformed
+per table (medians on the original scale) and the pairwise contrasts stay on
+the transformed scale. Effect plots take their letters from the factor's own
+table; a plot that averages over a factor in a significant interaction shows
+no letters and says why. Use \code{post_hoc} and \code{by} to choose the
+tables yourself.
+
+\strong{Effect and interaction plots.} When \code{effect_plots = TRUE},
 an estimated marginal means plot (estimate \eqn{\pm} 95\% CI, with jittered
 raw data and compact-letter-display labels) is added after the post hoc
 table for each categorical predictor. For a significant categorical
@@ -221,7 +315,7 @@ Outputs can be generated in multiple formats ("pdf", "word", "excel" and "rmd") 
 
 *Non-significant ANOVA results*: When the overall F-test is not significant, f_aov still reports the estimated marginal means table, but with all pairwise comparison letters replaced by *"ns"*. The numeric estimates (and their confidence intervals) are provided because they are often needed for manuscript tables, especially when the response was back-transformed from a Box-Cox or bestNormalize scale - the raw descriptive means and the emmeans values can differ, and it is the emmeans values that correspond to the actual model. The *"ns"* labels signal that pairwise differences should not be interpreted.
 
-This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
+This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or higher), a universal document converter.
 \itemize{
 \item \bold{Windows:} Install Pandoc and ensure the installation folder.
 \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
@@ -287,6 +381,18 @@ print(f_aov_out)
 
 # Plot residual plots.
 plot(f_aov_out)
+
+# Randomised complete block design: the block stays in the model, but
+# only the treatment is compared in the post hoc.
+wk6 <- subset(plant_trial, time_weeks == 6)
+f_aov(height_cm ~ block + treatment, data = wk6, post_hoc = "treatment")
+
+# Simple effects: which treatments differ within each week?
+# illustration only: plants are measured repeatedly, see f_lmer()
+pt <- plant_trial
+pt$week <- factor(pt$time_weeks)
+f_aov(height_cm ~ treatment * week, data = pt,
+      post_hoc = "treatment", by = "week")
 }
 
 #To print rmd output set chunck option to results = 'asis' and use cat().

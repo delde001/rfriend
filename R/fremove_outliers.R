@@ -1,7 +1,8 @@
 #' Remove Outliers from Data
 #'
 #' @description
-#' `f_remove_outliers()` removes specific rows from a dataframe based on a list of identifiers.
+#' `f_remove_outliers()` removes specific rows from a dataframe based on a list of identifiers,
+#' or, with \code{set_na = TRUE}, keeps the rows and sets only the outlier values to \code{NA}.
 #' It is designed to work seamlessly with the output of \code{\link{f_outliers}}, but can also
 #' accept a custom vector of IDs.
 #'
@@ -10,11 +11,25 @@
 #'   \itemize{
 #'     \item A dataframe returned by \code{\link{f_outliers}}.
 #'     \item A vector of IDs/row numbers to remove.
+#'     \item \code{NULL}, which is what \code{\link{f_outliers}} returns when it
+#'       finds no outliers. The data is then returned unchanged (with a
+#'       message when \code{verbose = TRUE}), so the find-then-remove pair
+#'       also runs on data without outliers.
 #'   }
 #' @param by A character string specifying the column to match on. Default is \code{"row_id"}.
 #'   If the source \code{data} does not have a \code{row_id} column, the function effectively
 #'   uses the row numbers (1, 2, 3...) to ensure safe deletion.
-#' @param verbose Logical. If \code{TRUE} (default), prints a summary of how many rows were removed.
+#' @param verbose Logical. If \code{TRUE} (default), prints a summary of what was removed.
+#' @param set_na Logical. If \code{FALSE} (default), whole rows are removed. If
+#'   \code{TRUE}, the rows are kept and only the values are set to \code{NA}
+#'   (missing): with an \code{f_outliers} result, exactly the flagged values in
+#'   the column(s) where they were flagged; with a vector of IDs or a data
+#'   frame, the values in \code{columns} of those rows.
+#' @param columns Character vector of column names. Only used with
+#'   \code{set_na = TRUE}. With an \code{f_outliers} result it limits the
+#'   change to these checked columns (default: all checked columns). With a
+#'   vector of IDs or a data frame it is required: the values in these columns
+#'   of the given rows are set to \code{NA}.
 #'
 #' @details
 #' \strong{Safe Deletion Logic:}
@@ -120,12 +135,22 @@
 #' bad_ids  <- bad_rows$output_df$EmployeeID
 #' any(clean_df$EmployeeID %in% bad_ids)  # FALSE
 #'
+#' # --- Keep the rows, set only the flagged values to NA ---
+#' bad_rows <- f_outliers(Salary ~ Team, data = df)
+#' df_na <- f_remove_outliers(df, bad_rows, set_na = TRUE)
+#' sum(is.na(df_na$Salary))   # the flagged salaries are now missing
+#'
+#' # --- By hand: set the Age of rows 39 and 40 to NA ---
+#' df_na2 <- f_remove_outliers(df, c(39, 40), set_na = TRUE, columns = "Age")
+#'
 #' @export
 
 f_remove_outliers <- function(data,
                               outliers,
                               by = "row_id",
-                              verbose = TRUE) {
+                              verbose = TRUE,
+                              set_na = FALSE,
+                              columns = NULL) {
 
   # --- Check Input Data ---
   if (is.numeric(data) || is.integer(data)) {
@@ -140,12 +165,68 @@ f_remove_outliers <- function(data,
     stop("Input 'data' must be a data.frame.")
   }
 
+  if (!is.logical(set_na) || length(set_na) != 1L || is.na(set_na)) {
+    stop("'set_na' must be TRUE or FALSE.")
+  }
+  if (!set_na && !is.null(columns)) {
+    stop("'columns' is only used with set_na = TRUE: without it, ",
+         "f_remove_outliers() removes whole rows.")
+  }
+  if (!is.null(columns)) {
+    if (!is.character(columns) || length(columns) == 0L) {
+      stop("'columns' must be a character vector of column names.")
+    }
+    missing_cols <- setdiff(columns, names(data))
+    if (length(missing_cols) > 0L) {
+      stop("Column(s) not found in 'data': ", paste(missing_cols, collapse = ", "), ".")
+    }
+  }
+
   # --- Check and Prepare Outlier IDs ---
   ids_to_remove <- NULL
 
+  # f_outliers() returns NULL when it finds nothing. Removing nothing is a
+  # valid result, so return the data unchanged instead of erroring.
+  if (is.null(outliers)) {
+    if (verbose) {
+      message("rfriend: No outliers to remove ('outliers' is NULL, as returned ",
+              "by f_outliers() when none are found). Data returned unchanged.")
+    }
+    return(data)
+  }
+
+  # cells to clear when set_na = TRUE: a list of (column, ids) pairs
+  na_targets <- list()
+
   if (inherits(outliers, "f_outliers")) {
+    tabs <- unclass(outliers)
     # Extract all row_ids across every result table in the list
-    ids_to_remove <- unique(unlist(lapply(outliers, function(df) df[[by]])))
+    ids_to_remove <- unique(unlist(lapply(tabs, function(df) df[[by]])))
+    if (set_na) {
+      tab_cols <- attr(outliers, "outlier_columns")
+      if (is.null(tab_cols)) {
+        # result from an older rfriend version: a table per column is named
+        # after its column; a single "output_df" cannot be resolved
+        tab_cols <- stats::setNames(names(tabs), names(tabs))
+        if ("output_df" %in% names(tabs)) {
+          stop("Cannot tell which column 'output_df' belongs to. Run f_outliers() ",
+               "again, or give the row numbers with 'columns'.")
+        }
+      }
+      flagged_cols <- unique(unname(tab_cols))
+      if (!is.null(columns)) {
+        not_checked <- setdiff(columns, flagged_cols)
+        if (length(not_checked) > 0L) {
+          stop("Column(s) not checked by f_outliers(): ", paste(not_checked, collapse = ", "),
+               ". Checked: ", paste(flagged_cols, collapse = ", "), ".")
+        }
+      }
+      for (tab in names(tabs)) {
+        col <- unname(tab_cols[[tab]])
+        if (!is.null(columns) && !(col %in% columns)) next
+        na_targets[[length(na_targets) + 1L]] <- list(column = col, ids = tabs[[tab]][[by]])
+      }
+    }
 
   } else if (is.data.frame(outliers)) {
     if (!by %in% names(outliers)) {
@@ -159,6 +240,16 @@ f_remove_outliers <- function(data,
     stop("'outliers' must be a dataframe or a vector of IDs.")
   }
 
+  if (set_na && !inherits(outliers, "f_outliers")) {
+    if (is.null(columns)) {
+      stop("With set_na = TRUE and row numbers or IDs, name the column(s) to clear ",
+           "with 'columns', for example columns = \"biomass_g\".")
+    }
+    for (col in columns) {
+      na_targets[[length(na_targets) + 1L]] <- list(column = col, ids = ids_to_remove)
+    }
+  }
+
   # --- Check 'by' column in Source Data ---
   # Track if we added the ID so we can remove it later
   added_id_col <- FALSE
@@ -170,6 +261,33 @@ f_remove_outliers <- function(data,
     } else {
       stop(paste0("The ID column '", by, "' was not found in the 'data'."))
     }
+  }
+
+  # --- Set values to NA, keep the rows ---
+  if (set_na) {
+    out <- data
+    n_set <- 0L
+    report <- character(0)
+    for (tg in na_targets) {
+      hit <- which(out[[by]] %in% tg$ids)
+      was_value <- !is.na(out[[tg$column]][hit])
+      n_set <- n_set + sum(was_value)
+      if (length(hit) > 0L) {
+        out[[tg$column]][hit] <- NA
+        report <- c(report, paste0(tg$column, ": ", by, " ",
+                                   paste(out[[by]][hit], collapse = ", ")))
+      }
+    }
+    if (added_id_col) out$row_id <- NULL
+    if (verbose) {
+      if (n_set == 0L) {
+        message("rfriend: No values were set to NA (no IDs matched, or the values were already missing).")
+      } else {
+        message("rfriend: Set ", n_set, if (n_set == 1L) " value" else " values",
+                " to NA (", paste(report, collapse = "; "), "). Rows kept: ", nrow(out), ".")
+      }
+    }
+    return(out)
   }
 
   # --- The Filtering Logic ---
@@ -195,7 +313,8 @@ f_remove_outliers <- function(data,
     if (n_removed == 0) {
       message("rfriend: No outliers were removed (no IDs matched).")
     } else {
-      message(paste0("rfriend: Removed ", n_removed, " outliers."))
+      message(paste0("rfriend: Removed ", n_removed,
+                     if (n_removed == 1) " outlier row." else " outlier rows."))
       message(paste0("rfriend: Rows: ", nrow(data), " -> ", n_remaining))
     }
   }

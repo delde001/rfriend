@@ -1,3 +1,381 @@
+# rfriend 3.2.1 (development version)
+
+## Breaking Changes
+
+These changes can change your results or break code that reads the returned
+objects. Please read them before updating scripts.
+
+* **`plant_trial`: new `biomass_g` values.** The column is now above-ground
+  biomass *estimated non-destructively from plant images*, so measuring the
+  same plant in weeks 2, 4 and 6 is realistic (dry biomass needs a
+  destructive harvest). It now includes a plant effect: a mixed model on
+  log biomass no longer gives a singular fit. All other columns are
+  unchanged. The raw, Excel and SPSS copies in `inst/extdata` are updated in
+  the same way. Results and examples that use `biomass_g` change.
+
+* **Misspelled arguments now stop with an error.** Before, a typo such as
+  `adjsut = "holm"` was silently ignored and the function ran with the
+  default setting, so you could get a different analysis than you asked for
+  without noticing. Now the function stops and suggests the right name:
+  `Unknown argument(s) in f_kruskal_test(): 'adjsut' (did you mean 'adjust'?)`.
+  This applies to `f_aov()`, `f_boxcox()`, `f_boxplot()`, `f_friedman()`,
+  `f_kruskal_test()`, `f_lm()`, `f_outliers()`, `f_scan()`,
+  `f_stat_wizard()`, `f_summary()`, `f_t_test()` and `f_wilcox_test()`.
+  Scripts that contained a typo will now stop; fix the spelling it suggests.
+
+* **Post hoc tests in `f_aov()` and `f_lm()`: one table per factor.** With
+  more than one factor in the model (for example `y ~ treatment + week`),
+  rfriend used to make a single table comparing every combination of all
+  factors (treatment x week) and labelled it "Marginal Means". You now get
+  one table per factor (all treatments, averaged over the weeks; all weeks,
+  averaged over the treatments) and, when an interaction is significant, an
+  extra table for the combinations. See the new `post_hoc` argument below.
+  The old single table is still available for one release (see Deprecated).
+
+* **Automatic transformations are kept only when they help.** `f_aov()`,
+  `f_lm()` and `f_t_test()` apply Box-Cox (or bestNormalize) automatically
+  when the residuals do not look normal. Before, the transformed result was
+  always reported, even when the transformation made the residuals *less*
+  normal. Now rfriend compares the residual check before and after: if the
+  transformation does not improve it, the untransformed analysis is
+  reported and the report says so, e.g. "Transformation not kept. Box-Cox
+  did not improve the normality of the residuals (Shapiro-Wilk p = 0.0375
+  before, 0.0252 after)." (When the transformation was triggered only by
+  unequal variances, the variance test is compared instead.) If you name a
+  response in `force_transformation`, it is always transformed. Some
+  analyses that were transformed in 3.2.0 are therefore reported
+  untransformed now.
+
+* **`f_lm()`: the plain result names now always hold the untransformed
+  model.** `$anova`, `$summary` and `$coefficients` describe the model on
+  the original response. When the response was transformed, the transformed
+  model is in `$transformed_anova`, `$transformed_summary` and
+  `$transformed_coefficients` (these are `NULL` otherwise). In 3.2.0 the
+  plain names held the transformed model whenever a transformation was
+  applied. What `print()` and the report show has not changed. To get the
+  table that was reported:
+  `tab <- if (out$y$Response_Transformed) out$y$transformed_anova else out$y$anova`.
+  `f_aov()` already worked this way (`$aov_summary` untransformed,
+  `$transformed_aov_summary` transformed).
+
+* **`f_aov()` now analyses block designs.** `f_aov()` skipped any analysis
+  in which one group combination had only one observation, saying the model
+  was "saturated". That also blocked ordinary designs such as a randomised
+  complete block design (`height ~ block + treatment`, one plant per
+  treatment per block), which can be analysed perfectly well. `f_aov()` now
+  only skips a model that truly has no degrees of freedom left for the
+  error. For such a model no F-test exists, so `force_aov = TRUE` now stops
+  with an explanation instead of fitting it.
+
+## New Features in Existing Functions
+
+* **`f_remove_outliers()` can keep the rows and set only values to `NA`.**
+  With `set_na = TRUE` the rows stay and only the outlier values become
+  missing, so the other measurements of that plant stay in the analysis.
+  With an `f_outliers()` result, exactly the flagged values in the column(s)
+  where they were flagged are cleared; `columns` limits this to some checked
+  columns. By hand, give row numbers (or IDs with `by`) and the columns:
+  `f_remove_outliers(df, c(21, 32), set_na = TRUE, columns = "biomass_g")`.
+  The message says which values were set to `NA`.
+
+* **Removed rows with missing values are reported in the console.** The test
+  and model functions leave out rows with a missing value (NA) in the columns
+  of the formula, as R does. Until now only the Word, PDF and R Markdown
+  reports said so. `f_aov()`, `f_lm()`, `f_glm()`, `f_lmer()`,
+  `f_t_test()`, `f_wilcox_test()`, `f_kruskal_test()` and `f_friedman()`
+  now also print a message, for example
+  `3 rows with missing values (NA) removed from analysis (NA in: height_cm).`
+  Functions that drop NA rows per response (`f_glm()`, `f_friedman()`) name
+  the response. No message when nothing was removed.
+
+* **`f_stat_wizard()` recognises ordinal responses.** A response stored as an
+  ordered factor (for example a leaf-damage score from 1 to 5,
+  `factor(score, ordered = TRUE)`) is now classified as ordinal. The wizard
+  recommends a rank-based test on the rank codes of the levels:
+  `f_wilcox_test()` for two groups, `f_kruskal_test()` for three or more,
+  the paired versions or `f_friedman()` when `id_col` is given, and a
+  Spearman correlation for a numeric predictor. With several predictors or
+  random effects it points to ordinal regression (`MASS::polr`,
+  `ordinal::clmm`). Before, an ordered factor was treated as unordered
+  categories (chi-square test). A numeric response of whole numbers on a short
+  scale (at most 10 values up to 10) is still analysed as count data, but the
+  report now says that it may be a score and shows how to store it as an
+  ordered factor.
+
+* **Choose your post hoc tables: new `post_hoc` and `by` arguments** in
+  `f_aov()`, `f_lm()` and `f_lmer()`, with the same meaning in all three:
+  - By default you get a table for each factor and, for each significant
+    interaction, a table of all combinations. A factor that is not
+    significant is still shown, with `ns` instead of letters. A factor that
+    is part of a significant interaction gets an "Interpret with caution"
+    note, because its average over the other factor can hide what happens
+    at each level. Numeric predictors get no table.
+  - `post_hoc = "treatment"` shows only that table. This is the way to leave
+    blocks out of the comparisons: the block stays in the model, but nobody
+    needs letters for blocks:
+    `f_aov(height ~ block + treatment, data = d, post_hoc = "treatment")`.
+    `post_hoc = "treatment:week"` shows the table of all combinations;
+    `post_hoc = FALSE` turns the post hoc off.
+  - `by = "week"` (together with `post_hoc = "treatment"`) compares the
+    treatments separately within each week. This needs far fewer
+    comparisons than the full combination table (for 4 treatments x 3 weeks:
+    18 instead of 66), so it has more power.
+  - Each table has its own letters, its own p-value adjustment and its own
+    footer, and says "Letters are compared within this table only." A
+    misspelled term name stops with a "did you mean" suggestion.
+  - The tables are returned as `out$y$post_hoc[["treatment"]]`,
+    `out$y$post_hoc[["treatment:week"]]` or
+    `out$y$post_hoc[["treatment | week"]]`, each with the same parts in all
+    three functions (`emmeans`, `pairs`, `cld`, `cld_text`, `caution`).
+  - Plots and Excel output follow the tables: a factor left out of
+    `post_hoc` gets no plot, the letters on a plot come from that factor's
+    own table, and the Excel file has one sheet per table. For `by`,
+    `f_aov()` draws a plot with the letters per level of `by`.
+
+* **`f_glm()`: yes/no responses with a new `event` argument.** For a
+  logistic regression (`family = binomial`) on a factor such as
+  `infected` ("no"/"yes"), write `event = "yes"` to say which outcome you
+  model. This matters: R's own `glm()` silently models the second level in
+  alphabetical order, so the labels "healthy"/"diseased" would give you
+  P(healthy) and turn every effect around. rfriend does not guess; without
+  `event` it stops and shows the levels and the call to use. The chosen
+  coding is printed, shown in the report and on the plots
+  ("P(infected = yes)"), and stored in `out$y$event_coding`. With three or
+  more levels, `event` can name one or more levels; the others are combined
+  and the report says which. Logical (`TRUE`/`FALSE`) responses need no
+  `event`.
+
+* **`f_stat_wizard()` knows the newer functions.** It now recommends
+  `f_lm()` for a numeric predictor, `f_friedman()` for repeated measurements
+  that are not normal, and `f_lmer()` for repeated measurements that are.
+  Its suggested `f_glm()` code for a yes/no factor includes `event`, and
+  `run = TRUE` can run all of these.
+
+* **Reports say which scale a test is on.** The ANOVA and t-test headings in
+  `f_aov()`, `f_lm()` and `f_t_test()` now read, for example,
+  "ANOVA on Box-Cox transformed height_cm (lambda = -0.131)" or
+  "ANOVA on height_cm (untransformed)".
+
+* **Easier checks on transformed results.** `f_aov()` always returns
+  `$transformed_aov_summary` (it is `NULL` when nothing was transformed), and
+  `f_t_test()` returns `$transformed_t_test` in the same way, so
+  `is.null()` tells you reliably whether a transformation was used.
+
+* **`f_pander()` prints `f_summary()` results directly** instead of warning
+  and printing an untidy list.
+
+* **`f_remove_outliers()` works when no outliers were found.** It now
+  accepts the `NULL` that `f_outliers()` returns in that case and gives your
+  data back unchanged, so the find-then-remove steps also run on clean data.
+
+## Deprecated
+
+These still work in 3.2.1 but will be removed in the next release.
+
+* `f_aov()`: `$post_hoc_summary_table`, `$summary_table` and `$cld_text`;
+  `f_lm()`: `$post_hoc_summary_table`, `$emmeans_table` and `$cld_text`.
+  They used to hold the single post hoc table. They now hold the
+  combinations table if there is a significant interaction, otherwise the
+  first table. Use `$post_hoc[[name]]` instead.
+
+* `f_t_test()`: `$t_test_transformed` is now called `$transformed_t_test`.
+
+* **Plot switches have the same names in all test functions.** The figures in
+  a report are switched with `diagnostic_plots` (assumption and residual
+  checks) and `effect_plots` (effect, estimated-means, interaction and
+  coefficient forest plots); `contrast_plots` is unchanged. The old names
+  still work, with a deprecation warning:
+  - `f_aov()`: `norm_plots` is now `diagnostic_plots`, `interaction_plots`
+    is now `effect_plots`.
+  - `f_lm()`, `f_t_test()`, `f_wilcox_test()`: `norm_plots` is now
+    `diagnostic_plots`.
+  - `f_glm()`, `f_lmer()`: `effect_plot` is now `effect_plots`.
+  - `f_kruskal_test()`, `f_friedman()`: `plot` is replaced by
+    `diagnostic_plots` (density plot / within-block trace plot) and
+    `effect_plots` (boxplot with letters); `plot` sets both.
+  - New: `f_t_test()` and `f_wilcox_test()` get `effect_plots` for the main
+    effect plot, which could not be switched off before.
+
+## Minor Changes
+
+* **Printed messages use plain ASCII punctuation.** Messages and report
+  lines of `f_stat_wizard()`, `f_aov()`, `f_corplot()` and `f_glm()` used
+  an em dash (a long dash), which is not ASCII and does not always display
+  or render to PDF correctly. They now use a colon, semicolon or comma, for
+  example "WARN: Unbalanced pairing: 60 subject x group combination(s) are
+  missing". The pairing lines of the `f_stat_wizard()` report also use a
+  plain "x" instead of a multiplication sign ("20 subjects x 3 groups").
+  In `f_glm()`,
+  the placeholder shown in the Letter column when LRT letters cannot be
+  computed is now `"-"` instead of an em dash. Code that tests for the
+  old placeholder should test for `"-"`.
+
+* **`unique_num_threshold` can now be spelled correctly** in `f_factors()`
+  and `f_corplot()`. The argument was named `unique_num_treshold` (missing
+  the "h"), next to the correctly spelled `repeats_threshold`. Both
+  spellings are now accepted, so existing scripts keep working; the help
+  pages use the correct spelling. Giving both spellings with different
+  values stops with an error.
+
+* The help for `repeats_threshold` (`f_factors()`, `f_corplot()`) now
+  describes what the code does: a numeric column becomes a factor only when
+  a value occurs *more than* `repeats_threshold` times, so with the default
+  of 2 a value has to occur at least three times. The help said 2 repeats
+  were enough. The behaviour itself has not changed.
+
+* The package description (DESCRIPTION) has been rewritten to give a short
+  overview of what rfriend does, including the newer functions `f_lm()`,
+  `f_friedman()`, `f_lmer()` and `f_stat_wizard()`, and now links to the
+  GitHub repository as well as the website.
+
+* The example workbook `plant_trial_raw.xlsx` (see `f_example_data()`) has
+  a second sheet, `meta_data`: a codebook with the meaning, unit and
+  intended values of each column. The raw data on the first sheet is
+  unchanged. Handy for practising `readxl::excel_sheets()` and
+  `read_excel(sheet = )` on a workbook with more than one sheet. The
+  `?plant_trial` help page now mentions it, and its `infected` entry uses
+  `f_glm(..., event = "yes")` instead of converting to 0/1.
+
+* The minimum Pandoc version (needed for Word and PDF output) is now stated
+  the same way everywhere: Pandoc 3.1 or higher. DESCRIPTION used to say
+  3.2 and the help pages 1.12.3.
+
+* The README has been rewritten and now shows an example report
+  (`man/figures/report-example.png`).
+
+## Bug Fixes
+
+* **`bad_rows$row_id` works on an `f_outliers()` result.** The result is a
+  list of tables (`output_df`, or one per checked column), so `bad_rows$row_id`
+  returned `NULL` without a warning, and `df$x[bad_rows$row_id] <- NA` silently
+  changed nothing. `$` now reaches the columns of the outlier table:
+  `bad_rows$row_id` gives the flagged rows (with several checked columns: all
+  of them), and with one checked column any column of the table works. A name
+  that is not part of the result stops with an error that lists what is
+  available. `[[` keeps the standard list behaviour.
+* **"Removed 1 outlier row."** `f_remove_outliers()` now uses the singular
+  and plural correctly ("outlier row" / "outlier rows").
+
+* **`f_example_data(dest = "data")` creates the folder.** When the folder did
+  not exist yet, the file was copied to a *file* named `data` (no extension),
+  with a message that looked like success. A `dest` without a file extension
+  (or ending in `/`) is now a folder: it is created if needed, with a
+  message, and the original file name is kept. A `dest` with a file
+  extension whose folder does not exist stops with a clear message.
+
+* **`subset` can pick two groups in `f_t_test()` and `f_wilcox_test()`.**
+  `f_t_test(y ~ treatment, data = d, subset = treatment %in% c("A", "B"))`
+  stopped with "Grouping variable must have exactly 2 levels", because the
+  two-group check ran on the full data before `subset` was applied. The
+  check now runs after the subset and the removal of missing values, and the
+  error names the levels it found.
+
+* **`f_t_test()` and `f_wilcox_test()` reports counted `subset` rows as
+  missing.** With `subset`, the report line "Removed n rows with missing
+  values" also counted the rows that `subset` left out. It now counts only
+  the rows removed because of NA.
+
+* **Ordinal responses in the rank tests.** `f_kruskal_test()` and
+  `f_friedman()` stopped with an internal error ("'type' must be 1 or 3 for
+  ordered factors") when the response was an ordered factor, such as a score
+  stored with `factor(score, ordered = TRUE)`. Rank tests use only the order
+  of the values, so `f_kruskal_test()`, `f_friedman()` and `f_wilcox_test()`
+  now test an ordered-factor response on the rank codes of its levels
+  (1 = lowest level) and print a message with the coding. Any other
+  non-numeric response stops with a clear message that points to
+  `factor(..., ordered = TRUE)` for scores and `f_chisq_test()` for unordered
+  categories.
+
+* `f_wilcox_test()` opened the generated Word, PDF or Excel file even when
+  run from a script, because `open_generated_files` defaulted to `TRUE`. It
+  now defaults to `interactive()`, as in the other functions and as the help
+  page already said.
+
+* **`f_model_compare()` accepts rfriend results.** Passing the result of
+  `f_lm()`, `f_aov()`, `f_glm()` or `f_lmer()` failed with an unreadable
+  error ("arguments imply differing number of rows"). The fitted model
+  stored in the result is now used. A result with several responses, or
+  with a response that was transformed, stops with a message that says what
+  to do instead.
+
+* **`f_model_compare()` uses a chi-square test for Poisson GLMs.** For
+  nested GLMs only binomial models got a likelihood-ratio (chi-square)
+  test; Poisson (and negative binomial) models got an F test, with R's
+  warning "using F test with a 'poisson' family is inappropriate". Families
+  with a fixed dispersion now get the chi-square test; gaussian, Gamma and
+  quasi families keep the F test.
+
+* **`f_model_compare()` compares mixed models on ML, not REML.** Models
+  fitted with REML (the `lme4::lmer()` default, and the models stored by
+  `f_lmer()`) are refitted with ML before AIC, BIC and the log-likelihood
+  are computed, with a message. Before, the REML criteria were reported,
+  which are not comparable between models with different fixed effects.
+  When `anova()` refuses two mixed models because their calls hold
+  different data objects (as for models stored by `f_lmer()`), the
+  likelihood-ratio test is computed directly instead of failing.
+
+* **`f_glm()` with an intercept-only model (`y ~ 1`)** stopped with
+  "'dim' cannot be of length 0". It now fits the model and skips the post
+  hoc step, which has nothing to compare.
+
+* `f_summary()` reported far too large skewness and kurtosis values (about
+  58 times too large for 60 observations), so even perfectly symmetric data
+  looked strongly skewed. The values are now the standard sample skewness and
+  excess kurtosis (the same as SPSS and SAS report), and missing values are
+  no longer counted.
+
+* `f_wilcox_test()` failed when `subset` referred to a column of the data,
+  e.g. `subset = week == 6` gave "object 'week' not found". It now works.
+
+* `print()` of an `f_lmer()` result showed the same footer line under every
+  post hoc table, with the wrong numbers for most of them (e.g. "3 estimates
+  / 3 tests" under a factor with 4 levels). Each table now shows its own
+  numbers. The "Interpret with caution" note for a factor that is part of a
+  significant interaction is now also shown in the console, not only in the
+  report.
+
+* `print()` of an `f_aov()` result with a transformed response showed the
+  ANOVA table of the *untransformed* response under the heading
+  "TRANSFORMED". It now shows the transformed table.
+
+* `f_aov()` with an `Error()` term (repeated-measures ANOVA written as
+  `y ~ time + Error(subject/time)`) is not supported; it now says so and
+  shows the equivalent `f_lmer()` call, instead of skipping the analysis
+  with a misleading message.
+
+* `f_model_compare()` on models fitted with an `Error()` term failed with an
+  unclear internal error after its warning. It now stops with a clear
+  message that suggests a mixed model instead.
+
+* `f_stat_wizard()` suggested chi-square code that did not run. It now
+  suggests `f_chisq_test(table(data$x, data$y))`. It also no longer suggests
+  an `f_aov(... + Error())` call.
+
+* `f_chisq_test()` showed the second variable as `y` in its output instead
+  of its real name, and its printout ended without a line break.
+
+* The notes under the letters tables of `f_kruskal_test()` and
+  `f_friedman()` were missing a bracket and a space
+  ("(alpha = 0.050.Groups ...").
+
+* The help page of `f_lmer()` said the post hoc only runs when a term is
+  significant. In fact every factor is shown, with `ns` when it is not
+  significant; the help page now says so.
+
+* `f_summary(..., digits = NULL)` did not switch rounding off, although the
+  help page says it does: it printed 2 decimals, the same as the default. It
+  now prints the unrounded values. Likewise, `allow_integer_decimal_mix =
+  TRUE` given to `f_summary()` had no effect on the printed table (only on
+  the Excel export); it now does. The default `digits` is now 2 in the
+  function itself as well, as the help page always said, so default output
+  does not change. The returned values were never rounded and still are not.
+
+* After a transformation was tried and not kept, `print()` of an `f_aov()`
+  result still advised "ENABLE the transformation option" under the
+  residual warnings, although the transformation was already on. It now
+  says the transformation was tried but not kept, as the report does, and
+  only suggests `transformation = TRUE` when you switched it off.
+
 # rfriend 3.2.0 (2026-07-04)
 
 ## New Functions

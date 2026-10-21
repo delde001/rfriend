@@ -12,9 +12,10 @@ f_lmer(
   alpha = 0.05,
   adjust = "sidak",
   diagnostic_plots = TRUE,
-  effect_plot = TRUE,
+  effect_plots = TRUE,
   contrast_plots = FALSE,
   post_hoc = TRUE,
+  by = NULL,
   intro_text = TRUE,
   output_type = "default",
   save_as = NULL,
@@ -22,6 +23,7 @@ f_lmer(
   close_generated_files = FALSE,
   open_generated_files = interactive(),
   norm_plots = lifecycle::deprecated(),
+  effect_plot = lifecycle::deprecated(),
   ...
 )
 }
@@ -73,7 +75,7 @@ pairwise comparisons in the post hoc step (passed to
 (residuals vs fitted, Q-Q of level-1 residuals, Q-Q of random-effect
 BLUPs, scale-location) are included in the output.}
 
-\item{effect_plot}{Logical. If \code{TRUE} (default), an estimated
+\item{effect_plots}{Logical. If \code{TRUE} (default), an estimated
 marginal means plot (estimate \eqn{\pm} 95\% CI, with jittered raw
 data and compact-letter-display labels) is added after each
 categorical fixed-effect term's post hoc table. For a significant
@@ -124,27 +126,38 @@ cell-contrast plots are stored as
 interaction cell-means tables. Contrast CIs use the same \code{adjust}
 method as the post hoc p-values, so figure and table agree.}
 
-\item{post_hoc}{Logical. If \code{TRUE} (default), runs
-\code{emmeans::emmeans()} pairwise comparisons \strong{only when}
-the linear mixed model finds a significant fixed-effect term
-(ANOVA p-value below \code{alpha}). The post hoc is performed on
-each significant factor fixed-effect term separately. Numeric
-covariates are skipped because their slope is already reported in
-the fixed-effects coefficient table; pairwise contrasts are not
-meaningful for a continuous predictor. If no fixed-effect term is
-significant, no post hoc is run. When a significant interaction
-between categorical factors is present, an additional
-\strong{cell-means} post hoc table is produced for that interaction
+\item{post_hoc}{Which post hoc tables to build; the same syntax as
+\code{\link{f_aov}}. \code{TRUE} (default) or \code{NULL}: every categorical
+fixed-effect main effect gets its own marginal-means table
+(\code{emmeans::emmeans()} pairwise comparisons with a compact letter
+display). A term that is not significant is still tabulated, with letters
+shown as \code{"ns"}, because the estimates and CIs are often needed for
+manuscript tables. Numeric covariates get no table: their slope is already
+reported in the fixed-effects coefficient table, and pairwise contrasts are
+not meaningful for a continuous predictor. Every significant interaction
+between categorical factors gets an additional \strong{cell-means} table
 (estimated mean for every factor-level combination, compared
-simultaneously, with a compact letter display and pairwise
-contrasts), matching \code{\link{f_aov}}. It is stored alongside the
-main-effect results under the interaction term name, e.g.
-\code{out$y1$post_hoc[["a:b"]]}. In addition, when a main-effect term
-takes part in a significant interaction, a caution note is printed
-directly above that term's marginal-means table (and the term's
-heading is annotated), warning that the marginal means average over
-the interacting factor and can hide or reverse the real pattern; the
-interaction cell-means table and plot(s) should be read instead.}
+simultaneously, with a compact letter display and pairwise contrasts),
+stored under the interaction term name, e.g.
+\code{out$y1$post_hoc[["a:b"]]}. When a main-effect term takes part in a
+significant interaction, a caution note is printed directly above that
+term's marginal-means table (and the heading is annotated), warning that the
+marginal means average over the interacting factor and can hide or reverse
+the real pattern; read the interaction cell-means table and plot(s)
+instead. \code{FALSE}: no post hoc. A character vector of terms: only those
+tables, e.g. \code{post_hoc = "treatment"} or
+\code{post_hoc = "treatment:week"} (tabulated with \code{"ns"} letters when
+not significant). Unknown or misspelled names stop with a "did you mean"
+error.}
+
+\item{by}{\code{NULL} (default) or one categorical fixed-effect predictor,
+used with \code{post_hoc} for simple effects:
+\code{post_hoc = "treatment", by = "week"} compares the treatments within
+each week (\code{emmeans(model, ~ treatment | week)}), with letters and the
+p-value adjustment computed per level of \code{by}, stored as
+\code{out$y1$post_hoc[["treatment | week"]]}. The rules are those of
+\code{\link{f_aov}}: \code{by} requires \code{post_hoc}, must not also be
+named in it, and cannot be combined with an interaction term there.}
 
 \item{intro_text}{Logical. If \code{TRUE} (default), prepends an
 explanation of LMM assumptions and the random-effects syntax linked
@@ -177,9 +190,11 @@ files after creation. Defaults to \code{TRUE} in an interactive R session
 and \code{FALSE} otherwise (e.g. in scripts or automated pipelines).
 Set to \code{TRUE} or \code{FALSE} to override this behaviour explicitly.}
 
-\item{norm_plots}{`r lifecycle::badge("deprecated")` Deprecated in
-version 4.0.0. Use \code{diagnostic_plots} instead. If supplied, its
-value is passed through to \code{diagnostic_plots} with a warning.}
+\item{norm_plots}{\strong{Deprecated} in 3.2.0. Use \code{diagnostic_plots} instead. If
+supplied, its value is passed to \code{diagnostic_plots} with a warning.}
+
+\item{effect_plot}{\strong{Deprecated} in 3.2.1. Use \code{effect_plots} instead. If
+supplied, its value is passed to \code{effect_plots} with a warning.}
 
 \item{...}{Additional arguments forwarded to \code{\link[lmerTest]{lmer}}.
 The arguments \code{subset}, \code{na.action}, and \code{weights}
@@ -355,7 +370,7 @@ fit usually means the random-effects structure is too complex for the
 data (often a random slope with too few levels) - simplify the model
 before interpreting results.
 
-This function requires Pandoc (>= 1.12.3) for \code{pdf}, \code{word}
+This function requires Pandoc (>= 3.1) for \code{pdf}, \code{word}
 and \code{rmd} output. See \code{\link{f_aov}} for installation notes.
 }
 \section{Multiple Testing Across Response Variables}{

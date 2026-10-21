@@ -127,7 +127,7 @@ This function will plot all numeric and factor candidates, use the function \cod
 
 Note that there is an optional \code{jitter} option to plot all individual data points over the boxplots.
 
-This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.
+This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or higher), a universal document converter.
 
 \bold{Windows:} Install Pandoc and ensure the installation folder \cr (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.
 

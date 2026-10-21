@@ -33,8 +33,8 @@ are replaced with the string specified by \code{na_string}. If
 \item{na_string}{Character string used to replace \code{NA} values in the
 output when \code{replace_na = TRUE}. Use \code{"-"} (default) for a
 standard "not available" dash, \code{""} for empty cells, or any other
-string as needed. Note that special characters such as the em dash
-(\code{"\u2014"}) may require additional LaTeX declarations when rendering
+string as needed. Note that non-ASCII characters (for example a
+long dash) may require additional LaTeX declarations when rendering
 to PDF via \code{pdflatex}. Default is \code{"-"}.}
 
 \item{allow_integer_decimal_mix}{Logical. If \code{TRUE}, each individual cell is evaluated: integer values are displayed without decimal places, and non-integer values are displayed with the specified number of decimal places, i.e. \code{digits}. Default is \code{FALSE}, when a column contains a mix of integers and decimal values, all values are displayed with the specified number of decimal places. Note: columns containing only integers are **always** displayed without decimal places, regardless of \code{allow_integer_decimal_mix}.}

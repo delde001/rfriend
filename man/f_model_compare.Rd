@@ -14,9 +14,9 @@ f_model_compare(
 )
 }
 \arguments{
-\item{model1}{The first model object. Supported classes include: \code{"lm", "glm", "aov", "lmerMod", "glmerMod", and "nls"}.}
+\item{model1}{The first model object. Supported classes include: \code{"lm", "glm", "aov", "lmerMod", "glmerMod", and "nls"}. The result of \code{f_lm()}, \code{f_aov()}, \code{f_glm()} or \code{f_lmer()} (for one response) is also accepted; the fitted model stored in it is used.}
 
-\item{model2}{The second model object. Supported classes include: \code{"lm", "glm", "aov", "lmerMod", "glmerMod", and "nls"}.}
+\item{model2}{The second model object. Supported classes include: \code{"lm", "glm", "aov", "lmerMod", "glmerMod", and "nls"}. The result of \code{f_lm()}, \code{f_aov()}, \code{f_glm()} or \code{f_lmer()} (for one response) is also accepted; the fitted model stored in it is used.}
 
 \item{nested}{Logical. If \code{TRUE}, assumes the models are nested and performs an ANOVA comparison.
 If \code{NULL} (default), the function attempts to automatically determine if the models are nested.}
@@ -67,6 +67,16 @@ automatically swaps them and issues a message.
 
 If the models are nested, an ANOVA test is performed to compare them, and a p-value
 is provided to assess whether the more complex model significantly improves fit.
+For linear models this is an F test. For GLMs with a fixed dispersion
+(binomial, poisson, negative binomial) it is a likelihood-ratio
+(chi-square) test; for GLMs with an estimated dispersion (gaussian, Gamma,
+quasi families) it is an F test. Mixed models are compared with a
+likelihood-ratio test.
+
+Linear mixed models fitted with REML (the \code{lme4::lmer()} default, and
+the models stored by \code{f_lmer()}) are refitted with maximum likelihood
+before the comparison, with a message: AIC, BIC and the log-likelihood of
+REML fits are not comparable between models with different fixed effects.
 }
 \note{
 \itemize{
@@ -92,7 +102,14 @@ The function supports the following model classes:
   }
 
 Note: Multi-stratum AOV models (fitted with \code{Error()}) are not supported
-and will produce a warning.
+and stop with an error that suggests the equivalent mixed model.
+
+Results of rfriend test functions are accepted as well: for a result of
+\code{f_lm()}, \code{f_aov()}, \code{f_glm()} or \code{f_lmer()} the
+fitted model stored in it is compared. A result with more than one response,
+or with a response that the function transformed (Box-Cox or
+bestNormalize), stops with a message, because models on different scales
+cannot be compared on AIC, BIC or likelihood.
 }
 
 \examples{

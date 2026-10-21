@@ -168,6 +168,40 @@ test_that("show_skew + show_kurtosis = TRUE both present", {
   expect_true("kurt" %in% names(res$output_df))
 })
 
+# Reference values from the moment form, independent of the implementation:
+# G1 = g1 * sqrt(n (n - 1)) / (n - 2),  g1 = m3 / m2^1.5
+# G2 = ((n + 1) g2 + 6) (n - 1) / ((n - 2) (n - 3)),  g2 = m4 / m2^2 - 3
+ref_G1 <- function(x) {
+  n <- length(x); d <- x - mean(x)
+  m2 <- mean(d^2); m3 <- mean(d^3)
+  (m3 / m2^1.5) * sqrt(n * (n - 1)) / (n - 2)
+}
+ref_G2 <- function(x) {
+  n <- length(x); d <- x - mean(x)
+  m2 <- mean(d^2); m4 <- mean(d^4)
+  ((n + 1) * (m4 / m2^2 - 3) + 6) * (n - 1) / ((n - 2) * (n - 3))
+}
+
+test_that("skew and kurt equal the sample G1 and G2 estimators", {
+  x <- c(1, 2, 3, 4, 10, 15, 2.5, 3.3)
+  res <- f_summary(data.frame(x = x), show_skew = TRUE, show_kurtosis = TRUE)
+  expect_equal(unname(res$output_df$skew), ref_G1(x), tolerance = 1e-10)
+  expect_equal(unname(res$output_df$kurt), ref_G2(x), tolerance = 1e-10)
+})
+
+test_that("symmetric data has skew 0", {
+  res <- f_summary(test_data, columns = "value", show_skew = TRUE)
+  expect_equal(unname(res$output_df$skew), 0, tolerance = 1e-12)
+})
+
+test_that("skew and kurt ignore NAs", {
+  res_na <- f_summary(na_data, columns = "value",
+                      show_skew = TRUE, show_kurtosis = TRUE)
+  x <- na_data$value[!is.na(na_data$value)]
+  expect_equal(unname(res_na$output_df$skew), ref_G1(x), tolerance = 1e-10)
+  expect_equal(unname(res_na$output_df$kurt), ref_G2(x), tolerance = 1e-10)
+})
+
 test_that("turning off ALL optional stats leaves only n", {
   res <- f_summary(test_data, columns = "value",
                    show_mean = FALSE, show_sd = FALSE, show_se = FALSE,
@@ -278,6 +312,43 @@ test_that("digits = 4 preserves at least 4 decimal places for non-integer values
 test_that("digits = NULL applies no rounding", {
   res <- f_summary(test_data, columns = "value", digits = NULL)
   expect_equal(res$output_df$mean, mean(test_data$value))
+})
+
+# The rounding is applied when printing, so test the printed table, not the
+# stored values (those are never rounded).
+printed_row <- function(x, ...) {
+  out <- utils::capture.output(print(x, ...))
+  grep("^[0-9]", trimws(out), value = TRUE)[1]
+}
+d_round <- data.frame(v = c(10.6, 20.0, 47.565))   # mean 26.055, sd 19.57...
+
+test_that("print: default digits = 2, digits = 3 and digits = NULL (unrounded)", {
+  expect_match(printed_row(f_summary(d_round, columns = "v")), "26.05 ", fixed = TRUE)
+  expect_match(printed_row(f_summary(d_round, columns = "v", digits = 3)), "26.055", fixed = TRUE)
+  row_null <- printed_row(f_summary(d_round, columns = "v", digits = NULL))
+  expect_match(row_null, "26.055", fixed = TRUE)
+  expect_match(row_null, format(sd(d_round$v), digits = getOption("digits")), fixed = TRUE)
+})
+
+test_that("print: digits given to print() overrides the one stored by f_summary()", {
+  res <- f_summary(d_round, columns = "v", digits = NULL)
+  expect_match(printed_row(res, digits = 1), "26.1", fixed = TRUE)
+})
+
+test_that("print: an object without stored formatting still prints with 2 decimals", {
+  res <- f_summary(d_round, columns = "v", digits = 3)
+  attr(res, "digits") <- NULL
+  attr(res, "allow_integer_decimal_mix") <- NULL
+  expect_match(printed_row(res), "26.05 ", fixed = TRUE)
+})
+
+test_that("allow_integer_decimal_mix given to f_summary() reaches the printed table", {
+  d_mix <- data.frame(v = c(1, 3, 2, 2.5), g = c("a", "a", "b", "b"))
+  row_a <- function(x) grep("^a ", utils::capture.output(print(x)), value = TRUE)
+  mixed   <- row_a(f_summary(v ~ g, data = d_mix, allow_integer_decimal_mix = TRUE))
+  uniform <- row_a(f_summary(v ~ g, data = d_mix))
+  expect_match(mixed,   "^a\\s+2\\s+2\\s+1\\.41")      # mean 2 shown as a whole number
+  expect_match(uniform, "^a\\s+2\\s+2\\.00\\s+1\\.41")  # mean 2.00 in a decimal column
 })
 
 

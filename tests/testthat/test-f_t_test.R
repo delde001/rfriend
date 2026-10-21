@@ -873,13 +873,13 @@ test_that("print.f_t_test runs without error", {
   expect_no_error(print(result))
 })
 
-test_that("Normality plot file exists after run with norm_plots = TRUE", {
+test_that("Normality plot file exists after run with diagnostic_plots = TRUE", {
   skip_on_cran()
   result <- f_t_test(
     y ~ 1,
     data = df_one,
     output_type = "default",
-    norm_plots = TRUE,
+    diagnostic_plots = TRUE,
     transformation = FALSE,
     intro_text = FALSE
   )

@@ -181,6 +181,8 @@ f_outliers <- function(x, ...) {
 #' @export
 #' @rdname f_outliers
 f_outliers.numeric <- function(x, ...) {
+
+
   # Extract hidden internal argument -- not exposed in the help file
   data <- x
   dots <- list(...)
@@ -257,6 +259,17 @@ f_outliers.data.frame <- function(x,
                                   digits_excel = NULL,
                                   allow_integer_decimal_mix = FALSE,
                                   ...) {
+
+
+  # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  # check_dots to prevent ignoring typos
+  # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  check_known_dots(...names(), ...length(),
+                   allowed    = 	c("data", "internal_col_name", "internal_data_name"),
+                   fun_name   = "f_outliers",
+                   valid_args = names(formals(sys.function())))
+
+
   data <- x
 
   # Input Validation & Setup
@@ -319,6 +332,9 @@ f_outliers.data.frame <- function(x,
   # Create a list to store all outputs in this function
   output_list <- list()
   output_excel<- list()
+  # Which checked column each result table belongs to (used by
+  # f_remove_outliers(set_na = TRUE) to clear exactly the flagged values).
+  table_columns <- list()
 
   # Preserve Original Row Number
   work_data <- data
@@ -397,8 +413,10 @@ f_outliers.data.frame <- function(x,
     # For backward compatability use the name "output_df" when only one column is produced.
     if (single_col) {
       output_list[["output_df"]] <- final_result
+      table_columns[["output_df"]] <- target_col
     } else {
       output_list[[target_col]] <- final_result
+      table_columns[[target_col]] <- target_col
     }
 
     # Use separate rounding for excel or default to no rounding.
@@ -447,6 +465,8 @@ f_outliers.data.frame <- function(x,
   }
 
   attr(output_list, "digits") <- digits
+  attr(output_list, "outlier_columns") <- unlist(table_columns)
+  attr(output_list, "id_column") <- if (is.null(id_var)) "row_id" else id_var
 
   if (length(output_list) == 0) {
     message("No outliers found in any column.")
@@ -503,3 +523,47 @@ print.f_outliers <- function(x,
   }
 }
 
+
+
+#' Access parts of an f_outliers result with $
+#'
+#' An \code{f_outliers} result is a list of tables: \code{output_df} when one
+#' column was checked, or one table per checked column. \code{$} gives
+#' these tables by name, as usual. In addition, a column of the outlier table
+#' can be taken directly from the result: \code{bad_rows$row_id} returns the
+#' flagged row numbers (with several checked columns: all flagged rows), and
+#' with one checked column any column of its table works, for example
+#' \code{bad_rows$biomass_g}. A name that is not part of the result stops
+#' with an error that lists what is available, instead of returning
+#' \code{NULL} silently. Use \code{[[} for the standard list behaviour.
+#'
+#' @param x An object of class \code{f_outliers}.
+#' @param name The name of a result table or of a column in the outlier table.
+#' @return A data frame (a result table) or a vector (a column).
+#' @examples
+#' bad_rows <- f_outliers(biomass_g ~ treatment, data = plant_trial)
+#' bad_rows$row_id       # the flagged row numbers
+#' bad_rows$output_df    # the full outlier table
+#' @export
+`$.f_outliers` <- function(x, name) {
+  tabs <- unclass(x)
+  if (name %in% names(tabs)) return(tabs[[name]])
+
+  id_col <- attr(x, "id_column")
+  if (is.null(id_col)) id_col <- "row_id"
+  if (length(tabs) == 1L) {
+    if (name %in% names(tabs[[1L]])) return(tabs[[1L]][[name]])
+  } else if (name %in% c("row_id", id_col)) {
+    ids <- unlist(lapply(tabs, function(d) d[[name]]), use.names = FALSE)
+    return(sort(unique(ids)))
+  }
+
+  available <- names(tabs)
+  if (length(tabs) == 1L) {
+    available <- c(available, names(tabs[[1L]]))
+  } else {
+    available <- c(available, unique(c("row_id", id_col)))
+  }
+  stop("'", name, "' is not part of this f_outliers result. Available: ",
+       paste(available, collapse = ", "), ".", call. = FALSE)
+}

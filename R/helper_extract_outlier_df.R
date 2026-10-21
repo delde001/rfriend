@@ -6,7 +6,7 @@
 # Returns NULL if no outlier data.frame can be recovered.
 extract_outlier_df <- function(x) {
   if (is.null(x)) return(NULL)
-  if (inherits(x, "f_outliers") && !is.null(x$output_df)) return(x$output_df)
+  if (inherits(x, "f_outliers") && !is.null(x[["output_df"]])) return(x[["output_df"]])
   if (is.data.frame(x)) return(x)
   NULL
 }

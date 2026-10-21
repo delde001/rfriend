@@ -4,7 +4,14 @@
 \alias{f_remove_outliers}
 \title{Remove Outliers from Data}
 \usage{
-f_remove_outliers(data, outliers, by = "row_id", verbose = TRUE)
+f_remove_outliers(
+  data,
+  outliers,
+  by = "row_id",
+  verbose = TRUE,
+  set_na = FALSE,
+  columns = NULL
+)
 }
 \arguments{
 \item{data}{A data.frame, tibble, or data.table containing the original data.}
@@ -13,20 +20,37 @@ f_remove_outliers(data, outliers, by = "row_id", verbose = TRUE)
 \itemize{
   \item A dataframe returned by \code{\link{f_outliers}}.
   \item A vector of IDs/row numbers to remove.
+  \item \code{NULL}, which is what \code{\link{f_outliers}} returns when it
+    finds no outliers. The data is then returned unchanged (with a
+    message when \code{verbose = TRUE}), so the find-then-remove pair
+    also runs on data without outliers.
 }}
 
 \item{by}{A character string specifying the column to match on. Default is \code{"row_id"}.
 If the source \code{data} does not have a \code{row_id} column, the function effectively
 uses the row numbers (1, 2, 3...) to ensure safe deletion.}
 
-\item{verbose}{Logical. If \code{TRUE} (default), prints a summary of how many rows were removed.}
+\item{verbose}{Logical. If \code{TRUE} (default), prints a summary of what was removed.}
+
+\item{set_na}{Logical. If \code{FALSE} (default), whole rows are removed. If
+\code{TRUE}, the rows are kept and only the values are set to \code{NA}
+(missing): with an \code{f_outliers} result, exactly the flagged values in
+the column(s) where they were flagged; with a vector of IDs or a data
+frame, the values in \code{columns} of those rows.}
+
+\item{columns}{Character vector of column names. Only used with
+\code{set_na = TRUE}. With an \code{f_outliers} result it limits the
+change to these checked columns (default: all checked columns). With a
+vector of IDs or a data frame it is required: the values in these columns
+of the given rows are set to \code{NA}.}
 }
 \value{
 An object of the same class as the input \code{data} (data.frame, tibble, or data.table)
   with the specified outlier rows removed.
 }
 \description{
-`f_remove_outliers()` removes specific rows from a dataframe based on a list of identifiers.
+`f_remove_outliers()` removes specific rows from a dataframe based on a list of identifiers,
+or, with \code{set_na = TRUE}, keeps the rows and sets only the outlier values to \code{NA}.
 It is designed to work seamlessly with the output of \code{\link{f_outliers}}, but can also
 accept a custom vector of IDs.
 }
@@ -128,6 +152,14 @@ clean_df <- f_remove_outliers(df, bad_rows$output_df, by = "EmployeeID")
 # Confirm the flagged employees are no longer in the clean data
 bad_ids  <- bad_rows$output_df$EmployeeID
 any(clean_df$EmployeeID \%in\% bad_ids)  # FALSE
+
+# --- Keep the rows, set only the flagged values to NA ---
+bad_rows <- f_outliers(Salary ~ Team, data = df)
+df_na <- f_remove_outliers(df, bad_rows, set_na = TRUE)
+sum(is.na(df_na$Salary))   # the flagged salaries are now missing
+
+# --- By hand: set the Age of rows 39 and 40 to NA ---
+df_na2 <- f_remove_outliers(df, c(39, 40), set_na = TRUE, columns = "Age")
 
 }
 \seealso{
