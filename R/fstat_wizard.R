@@ -1,6 +1,13 @@
 #' Statistical Test Wizard
 #'
 #' @description
+#' \ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#experimental}{\figure{lifecycle-experimental.svg}{options: alt='[Experimental]'}}}{\strong{[Experimental]}}
+#'
+#' \strong{Beta.} \code{f_stat_wizard()} is under active development: its
+#' recommendations can be wrong and can change between versions. Use the
+#' recommendation as a proposal and verify it against your experimental
+#' design before you report it.
+#'
 #' Analyzes your data structure based on a formula and recommends the appropriate statistical test.
 #' Checks variable types, normality of residuals, homogeneity of variance, and checks if f_boxcox
 #' transformation can fix non-normality. Recommends rfriend functions as primary code, with

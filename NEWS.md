@@ -198,6 +198,12 @@ These still work in 3.2.1 but will be removed in the next release.
 
 ## Minor Changes
 
+* **`f_stat_wizard()` is marked as experimental (beta).** The help page now
+  shows a lifecycle "experimental" badge and says that the recommendations
+  can be wrong and can change between versions, in line with the "BETA" line
+  the wizard already prints in its disclaimer. The function itself is
+  unchanged.
+
 * **Printed messages use plain ASCII punctuation.** Messages and report
   lines of `f_stat_wizard()`, `f_aov()`, `f_corplot()` and `f_glm()` used
   an em dash (a long dash), which is not ASCII and does not always display
