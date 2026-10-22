@@ -20,13 +20,14 @@
 #'   \itemize{
 #'     \item Use column names: \code{c("OD_t0", "OD_t1")}
 #'     \item Use column numbers: \code{2:5}
-#'     \item Use helpers: \code{starts_with("Measure")}
+#'     \item Use helpers: \code{starts_with("Measure")} (works without loading \pkg{dplyr})
 #'   }
 #'   If NULL (default), the function will pivot ALL columns except those in \code{keep_cols}.
 #' @param keep_cols (Optional) The columns that identify your samples (IDs).
 #'   E.g., "SampleID", "PatientID", "Treatment", "Student number".
 #'   These are repeated for every measurement.
 #'   *If left empty, all non-measured columns are kept.*
+#'   Accepts the same forms as \code{measure_columns} (names, numbers, helpers).
 #'   Important: If \code{measure_columns} is NULL, you MUST specify \code{keep_cols}.
 #' @param category_name Name for the new column containing the headers.
 #'   Default is "name". Choose something logical like "Timepoints", "Genes", or "Condition".
@@ -104,10 +105,15 @@ f_long <- function(data,
   # Variable to store columns to be pivoted (for checking purposes later)
   target_cols <- NULL
 
-  # Scenario 1: Lazy Mode (Pivot everything except keep_cols)
-  if (is.null(measure_columns)) {
+  # Check for a missing selection WITHOUT evaluating it: a helper such as
+  # starts_with() only works inside dplyr::select() (BUGS #33).
+  no_measure <- selection_is_null(rlang::enquo(measure_columns))
+  no_keep <- selection_is_null(rlang::enquo(keep_cols))
 
-    if (is.null(keep_cols)) {
+  # Scenario 1: Lazy Mode (Pivot everything except keep_cols)
+  if (no_measure) {
+
+    if (no_keep) {
       stop("rfriend error: Lazy Mode active (no measure_columns selected); that is why you MUST specify 'keep_cols' so I know which columns NOT to pivot.")
     }
 
@@ -124,10 +130,14 @@ f_long <- function(data,
     temp_data <- dplyr::select(data, {{ measure_columns }})
     target_cols <- names(temp_data)
 
-    if (!is.null(keep_cols)) {
+    if (!no_keep) {
       data <- dplyr::select(data, {{ keep_cols }}, all_of(target_cols))
     }
 
+  }
+
+  if (length(target_cols) == 0) {
+    stop("rfriend error: The selection in 'measure_columns' (or everything outside 'keep_cols') matches no columns. Check the column names with names(data).", call. = FALSE)
   }
 
   # --- THE SAFETY CHECK FOR LABELS ---
@@ -157,7 +167,7 @@ f_long <- function(data,
 
     # If Manual Mode, we trust the user.
     # If Lazy Mode, we give an extra warning.
-    if (is.null(measure_columns)) {
+    if (no_measure) {
       warning("rfriend tip: You are using automatic selection with renaming. Check the table above carefully! R determines the column order.", call. = FALSE)
     }
   }
@@ -195,6 +205,17 @@ f_long <- function(data,
   }, error = function(e) {
     stop(paste0("rfriend technical error: ", e$message))
   })
+}
+
+
+# TRUE when a tidyselect argument is NULL (default, or a variable holding
+# NULL), without evaluating helpers such as starts_with() outside a selection.
+selection_is_null <- function(quo) {
+  if (rlang::quo_is_null(quo)) return(TRUE)
+  if (rlang::quo_is_symbol(quo)) {
+    return(isTRUE(tryCatch(is.null(rlang::eval_tidy(quo)), error = function(e) FALSE)))
+  }
+  FALSE
 }
 
 

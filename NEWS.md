@@ -245,6 +245,15 @@ These still work in 3.2.1 but will be removed in the next release.
 
 ## Bug Fixes
 
+* **`f_long()`: helpers such as `starts_with()` work.** The help page offered
+  `measure_columns = starts_with("Measure")`, but any helper stopped with an
+  error ("must be used within a *selecting* function", or "could not find
+  function" without dplyr loaded), because the argument was checked with
+  `is.null()` before the selection. Helpers now work in `measure_columns` and
+  `keep_cols`, also without loading dplyr. Column names, column numbers and a
+  variable that holds `NULL` behave as before. A selection that matches no
+  columns now stops with a clear message.
+
 * **`bad_rows$row_id` works on an `f_outliers()` result.** The result is a
   list of tables (`output_df`, or one per checked column), so `bad_rows$row_id`
   returned `NULL` without a warning, and `df$x[bad_rows$row_id] <- NA` silently

@@ -22,7 +22,7 @@ These values are often the response variables, i.e. will end up on the Y-axis.
 \itemize{
   \item Use column names: \code{c("OD_t0", "OD_t1")}
   \item Use column numbers: \code{2:5}
-  \item Use helpers: \code{starts_with("Measure")}
+  \item Use helpers: \code{starts_with("Measure")} (works without loading \pkg{dplyr})
 }
 If NULL (default), the function will pivot ALL columns except those in \code{keep_cols}.}
 
@@ -30,6 +30,7 @@ If NULL (default), the function will pivot ALL columns except those in \code{kee
 E.g., "SampleID", "PatientID", "Treatment", "Student number".
 These are repeated for every measurement.
 *If left empty, all non-measured columns are kept.*
+Accepts the same forms as \code{measure_columns} (names, numbers, helpers).
 Important: If \code{measure_columns} is NULL, you MUST specify \code{keep_cols}.}
 
 \item{category_name}{Name for the new column containing the headers.
