@@ -14,6 +14,8 @@ f_factors(
   unique_num_threshold = 8,
   repeats_threshold = 2,
   unique_num_treshold = NULL,
+  ordered = NULL,
+  levels = NULL,
   ...
 )
 }
@@ -44,7 +46,26 @@ present in a given factor is skipped with a warning. Default \code{NULL}
 
 \item{unique_num_treshold}{Alternative spelling of \code{unique_num_threshold}, accepted so that existing scripts keep working. Default \code{NULL} (not used). Supplying both spellings with different values is an error.}
 
-\item{...}{Additional arguments passed to the \code{factor()} function of baseR.}
+\item{ordered}{Which converted columns become ordered factors (for ordinal
+data such as a damage score). Supply the column names, e.g.
+\code{ordered = "damage"} or \code{ordered = c("damage", "stage")};
+\code{TRUE} orders all converted columns, \code{FALSE} makes all of them
+unordered. Default \code{NULL}: \code{factor()}'s own default (a column
+that is already ordered stays ordered). A named column must exist and be
+among the converted columns, otherwise the function stops with an error.}
+
+\item{levels}{Optional named list with the level order per column, e.g.
+\code{levels = list(damage = c("low", "medium", "high"))}. Without it,
+\code{factor()} sorts the levels (text alphabetically), which is rarely
+the right order for an ordered factor. Every value in the column must be
+one of the given levels (missing values excepted), otherwise the
+function stops: a value outside the levels would silently become
+\code{NA}. Levels without observations are allowed. A named column must
+exist and be among the converted columns. Default \code{NULL}.}
+
+\item{...}{Additional arguments passed to the \code{factor()} function of
+base R, such as \code{labels}. \code{ordered} and \code{levels} are
+arguments of \code{f_factors()} itself (see above).}
 }
 \value{
 Returns the modified data frame with the specified (or all suitable) columns converted to factors. Can also force a print of a summary of the data frame's structure to the console (properties = TRUE).
@@ -57,6 +78,7 @@ Converts multiple specified columns of a data frame into factors. If no columns 
 \item If \code{select} is \code{NULL}, the function identifies columns with character data, and numeric columns with fewer than \code{unique_num_threshold} (default 8) unique values of which at least one value occurs more than \code{repeats_threshold} (default 2) times, as candidates for conversion to factors.
 \item The function checks if all specified columns exist in the data frame and stops execution if any are missing.
 \item Converts specified columns into factors, applying any additional arguments provided.
+\item \code{ordered} and \code{levels} make ordinal columns: name the columns and give the level order. \code{ref} does not apply to an ordered factor (it uses its level order, not a reference level) and stops with an error.
 \item Outputs a summary data frame with details about each column, including its type, class, number of observations, missing values, factor levels, and labels.
 }
 }
@@ -105,6 +127,14 @@ levels(df_ref$a)[1] # reference is now "yes" (was "no")
 # and/or repeats_threshold:
 df5 <- f_factors(df, unique_num_threshold = 2)
 str(df5)
+
+# An ordinal column: name it in 'ordered' and give the level order in 'levels'
+# (without 'levels' the order would be alphabetical: high, low, medium).
+scores <- data.frame(damage = c("low", "high", "medium", "low", "high", "medium"),
+                     trt = c("a", "b", "a", "b", "a", "b"))
+scores_f <- f_factors(scores, select = c("damage", "trt"), ordered = "damage",
+                      levels = list(damage = c("low", "medium", "high")))
+str(scores_f)
 
 # Use `properties = TRUE` to view the data frame's structure.
 # This forces a printed output which is more insight than standard str() output.

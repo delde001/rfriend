@@ -19,13 +19,31 @@
 #' @param unique_num_threshold  Numeric. A threshold of the amount of unique numbers a numeric column should have to keep it numeric, i.e. omit factor conversion. A numeric column is a factor candidate only when it has fewer than \code{unique_num_threshold} unique values. Default \code{8}.
 #' @param repeats_threshold  Numeric. A numeric column is converted to a factor only when at least one of its values occurs more than \code{repeats_threshold} times. Default \code{2}, so a value has to occur at least three times.
 #' @param unique_num_treshold  Alternative spelling of \code{unique_num_threshold}, accepted so that existing scripts keep working. Default \code{NULL} (not used). Supplying both spellings with different values is an error.
-#' @param ... Additional arguments passed to the \code{factor()} function of baseR.
+#' @param ordered Which converted columns become ordered factors (for ordinal
+#'   data such as a damage score). Supply the column names, e.g.
+#'   \code{ordered = "damage"} or \code{ordered = c("damage", "stage")};
+#'   \code{TRUE} orders all converted columns, \code{FALSE} makes all of them
+#'   unordered. Default \code{NULL}: \code{factor()}'s own default (a column
+#'   that is already ordered stays ordered). A named column must exist and be
+#'   among the converted columns, otherwise the function stops with an error.
+#' @param levels Optional named list with the level order per column, e.g.
+#'   \code{levels = list(damage = c("low", "medium", "high"))}. Without it,
+#'   \code{factor()} sorts the levels (text alphabetically), which is rarely
+#'   the right order for an ordered factor. Every value in the column must be
+#'   one of the given levels (missing values excepted), otherwise the
+#'   function stops: a value outside the levels would silently become
+#'   \code{NA}. Levels without observations are allowed. A named column must
+#'   exist and be among the converted columns. Default \code{NULL}.
+#' @param ... Additional arguments passed to the \code{factor()} function of
+#'   base R, such as \code{labels}. \code{ordered} and \code{levels} are
+#'   arguments of \code{f_factors()} itself (see above).
 #'
 #' @details
 #' \itemize{
 #' \item If \code{select} is \code{NULL}, the function identifies columns with character data, and numeric columns with fewer than \code{unique_num_threshold} (default 8) unique values of which at least one value occurs more than \code{repeats_threshold} (default 2) times, as candidates for conversion to factors.
 #' \item The function checks if all specified columns exist in the data frame and stops execution if any are missing.
 #' \item Converts specified columns into factors, applying any additional arguments provided.
+#' \item \code{ordered} and \code{levels} make ordinal columns: name the columns and give the level order. \code{ref} does not apply to an ordered factor (it uses its level order, not a reference level) and stops with an error.
 #' \item Outputs a summary data frame with details about each column, including its type, class, number of observations, missing values, factor levels, and labels.
 #'}
 #' @return Returns the modified data frame with the specified (or all suitable) columns converted to factors. Can also force a print of a summary of the data frame's structure to the console (properties = TRUE).
@@ -79,6 +97,14 @@
 #' df5 <- f_factors(df, unique_num_threshold = 2)
 #' str(df5)
 #'
+#' # An ordinal column: name it in 'ordered' and give the level order in 'levels'
+#' # (without 'levels' the order would be alphabetical: high, low, medium).
+#' scores <- data.frame(damage = c("low", "high", "medium", "low", "high", "medium"),
+#'                      trt = c("a", "b", "a", "b", "a", "b"))
+#' scores_f <- f_factors(scores, select = c("damage", "trt"), ordered = "damage",
+#'                       levels = list(damage = c("low", "medium", "high")))
+#' str(scores_f)
+#'
 #' # Use `properties = TRUE` to view the data frame's structure.
 #' # This forces a printed output which is more insight than standard str() output.
 #' df6 <- f_factors(df, properties = TRUE)
@@ -98,6 +124,8 @@ f_factors <- function(data,
                       unique_num_threshold = 8,
                       repeats_threshold = 2,
                       unique_num_treshold = NULL,
+                      ordered = NULL,
+                      levels = NULL,
                       ...) {
 
     unique_num_threshold <- resolve_unique_num_threshold(
@@ -128,8 +156,46 @@ f_factors <- function(data,
     stop("Some specified columns do not exist in the data frame.")
   }
 
-  # Convert selected columns to factors
-  data[select] <- lapply(data[select], function(col) factor(col, ...))
+  # Validate 'ordered' and 'levels' before converting anything (BUGS #34)
+  if (!is.null(ordered)) {
+    if (is.character(ordered)) {
+      check_factor_targets(ordered, "ordered", data, select)
+    } else if (!(is.logical(ordered) && length(ordered) == 1L && !is.na(ordered))) {
+      stop("f_factors(): 'ordered' must be TRUE, FALSE or the names of the ",
+           "columns to order, e.g. ordered = c(\"damage\", \"stage\").",
+           call. = FALSE)
+    }
+  }
+  if (!is.null(levels)) {
+    if (!is.list(levels) || is.null(names(levels)) || any(names(levels) == "")) {
+      stop("f_factors(): 'levels' must be a named list with one entry per ",
+           "column, e.g. levels = list(damage = c(\"low\", \"medium\", \"high\")).",
+           call. = FALSE)
+    }
+    check_factor_targets(names(levels), "levels", data, select)
+    for (nm in names(levels)) {
+      present <- unique(as.character(data[[nm]][!is.na(data[[nm]])]))
+      uncovered <- setdiff(present, as.character(levels[[nm]]))
+      if (length(uncovered) > 0L) {
+        stop("f_factors(): the levels for '", nm, "' do not include ",
+             paste0("\"", uncovered, "\"", collapse = ", "),
+             ". Every value in the column must be one of the levels; ",
+             "otherwise it would become NA.", call. = FALSE)
+      }
+    }
+  }
+
+  # Convert selected columns to factors, with per-column order and levels
+  data[select] <- lapply(select, function(nm) {
+    args <- list(data[[nm]])
+    if (!is.null(levels[[nm]])) args$levels <- levels[[nm]]
+    if (isTRUE(ordered) || (is.character(ordered) && nm %in% ordered)) {
+      args$ordered <- TRUE
+    } else if (identical(ordered, FALSE)) {
+      args$ordered <- FALSE
+    }
+    do.call(factor, c(args, list(...)))
+  })
 
   # Optionally set reference levels (the level a factor is contrasted against
   # in a model). Accepts a single string applied to any converted factor that
@@ -141,8 +207,10 @@ f_factors <- function(data,
         col <- data[[col_name]]
         if (is.factor(col)) {
           hit <- ref[ref %in% levels(col)]
-          if (length(hit) >= 1L)
+          if (length(hit) >= 1L) {
+            stop_if_ordered_ref(col, col_name)
             data[[col_name]] <- stats::relevel(col, ref = hit[[1L]])
+          }
         }
       }
     } else {
@@ -165,6 +233,7 @@ f_factors <- function(data,
                   call. = FALSE)
           next
         }
+        stop_if_ordered_ref(col, col_name)
         data[[col_name]] <- stats::relevel(col, ref = ref[[col_name]])
       }
     }
@@ -176,7 +245,7 @@ f_factors <- function(data,
     summary <- data.frame(
       Column = names(data),
       Type = vapply(data, typeof, FUN.VALUE = character(1)),
-      Class = vapply(data, class, FUN.VALUE = character(1)),
+      Class = vapply(data, function(col) class(col)[1L], FUN.VALUE = character(1)),
       Obs = vapply(data, function(col)
         sum(!is.na(col)), FUN.VALUE = integer(1)),
       Missing = vapply(data, function(col)
@@ -200,6 +269,33 @@ f_factors <- function(data,
   }
 
   return(data)
+}
+
+
+# Columns named in 'ordered' or 'levels' must exist and be converted.
+check_factor_targets <- function(cols, arg, data, select) {
+  unknown <- setdiff(cols, names(data))
+  if (length(unknown) > 0L) {
+    stop("f_factors(): column(s) in '", arg, "' not found in the data: ",
+         paste0("'", unknown, "'", collapse = ", "), ".", call. = FALSE)
+  }
+  unconverted <- setdiff(cols, select)
+  if (length(unconverted) > 0L) {
+    stop("f_factors(): '", arg, "' names column(s) that are not converted: ",
+         paste0("'", unconverted, "'", collapse = ", "),
+         ". Add them to 'select' (or remove them from 'exclude').", call. = FALSE)
+  }
+  invisible(TRUE)
+}
+
+# An ordered factor has no reference level: stop with a clear message.
+stop_if_ordered_ref <- function(col, col_name) {
+  if (is.ordered(col)) {
+    stop("f_factors(): '", col_name, "' is an ordered factor, so 'ref' does ",
+         "not apply: an ordered factor uses its level order, not a reference ",
+         "level. Set the order with 'levels', or leave the column unordered.",
+         call. = FALSE)
+  }
 }
 
 

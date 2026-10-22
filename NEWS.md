@@ -251,6 +251,23 @@ These still work in 3.2.1 but will be removed in the next release.
 
 ## Bug Fixes
 
+* **`f_factors()` handles ordered factors.** Three problems with ordinal
+  data are solved:
+  - `properties = TRUE` stopped with "values must be length 1" as soon as
+    *any* column in the data was an ordered factor. The table now shows
+    "ordered" as the class.
+  - `ref` on an ordered factor gave the base R error "'relevel' only for
+    unordered factors". It now stops with a clear message: an ordered factor
+    uses its level order, not a reference level.
+  - `ordered` could only be passed on to `factor()` and then applied to all
+    converted columns. New argument `ordered`: the names of the columns to
+    order (`ordered = "damage"`), or `TRUE`/`FALSE` for all converted
+    columns. New argument `levels`: the level order per column, e.g.
+    `levels = list(damage = c("low", "medium", "high"))`; without it the
+    levels are sorted alphabetically. A column name that does not exist or
+    is not converted, or a value in the column that is not one of the given
+    levels (it would silently become `NA`), stops with an error.
+
 * **`f_long()`: helpers such as `starts_with()` work.** The help page offered
   `measure_columns = starts_with("Measure")`, but any helper stopped with an
   error ("must be used within a *selecting* function", or "could not find
