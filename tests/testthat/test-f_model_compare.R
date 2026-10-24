@@ -770,7 +770,9 @@ test_that("results of f_lm(), f_aov() and f_glm() are accepted as models", {
   expect_true(ra$nested)
   expect_equal(ra$model1_class, "aov")
 
-  g1 <- suppressMessages(f_glm(chloroplast_count ~ treatment, data = wk6, family = "poisson"))
+  # overdispersed counts: f_glm() warns (BUGS #35)
+  expect_warning(g1 <- suppressMessages(f_glm(chloroplast_count ~ treatment, data = wk6, family = "poisson")),
+                 "overdispersion detected", fixed = TRUE)
   g2 <- suppressMessages(f_glm(chloroplast_count ~ treatment + block, data = wk6, family = "poisson"))
   rg <- f_model_compare(g1, g2)
   expect_equal(rg$model1_class, "glm")

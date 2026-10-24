@@ -1029,7 +1029,9 @@ test_that("bundled plant_trial works with event = 'yes'", {
 
 test_that("an intercept-only model runs and skips the post hoc step (BUGS #23)", {
   wk6 <- subset(plant_trial, time_weeks == 6)
-  expect_no_error(g <- f_glm(chloroplast_count ~ 1, data = wk6, family = "poisson"))
+  # the counts are overdispersed: f_glm() says so (BUGS #35)
+  expect_warning(g <- f_glm(chloroplast_count ~ 1, data = wk6, family = "poisson"),
+                 "overdispersion detected", fixed = TRUE)
   expect_null(g$chloroplast_count$posthoc)
   expect_equal(unname(coef(g$chloroplast_count$model)),
                log(mean(wk6$chloroplast_count)))

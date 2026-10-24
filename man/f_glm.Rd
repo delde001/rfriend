@@ -93,7 +93,10 @@ or \code{"link"} (on the linear predictor scale, e.g. log-odds). Default is \cod
 \item{dispersion_test}{Logical. If \code{TRUE}, includes a dispersion diagnostic
 section in the output: a DHARMa simulation-based test for overdispersion
 (Poisson/Binomial), the quasi-dispersion parameter (quasi-families), or a
-note explaining why the test is skipped (Bernoulli data). Default is \code{TRUE}.}
+note explaining why the test is skipped (Bernoulli data). Default is \code{TRUE}.
+Independent of this setting, the verdict is always stored in
+\code{$dispersion}, printed in the console, and a significant
+overdispersion in a Poisson or binomial model gives a warning.}
 
 \item{output_type}{Character string specifying the output format. Default is \code{"default"}.
 \itemize{
@@ -151,6 +154,13 @@ An object of class 'f_glm' (a named list, one entry per response variable) conta
       \code{label} and a one-sentence \code{text}. \code{NULL} for numeric
       responses.}
     \item{lrt_pct_explained}{McFadden's Pseudo-R\eqn{^2}.}
+    \item{dispersion}{The dispersion verdict: a list with \code{type}
+      (\code{"DHARMa"}, \code{"quasi-dispersion"}, \code{"not applicable"}
+      or \code{"not available"}), \code{statistic} (DHARMa ratio of
+      simulated vs. observed variance, or the quasi-dispersion parameter),
+      \code{p.value}, \code{significant} (\code{p.value < alpha}),
+      \code{direction} (\code{"overdispersion"} or
+      \code{"underdispersion"}) and a one-sentence \code{text}, as printed.}
   }
   Using the option \code{output_type}, it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and plot methods for 'f_glm' objects.
 }

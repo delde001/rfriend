@@ -89,6 +89,9 @@
 #'   section in the output: a DHARMa simulation-based test for overdispersion
 #'   (Poisson/Binomial), the quasi-dispersion parameter (quasi-families), or a
 #'   note explaining why the test is skipped (Bernoulli data). Default is \code{TRUE}.
+#'   Independent of this setting, the verdict is always stored in
+#'   \code{$dispersion}, printed in the console, and a significant
+#'   overdispersion in a Poisson or binomial model gives a warning.
 #' @param influence_threshold Numeric multiplier for the leverage threshold. Observations
 #'   with hat values exceeding \code{influence_threshold * mean(hat values)} are flagged
 #'   as high-leverage points. Default is \code{2}, a common rule of thumb.
@@ -180,6 +183,13 @@
 #'       \code{label} and a one-sentence \code{text}. \code{NULL} for numeric
 #'       responses.}
 #'     \item{lrt_pct_explained}{McFadden's Pseudo-R\eqn{^2}.}
+#'     \item{dispersion}{The dispersion verdict: a list with \code{type}
+#'       (\code{"DHARMa"}, \code{"quasi-dispersion"}, \code{"not applicable"}
+#'       or \code{"not available"}), \code{statistic} (DHARMa ratio of
+#'       simulated vs. observed variance, or the quasi-dispersion parameter),
+#'       \code{p.value}, \code{significant} (\code{p.value < alpha}),
+#'       \code{direction} (\code{"overdispersion"} or
+#'       \code{"underdispersion"}) and a one-sentence \code{text}, as printed.}
 #'   }
 #'   Using the option \code{output_type}, it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and plot methods for 'f_glm' objects.
 #'
@@ -1225,6 +1235,32 @@ This plot shows your residuals (errors) on the Y-axis against the model's predic
                 "logistic regression (logistf::logistf or ",
                 "brglm2::brglm_fit) for finite estimates.",
                 call. = FALSE, immediate. = TRUE)
+      }
+
+      # Dispersion verdict: store it and warn on significant overdispersion,
+      # so it is not visible only in the Word/PDF report (BUGS #35). The
+      # Bernoulli rule is the same one the report uses.
+      disp_bernoulli <- family$family == "binomial" &&
+        all(data[[response_name]] %in% c(0, 1, NA))
+      disp_verdict <- glm_dispersion_verdict(
+        glm_fit,
+        output_list[[response_name]][["diagnostics"]][["residuals"]][["test_results"]],
+        is_bernoulli = disp_bernoulli,
+        alpha = alpha)
+      output_list[[response_name]][["dispersion"]] <- disp_verdict
+      if (isTRUE(disp_verdict$significant) &&
+          identical(disp_verdict$direction, "overdispersion") &&
+          family$family %in% c("poisson", "binomial")) {
+        quasi_fam <- if (family$family == "poisson") "quasipoisson" else "quasibinomial"
+        warning("f_glm: overdispersion detected for response '", response_name,
+                "': the data vary more than a ", family$family,
+                " model assumes (DHARMa dispersion test: ratio = ",
+                disp_verdict$statistic, ", p = ", disp_verdict$p.value,
+                "). Standard errors and p-values are then too small. Refit ",
+                "with family = \"", quasi_fam, "\"",
+                if (family$family == "poisson")
+                  ", or use a negative binomial model (MASS::glm.nb)" else "",
+                ".", call. = FALSE, immediate. = TRUE)
       }
 
       # ---- Interaction-aware emmeans mode (mirrors f_aov logic) ----
@@ -2844,6 +2880,56 @@ main findings in the *Results* section, you **must** use the Emmeans table below
 }
 
 # Print method for f_glm objects
+# Dispersion verdict for one fitted GLM (BUGS #35). Used for the stored
+# $dispersion element, the warning in f_glm() and print.f_glm(), with the same
+# rules as the report: the DHARMa test (rounded to 4 decimals, significant when
+# p < alpha), the quasi-dispersion parameter for quasi-families, and "not
+# applicable" for 0/1 (Bernoulli) data.
+glm_dispersion_verdict <- function(glm_fit, test_results, is_bernoulli, alpha) {
+  verdict <- function(type, statistic = NA_real_, p.value = NA_real_,
+                      significant = FALSE, direction = NA_character_, text) {
+    list(type = type, statistic = statistic, p.value = p.value,
+         significant = significant, direction = direction, text = text)
+  }
+  fam <- stats::family(glm_fit)$family
+  if (isTRUE(is_bernoulli)) {
+    return(verdict("not applicable",
+      text = "Not applicable: 0/1 (Bernoulli) data cannot be overdispersed."))
+  }
+  if (fam %in% c("quasipoisson", "quasibinomial", "quasi")) {
+    phi <- round(summary(glm_fit)$dispersion, 4)
+    return(verdict("quasi-dispersion", statistic = phi,
+      text = paste0("Quasi-dispersion parameter phi = ", phi,
+                    "; standard errors are already scaled by sqrt(phi).")))
+  }
+  d <- if (is.list(test_results)) test_results[["dispersion"]] else NULL
+  if (is.null(d) || is.null(d$p.value)) {
+    return(verdict("not available",
+      text = "Not available: the DHARMa dispersion test did not run."))
+  }
+  stat <- round(as.numeric(d$statistic), 4)
+  p    <- round(d$p.value, 4)
+  sig  <- p < alpha
+  dirn <- if (stat > 1) "overdispersion" else "underdispersion"
+  text <- if (!sig) {
+    paste0("Not significant (DHARMa ratio = ", stat, ", p = ", p,
+           "): no evidence of over- or underdispersion.")
+  } else if (dirn == "overdispersion" && fam %in% c("poisson", "binomial")) {
+    paste0("Significant overdispersion (DHARMa ratio = ", stat, ", p = ", p,
+           "): standard errors and p-values of this model are too small. ",
+           "Refit with family = \"",
+           if (fam == "poisson") "quasipoisson" else "quasibinomial", "\".")
+  } else if (dirn == "overdispersion") {
+    paste0("Significant overdispersion (DHARMa ratio = ", stat, ", p = ", p,
+           "): more variance than the ", fam, " model assumes.")
+  } else {
+    paste0("Significant underdispersion (DHARMa ratio = ", stat, ", p = ", p,
+           "): less variance than the model assumes, so p-values are conservative.")
+  }
+  verdict("DHARMa", statistic = stat, p.value = p, significant = sig,
+          direction = dirn, text = text)
+}
+
 #' @export
 print.f_glm <- function(x, ...) {
 
@@ -2894,6 +2980,11 @@ print.f_glm <- function(x, ...) {
     cat("Residual deviance: ", round(sublist$lrt_resid_dev, 4),
         " on", sublist$lrt_resid_df, "df\n")
     cat("McFadden's Pseudo-R\u00b2:", sublist$lrt_pct_explained, "\n")
+
+    if (!is.null(sublist$dispersion)) {
+      cat("\n--- Dispersion test ---\n")
+      cat(paste(strwrap(sublist$dispersion$text, width = 76), collapse = "\n"), "\n")
+    }
 
     cat("\n--- Post hoc Comparisons of:", category, "---\n")
     if (is.null(sublist$posthoc)) {

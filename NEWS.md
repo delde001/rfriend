@@ -251,6 +251,21 @@ These still work in 3.2.1 but will be removed in the next release.
 
 ## Bug Fixes
 
+* **`f_glm()`: overdispersion is no longer silent in the console.** The
+  DHARMa dispersion test ran, but its verdict appeared only in the Word, PDF
+  or R Markdown report. A Poisson model with more spread than it assumes
+  (which makes p-values too small) gave no warning in the console. Now:
+  - a significant overdispersion in a Poisson or binomial model gives a
+    warning that names the fix (`family = "quasipoisson"` or
+    `"quasibinomial"`, or a negative binomial model for counts);
+  - the console printout has a "Dispersion test" section;
+  - the result has a new element `$dispersion` with the verdict (type,
+    statistic, p-value, whether it is significant, direction, and the
+    printed text).
+  The rules are those of the report: not applicable to 0/1 data, the
+  quasi-dispersion parameter for quasi-families. `dispersion_test = FALSE`
+  still only leaves the section out of the report.
+
 * **`f_factors()` handles ordered factors.** Three problems with ordinal
   data are solved:
   - `properties = TRUE` stopped with "values must be length 1" as soon as
