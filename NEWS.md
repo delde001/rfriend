@@ -271,6 +271,13 @@ These still work in 3.2.1 but will be removed in the next release.
 
 ## Bug Fixes
 
+* **`f_conditional_round()`: a rounded ANOVA table prints its values.** The
+  rounded numbers are text, but the result kept classes such as `anova`, so
+  `print()` showed nonsense (1, 2, 2, 2 instead of 1556.868, 3, 28.391, ...)
+  without a warning. The result is now a plain data frame (or tibble), and
+  `print()` shows the rounded values. `na_string` is now also used for the
+  columns of a data frame; before, they always got `"-"`.
+
 * **`f_glm()`: overdispersion is no longer silent in the console.** The
   DHARMa dispersion test ran, but its verdict appeared only in the Word, PDF
   or R Markdown report. A Poisson model with more spread than it assumes

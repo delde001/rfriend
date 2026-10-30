@@ -45,7 +45,10 @@ to PDF via \code{pdflatex}. Default is \code{"-"}.}
 formatted according to the specified rules.
 
   \item If input is a data frame: A data frame with the same structure as the input, but with
-character columns formatted according to the specified rules.
+character columns formatted according to the specified rules. Because the numbers become
+text, the result is a plain data frame (or tibble): other classes, such as the
+\code{anova} class of an ANOVA table, are dropped, so that \code{print()} shows the
+rounded values.
  }
 }
 \description{

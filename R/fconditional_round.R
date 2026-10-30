@@ -30,7 +30,10 @@
 #' formatted according to the specified rules.
 #'
 #'   \item If input is a data frame: A data frame with the same structure as the input, but with
-#' character columns formatted according to the specified rules.
+#' character columns formatted according to the specified rules. Because the numbers become
+#' text, the result is a plain data frame (or tibble): other classes, such as the
+#' \code{anova} class of an ANOVA table, are dropped, so that \code{print()} shows the
+#' rounded values.
 #'  }
 #'
 #' @details
@@ -121,8 +124,14 @@ f_conditional_round <- function(x,
                                              threshold_large = threshold_large,
                                              digits = digits,
                                              replace_na = replace_na,
+                                             na_string = na_string,
                                              allow_integer_decimal_mix = allow_integer_decimal_mix)
       }
+      # The numbers are now text. Classes such as "anova" would make print()
+      # treat that text as numbers (and show nonsense), so keep only the data
+      # frame classes (BUGS #37).
+      df_classes <- c("tbl_df", "tbl", "data.frame")
+      class(result) <- intersect(class(result), df_classes)
       return(result)
     } else {
       warning("No numeric columns found in the data frame.")
