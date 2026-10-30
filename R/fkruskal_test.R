@@ -55,8 +55,11 @@
 #'   post hoc test and the Kruskal-Wallis test itself all see the exact
 #'   same row set.
 
-#' @return An object of class 'f_kruskal_test' (a named list, one entry per
-#'   response-predictor combination) containing:
+#' @return An object of class 'f_kruskal_test': a named list with one entry
+#'   per response, and inside it one entry per predictor, so the results of
+#'   \code{biomass_g ~ treatment} are in \code{out$biomass_g$treatment}
+#'   (the same "per response" structure as the other test functions). Each
+#'   entry contains:
 #'   \describe{
 #'     \item{kruskal.test}{The \code{htest} object from \code{kruskal.test()}.}
 #'     \item{dunn_test}{Data frame of pairwise Dunn's test results from \code{rstatix::dunn_test()}.}
@@ -584,10 +587,10 @@ Each group should ideally include at least five observations for reliable result
 
         }
 
-        output_list[[paste0(response_name,"_",predictor_name)]][["distributions"]] <- d
+        output_list[[response_name]][[predictor_name]][["distributions"]] <- d
         # Store alpha and adjust for print.class function
-        output_list[[paste0(response_name,"_",predictor_name)]][["alpha"]]          <- alpha
-        output_list[[paste0(response_name,"_",predictor_name)]][["DunnTest_adjust"]]<- adjust
+        output_list[[response_name]][[predictor_name]][["alpha"]]          <- alpha
+        output_list[[response_name]][[predictor_name]][["DunnTest_adjust"]]<- adjust
 
         # cat("   \n     \n&nbsp;  \n   \n ")
         if(output_type != "rmd"){
@@ -624,7 +627,7 @@ Each group should ideally include at least five observations for reliable result
           "\n\n&nbsp;\n   \n"
         ))
         # Store Kruskal-Wallis test in ouput
-        output_list[[paste0(response_name,"_",predictor_name)]][["kruskal.test"]] <- kruskal.test_result
+        output_list[[response_name]][[predictor_name]][["kruskal.test"]] <- kruskal.test_result
 
         # Create data summary table for output and store in output_list
         summary_table <- f_summary(data,
@@ -674,7 +677,7 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 rep
         } # end if KW significant (Dunn output)
 
         # Store dunn_test_result in ouput
-        output_list[[paste0(response_name,"_",predictor_name)]][["dunn_test"]] <- dunn_test_result
+        output_list[[response_name]][[predictor_name]][["dunn_test"]] <- dunn_test_result
 
 
         # ---- Compact letter display, ordered high-to-low by median ----------
@@ -735,7 +738,7 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 rep
                            })
 
         # Store adjust method in output
-        output_list[[paste0(response_name,"_",predictor_name)]][["adjust"]] <- adjust
+        output_list[[response_name]][[predictor_name]][["adjust"]] <- adjust
 
         if(isTRUE(effect_plots)){
 
@@ -812,7 +815,7 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 rep
                      "   \n  \n"))
           # cat("&nbsp;\n   \n")
 
-          output_list[[paste0(response_name,"_",predictor_name)]][["Boxplot"]] <- p
+          output_list[[response_name]][[predictor_name]][["Boxplot"]] <- p
         }
 
         # Create data summary with letters table for output and store in output_list
@@ -841,7 +844,7 @@ Group 1 and group 2 indicate the compared groups with respectively n1 and n2 rep
         remaining <- setdiff(names(summary_table), col_order)
         summary_table <- summary_table[, c(col_order, remaining), drop = FALSE]
 
-        output_list[[paste0(response_name,"_",predictor_name)]][["summary_table"]] <- summary_table
+        output_list[[response_name]][[predictor_name]][["summary_table"]] <- summary_table
 
         # Helper: bold the median column for markdown/pander display only
         bold_median <- function(tbl) {
@@ -982,12 +985,17 @@ header-includes:
     # show the location were the file is saved
     message(paste0("Saving output in: ", output_path))
 
-    # Extract all post_hoc_summary_table tables and keep their names
-    post_hoc_tables <- lapply(output_list, function(obj)
-      obj$summary_table)
-
-    # Assign names to the list for Excel sheet names based on response names
-    names(post_hoc_tables) <- response_names
+    # One sheet per response; with several predictors one sheet per
+    # response and predictor ("response_predictor").
+    post_hoc_tables <- list()
+    for (resp in names(output_list)) {
+      if (!is.list(output_list[[resp]])) next
+      preds <- names(output_list[[resp]])
+      for (pred in preds) {
+        sheet <- if (length(rhs) == 1L) resp else paste0(resp, "_", pred)
+        post_hoc_tables[[sheet]] <- output_list[[resp]][[pred]][["summary_table"]]
+      }
+    }
 
     # Write to an Excel file with each table in its own sheet
     write_xlsx(post_hoc_tables, path = output_path)
@@ -1046,13 +1054,16 @@ print.f_kruskal_test <- function(x, ...) {
 
 
 
-# Loop over each category (a, b, etc.)
-  for (category in names(x)) {
-    # Get the sublist for this category
-    sublist <- x[[category]]
+  # Results are stored per response, then per predictor; skip non-result
+  # entries such as the "rmd" character string.
+  entries <- list()
+  for (resp in names(x)) {
+    by_pred <- .subset2(x, resp)
+    if (!is.list(by_pred)) next
+    for (pred in names(by_pred)) entries[[length(entries) + 1L]] <- by_pred[[pred]]
+  }
 
-    # Skip non-result entries (e.g. the "rmd" character string)
-    if (!is.list(sublist)) next
+  for (sublist in entries) {
 
     cat("\n==========================================================\n")
     cat("Results of testing", sublist$kruskal.test$data.name)
@@ -1131,15 +1142,17 @@ plot.f_kruskal_test <- function(x, which = c("distributions", "Boxplot"), ...) {
 
   which <- match.arg(which, choices = c("distributions", "Boxplot"), several.ok = TRUE)
 
-  for (category in names(x)) {
-    sublist <- x[[category]]
+  for (resp in names(x)) {
+    by_pred <- .subset2(x, resp)
 
     # Skip non-result entries (e.g. the "rmd" character string)
-    if (!is.list(sublist)) next
+    if (!is.list(by_pred)) next
 
-    for (plt_name in which) {
-      if (!is.null(sublist[[plt_name]])) {
-        print(sublist[[plt_name]])
+    for (sublist in by_pred) {
+      for (plt_name in which) {
+        if (!is.null(sublist[[plt_name]])) {
+          print(sublist[[plt_name]])
+        }
       }
     }
   }
@@ -1148,3 +1161,35 @@ plot.f_kruskal_test <- function(x, which = c("distributions", "Boxplot"), ...) {
 }
 
 
+# Old names "response_predictor" (before rfriend 3.2.1) would silently give
+# NULL with `$` or `[[`. Stop with the new path instead.
+kruskal_old_name <- function(x, name) {
+  if (!is.character(name) || length(name) != 1L || name %in% names(x)) return(NULL)
+  for (resp in names(x)) {
+    by_pred <- .subset2(x, resp)
+    if (!is.list(by_pred) || !startsWith(name, paste0(resp, "_"))) next
+    pred <- substring(name, nchar(resp) + 2L)
+    if (pred %in% names(by_pred)) return(c(resp, pred))
+  }
+  NULL
+}
+
+kruskal_old_name_stop <- function(name, hit) {
+  stop("'", name, "' is not an element of an f_kruskal_test() result: results ",
+       "are stored per response, then per predictor. Use x$", hit[1L], "$",
+       hit[2L], " instead.", call. = FALSE)
+}
+
+#' @export
+`$.f_kruskal_test` <- function(x, name) {
+  hit <- kruskal_old_name(x, name)
+  if (!is.null(hit)) kruskal_old_name_stop(name, hit)
+  NextMethod()
+}
+
+#' @export
+`[[.f_kruskal_test` <- function(x, i, ...) {
+  hit <- kruskal_old_name(x, i)
+  if (!is.null(hit)) kruskal_old_name_stop(i, hit)
+  NextMethod()
+}

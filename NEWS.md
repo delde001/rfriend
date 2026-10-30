@@ -13,6 +13,26 @@ objects. Please read them before updating scripts.
   unchanged. The raw, Excel and SPSS copies in `inst/extdata` are updated in
   the same way. Results and examples that use `biomass_g` change.
 
+* **One structure for the results of the test functions.** Every test
+  function stores its results per response (`out$height_cm`). Two functions
+  were exceptions; they now follow the same rules:
+  - `f_kruskal_test()` stores its results per response, then per predictor:
+    `out$biomass_g$treatment` instead of `out$biomass_g_treatment`. The
+    Excel output has one sheet per response (per response and predictor when
+    a call has several predictors; before, the sheet names did not match
+    then).
+  - `f_glm()` stores its post hoc as `post_hoc[[term]]`, with `emmeans`,
+    `pairs`, `cld` (the table with letters), `cld_text` and `caution`, as
+    `f_aov()`, `f_lm()` and `f_lmer()` do. Before, it was `posthoc`, with
+    `emm` and `post_hoc_summary_table`. The calculation is unchanged:
+    `f_glm()` compares the cells of all categorical predictors together, so
+    there is one table, `post_hoc$treatment` for one factor and
+    `post_hoc[["block:treatment"]]` for two.
+  An old name now stops with a message that gives the new path, instead of
+  silently returning `NULL`, for example: "'biomass_g_treatment' is not an
+  element of an f_kruskal_test() result: ... Use x$biomass_g$treatment
+  instead."
+
 * **Misspelled arguments now stop with an error.** Before, a typo such as
   `adjsut = "holm"` was silently ignored and the function ran with the
   default setting, so you could get a different analysis than you asked for

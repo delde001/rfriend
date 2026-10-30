@@ -146,7 +146,16 @@ An object of class 'f_glm' (a named list, one entry per response variable) conta
     \item{summary}{Output of \code{summary(glm_fit)}.}
     \item{drop1}{Type II Analysis of Deviance table from \code{stats::drop1()}.}
     \item{diagnostics}{DHARMa residual checks and hat-value based leverage diagnostics.}
-    \item{posthoc}{Estimated marginal means, pairwise comparisons, CLD letters, and summary table.}
+    \item{post_hoc}{The post hoc comparisons, stored as
+      \code{post_hoc[[term]]} with \code{emmeans}, \code{pairs}, \code{cld}
+      (the table with letters), \code{cld_text} (the footer) and
+      \code{caution}: the structure of \code{\link{f_aov}},
+      \code{\link{f_lm}} and \code{\link{f_lmer}}. \code{f_glm()} compares
+      the cells of all categorical predictors together, so there is one
+      table: \code{post_hoc$treatment} for one factor,
+      \code{post_hoc[["block:treatment"]]} for two. It also holds
+      \code{emmeans_table} and \code{data_summary_table} (observed
+      descriptives). \code{NULL} for an intercept-only model.}
     \item{sep_flag}{Logical indicating whether complete separation was detected.}
     \item{event_coding}{For a categorical binomial response: a list with the
       \code{event} and \code{non_event} levels, their counts, the number of

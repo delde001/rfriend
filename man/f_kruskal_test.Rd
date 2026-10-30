@@ -89,8 +89,11 @@ post hoc test and the Kruskal-Wallis test itself all see the exact
 same row set.}
 }
 \value{
-An object of class 'f_kruskal_test' (a named list, one entry per
-  response-predictor combination) containing:
+An object of class 'f_kruskal_test': a named list with one entry
+  per response, and inside it one entry per predictor, so the results of
+  \code{biomass_g ~ treatment} are in \code{out$biomass_g$treatment}
+  (the same "per response" structure as the other test functions). Each
+  entry contains:
   \describe{
     \item{kruskal.test}{The \code{htest} object from \code{kruskal.test()}.}
     \item{dunn_test}{Data frame of pairwise Dunn's test results from \code{rstatix::dunn_test()}.}

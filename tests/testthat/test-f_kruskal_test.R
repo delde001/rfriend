@@ -43,9 +43,9 @@ test_that("returns correct class and named structure", {
   res <- f_kruskal_test(Sepal.Width ~ Species, data = iris, diagnostic_plots = FALSE, effect_plots = FALSE)
 
   expect_s3_class(res, "f_kruskal_test")
-  expect_true("Sepal.Width_Species" %in% names(res))
+  expect_true("Species" %in% names(res$Sepal.Width))
 
-  entry <- res[["Sepal.Width_Species"]]
+  entry <- res[["Sepal.Width"]][["Species"]]
 
   # All expected components present
   expect_true(all(c("kruskal.test", "dunn_test", "summary_table",
@@ -79,7 +79,7 @@ test_that("returns correct class and named structure", {
 test_that("diagnostic_plots = FALSE, effect_plots = FALSE: no ggplot objects stored", {
   skip_on_cran()
   res <- f_kruskal_test(Sepal.Width ~ Species, data = iris, diagnostic_plots = FALSE, effect_plots = FALSE)
-  entry <- res[["Sepal.Width_Species"]]
+  entry <- res[["Sepal.Width"]][["Species"]]
 
   expect_null(entry$distributions)
   expect_null(entry$Boxplot)
@@ -88,7 +88,7 @@ test_that("diagnostic_plots = FALSE, effect_plots = FALSE: no ggplot objects sto
 test_that("diagnostic_plots = TRUE, effect_plots = TRUE: ggplot objects are stored", {
   skip_on_cran()
   res <- f_kruskal_test(Sepal.Width ~ Species, data = iris, diagnostic_plots = TRUE, effect_plots = TRUE)
-  entry <- res[["Sepal.Width_Species"]]
+  entry <- res[["Sepal.Width"]][["Species"]]
 
   expect_s3_class(entry$distributions, "ggplot")
   expect_s3_class(entry$Boxplot, "ggplot")
@@ -102,7 +102,7 @@ test_that("diagnostic_plots = TRUE, effect_plots = TRUE: ggplot objects are stor
 test_that("summary_table: Letters 2nd, median-centric layout, mean last", {
   skip_on_cran()
   res  <- f_kruskal_test(Sepal.Width ~ Species, data = iris, diagnostic_plots = FALSE, effect_plots = FALSE)
-  cols <- names(res[["Sepal.Width_Species"]]$summary_table)
+  cols <- names(res[["Sepal.Width"]][["Species"]]$summary_table)
 
   # First column is the predictor
 
@@ -131,8 +131,8 @@ test_that("multiple responses: each gets its own entry", {
   res <- f_kruskal_test(Sepal.Width + Sepal.Length ~ Species,
                          data = iris, diagnostic_plots = FALSE, effect_plots = FALSE)
 
-  expect_true("Sepal.Width_Species"  %in% names(res))
-  expect_true("Sepal.Length_Species" %in% names(res))
+  expect_true("Species" %in% names(res$Sepal.Width))
+  expect_true("Species" %in% names(res$Sepal.Length))
 })
 
 test_that("formula with minus separator on LHS works", {
@@ -140,8 +140,8 @@ test_that("formula with minus separator on LHS works", {
   res <- f_kruskal_test(Sepal.Width - Sepal.Length ~ Species,
                          data = iris, diagnostic_plots = FALSE, effect_plots = FALSE)
 
-  expect_true("Sepal.Width_Species"  %in% names(res))
-  expect_true("Sepal.Length_Species" %in% names(res))
+  expect_true("Species" %in% names(res$Sepal.Width))
+  expect_true("Species" %in% names(res$Sepal.Length))
 })
 
 test_that("multiple predictors: all response x predictor combinations", {
@@ -154,10 +154,10 @@ test_that("multiple predictors: all response x predictor combinations", {
 
   res <- f_kruskal_test(y1 + y2 ~ grpA + grpB, data = df, diagnostic_plots = FALSE, effect_plots = FALSE)
 
-  expected <- c("y1_grpA", "y1_grpB", "y2_grpA", "y2_grpB")
-  expect_true(all(expected %in% names(res)))
-  # Only these 4 entries (no extras)
-  expect_equal(length(res), length(expected))
+  # per response, then per predictor: 2 x 2 entries, no extras
+  expect_identical(names(res), c("y1", "y2"))
+  expect_identical(names(res$y1), c("grpA", "grpB"))
+  expect_identical(names(res$y2), c("grpA", "grpB"))
 })
 
 
@@ -169,7 +169,7 @@ test_that("KW statistic and p-value match base R kruskal.test()", {
   skip_on_cran()
   base_res <- kruskal.test(Sepal.Width ~ Species, data = iris)
   pkg_res  <- f_kruskal_test(Sepal.Width ~ Species, data = iris, diagnostic_plots = FALSE, effect_plots = FALSE)
-  stored   <- pkg_res[["Sepal.Width_Species"]]$kruskal.test
+  stored   <- pkg_res[["Sepal.Width"]][["Species"]]$kruskal.test
 
   expect_equal(stored$statistic, base_res$statistic)
   expect_equal(stored$p.value,   base_res$p.value)
@@ -180,7 +180,7 @@ test_that("significant KW: letters differ across groups", {
   skip_on_cran()
   # iris Sepal.Width ~ Species is highly significant (p << 0.001)
   res     <- f_kruskal_test(Sepal.Width ~ Species, data = iris, diagnostic_plots = FALSE, effect_plots = FALSE)
-  letters <- res[["Sepal.Width_Species"]]$summary_table$Letters
+  letters <- res[["Sepal.Width"]][["Species"]]$summary_table$Letters
 
   expect_true(length(unique(letters)) > 1)
   expect_false(any(letters == "ns"))
@@ -195,7 +195,7 @@ test_that("non-significant KW: all letters are 'ns'", {
   )
 
   res   <- f_kruskal_test(y ~ grp, data = ns_df, diagnostic_plots = FALSE, effect_plots = FALSE)
-  entry <- res[["y_grp"]]
+  entry <- res[["y"]][["grp"]]
 
   # Guard: only check letters if KW was indeed non-significant
   # (with this seed and n = 150, it should be, but we guard against rare flukes)
@@ -211,15 +211,15 @@ test_that("custom alpha is stored and propagated", {
   res_lax    <- f_kruskal_test(Sepal.Width ~ Species, data = iris,
                                 alpha = 0.10,  diagnostic_plots = FALSE, effect_plots = FALSE)
 
-  expect_equal(res_strict[["Sepal.Width_Species"]]$alpha, 0.001)
-  expect_equal(res_lax[["Sepal.Width_Species"]]$alpha,    0.10)
+  expect_equal(res_strict[["Sepal.Width"]][["Species"]]$alpha, 0.001)
+  expect_equal(res_lax[["Sepal.Width"]][["Species"]]$alpha,    0.10)
 })
 
 test_that("Dunn's test has correct number of pairwise comparisons", {
   skip_on_cran()
   # 3 groups -> C(3,2) = 3
   res3 <- f_kruskal_test(Sepal.Width ~ Species, data = iris, diagnostic_plots = FALSE, effect_plots = FALSE)
-  expect_equal(nrow(res3[["Sepal.Width_Species"]]$dunn_test), 3)
+  expect_equal(nrow(res3[["Sepal.Width"]][["Species"]]$dunn_test), 3)
 
   # 6 groups -> C(6,2) = 15
   set.seed(7)
@@ -228,7 +228,7 @@ test_that("Dunn's test has correct number of pairwise comparisons", {
     group = factor(rep(LETTERS[1:6], each = 20))
   )
   res6 <- f_kruskal_test(val ~ group, data = df6, diagnostic_plots = FALSE, effect_plots = FALSE)
-  expect_equal(nrow(res6[["val_group"]]$dunn_test), 15)
+  expect_equal(nrow(res6[["val"]][["group"]]$dunn_test), 15)
 })
 
 test_that("Dunn's test: adjust method is passed to rstatix", {
@@ -238,8 +238,8 @@ test_that("Dunn's test: adjust method is passed to rstatix", {
   res_none <- f_kruskal_test(Sepal.Width ~ Species, data = iris,
                               adjust = "none", diagnostic_plots = FALSE, effect_plots = FALSE)
 
-  dunn_holm <- res_holm[["Sepal.Width_Species"]]$dunn_test
-  dunn_none <- res_none[["Sepal.Width_Species"]]$dunn_test
+  dunn_holm <- res_holm[["Sepal.Width"]][["Species"]]$dunn_test
+  dunn_none <- res_none[["Sepal.Width"]][["Species"]]$dunn_test
 
   # Raw p-values should be identical (same z-statistics)
   expect_equal(dunn_holm$p, dunn_none$p)
@@ -267,7 +267,7 @@ test_that("all adjust methods run without error", {
     expect_true(inherits(res, "f_kruskal_test"),
                 info = paste("adjust =", m))
     expected_stored <- switch(m, "bh" = "BH", "by" = "BY", m)
-    expect_equal(res[["Sepal.Width_Species"]]$DunnTest_adjust, expected_stored,
+    expect_equal(res[["Sepal.Width"]][["Species"]]$DunnTest_adjust, expected_stored,
                  info = paste("stored adjust should match for method:", m))
   }
 })
@@ -286,7 +286,7 @@ test_that("two-group data works (KW with k = 2)", {
   )
 
   res   <- f_kruskal_test(score ~ grp, data = df2, diagnostic_plots = FALSE, effect_plots = FALSE)
-  entry <- res[["score_grp"]]
+  entry <- res[["score"]][["grp"]]
 
   expect_s3_class(entry$kruskal.test, "htest")
   expect_equal(unname(entry$kruskal.test$parameter), 1)   # df = k - 1 = 1
@@ -307,8 +307,8 @@ test_that("integer/ordinal data with many ties works", {
 
   res <- f_kruskal_test(rating ~ condition, data = df_tie, diagnostic_plots = FALSE, effect_plots = FALSE)
   expect_s3_class(res, "f_kruskal_test")
-  expect_true(is.data.frame(res[["rating_condition"]]$summary_table))
-  expect_equal(nrow(res[["rating_condition"]]$summary_table), 3)
+  expect_true(is.data.frame(res[["rating"]][["condition"]]$summary_table))
+  expect_equal(nrow(res[["rating"]][["condition"]]$summary_table), 3)
 })
 
 test_that("data with NAs: runs without error, structure intact", {
@@ -319,8 +319,8 @@ test_that("data with NAs: runs without error, structure intact", {
   res <- f_kruskal_test(Sepal.Width ~ Species, data = na_df, diagnostic_plots = FALSE, effect_plots = FALSE)
 
   expect_s3_class(res, "f_kruskal_test")
-  expect_true(is.data.frame(res[["Sepal.Width_Species"]]$summary_table))
-  expect_s3_class(res[["Sepal.Width_Species"]]$kruskal.test, "htest")
+  expect_true(is.data.frame(res[["Sepal.Width"]][["Species"]]$summary_table))
+  expect_s3_class(res[["Sepal.Width"]][["Species"]]$kruskal.test, "htest")
 })
 
 test_that("many groups (k = 6) work", {
@@ -332,7 +332,7 @@ test_that("many groups (k = 6) work", {
   )
 
   res   <- f_kruskal_test(val ~ group, data = df6, diagnostic_plots = FALSE, effect_plots = FALSE)
-  entry <- res[["val_group"]]
+  entry <- res[["val"]][["group"]]
 
   expect_equal(nrow(entry$summary_table), 6)
   expect_equal(unname(entry$kruskal.test$parameter), 5)  # df = 6 - 1
@@ -348,7 +348,7 @@ test_that("numeric predictor is auto-converted to factor", {
   # x is numeric, should be silently coerced to factor
   res <- f_kruskal_test(y ~ x, data = df_num, diagnostic_plots = FALSE, effect_plots = FALSE)
   expect_s3_class(res, "f_kruskal_test")
-  expect_equal(nrow(res[["y_x"]]$summary_table), 3)
+  expect_equal(nrow(res[["y"]][["x"]]$summary_table), 3)
 })
 
 test_that("character predictor works (coerced to factor)", {
@@ -361,7 +361,7 @@ test_that("character predictor works (coerced to factor)", {
 
   res <- f_kruskal_test(y ~ g, data = df_chr, diagnostic_plots = FALSE, effect_plots = FALSE)
   expect_s3_class(res, "f_kruskal_test")
-  expect_equal(nrow(res[["y_g"]]$summary_table), 3)
+  expect_equal(nrow(res[["y"]][["g"]]$summary_table), 3)
 })
 
 
@@ -498,10 +498,10 @@ test_that("stress: multiple responses, custom alpha, holm adjust, no plots, rmd 
 
   # All 4 response entries present
   for (resp in c("Sepal.Width", "Sepal.Length", "Petal.Length", "Petal.Width")) {
-    key <- paste0(resp, "_Species")
+    key <- resp
     expect_true(key %in% names(res), info = paste("missing:", key))
-    expect_equal(res[[key]]$alpha, 0.01, info = key)
-    expect_equal(res[[key]]$DunnTest_adjust, "holm", info = key)
+    expect_equal(res[[key]][["Species"]]$alpha, 0.01, info = key)
+    expect_equal(res[[key]][["Species"]]$DunnTest_adjust, "holm", info = key)
   }
 
   # rmd should contain the multiple-testing warning (k = 4)
@@ -527,14 +527,14 @@ test_that("stress: 2 responses x 2 predictors, fdr adjust, plots, default output
     output_type = "default"
   )
 
-  expected <- c("y1_f1", "y1_f2", "y2_f1", "y2_f2")
-  expect_true(all(expected %in% names(res)))
+  expect_true(all(c("y1", "y2") %in% names(res)))
 
   # Each entry should have ggplot objects (diagnostic_plots = TRUE, effect_plots = TRUE)
-  for (key in expected) {
-    expect_true(inherits(res[[key]]$distributions, "ggplot"), info = key)
-    expect_true(inherits(res[[key]]$Boxplot,       "ggplot"), info = key)
-    expect_equal(res[[key]]$DunnTest_adjust,  "fdr",    info = key)
+  for (resp in c("y1", "y2")) for (pred in c("f1", "f2")) {
+    key <- paste(resp, pred)
+    expect_true(inherits(res[[resp]][[pred]]$distributions, "ggplot"), info = key)
+    expect_true(inherits(res[[resp]][[pred]]$Boxplot,       "ggplot"), info = key)
+    expect_equal(res[[resp]][[pred]]$DunnTest_adjust,  "fdr",    info = key)
   }
 })
 
@@ -549,7 +549,7 @@ test_that("stress: large dataset (1000 obs x 10 groups)", {
   res <- f_kruskal_test(value ~ group, data = big_df, diagnostic_plots = FALSE, effect_plots = FALSE)
 
   expect_s3_class(res, "f_kruskal_test")
-  entry <- res[["value_group"]]
+  entry <- res[["value"]][["group"]]
 
   expect_equal(nrow(entry$summary_table), 10)
   expect_equal(unname(entry$kruskal.test$parameter), 9)  # df = 10 - 1
@@ -579,7 +579,7 @@ test_that("subset drops rows before kruskal.test is called", {
                    diagnostic_plots = FALSE, effect_plots = FALSE, output_type = "default")
   )
 
-  entry <- res[[1]]
+  entry <- res[[1]][[1]]
   # Summary table reflects the subset (2 Species only)
   expect_equal(nrow(entry$summary_table), 2L)
   expect_false("setosa" %in% as.character(entry$summary_table$Species))
@@ -596,7 +596,7 @@ test_that("subset flows through to Dunn's test (same row set)", {
                    diagnostic_plots = FALSE, effect_plots = FALSE, output_type = "default")
   )
 
-  dunn <- res[[1]]$dunn_test
+  dunn <- res[[1]][[1]]$dunn_test
   # With only two Species left, Dunn's test has exactly 1 comparison
   expect_equal(nrow(dunn), 1L)
   compared <- c(dunn$group1, dunn$group2)
@@ -618,7 +618,7 @@ test_that("na.action = na.omit strips NA rows consistently", {
                    diagnostic_plots = FALSE, effect_plots = FALSE, output_type = "default")
   )
 
-  entry <- res[[1]]
+  entry <- res[[1]][[1]]
   # Total n after NA drop
   expect_equal(sum(entry$summary_table$n), 145L)   # 150 - 5
 })
@@ -631,7 +631,7 @@ test_that("default behavior (no dots) still works and uses full data", {
     f_kruskal_test(Sepal.Width ~ Species, data = iris,
                    diagnostic_plots = FALSE, effect_plots = FALSE, output_type = "default")
   )
-  entry <- res[[1]]
+  entry <- res[[1]][[1]]
   expect_equal(sum(entry$summary_table$n), 150L)
   expect_equal(nrow(entry$summary_table), 3L)
 })

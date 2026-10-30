@@ -22,10 +22,10 @@ test_that("f_kruskal_test: ordered factor is tested on its rank codes", {
     "ordered factor.*rank codes")
   k_n <- suppressMessages(suppressWarnings(
     f_kruskal_test(damage ~ treatment, data = d, diagnostic_plots = FALSE, effect_plots = FALSE)))
-  expect_equal(unname(k_o$damage_o_treatment$kruskal.test$statistic),
-               unname(k_n$damage_treatment$kruskal.test$statistic))
-  expect_equal(k_o$damage_o_treatment$kruskal.test$p.value,
-               k_n$damage_treatment$kruskal.test$p.value)
+  expect_equal(unname(k_o$damage_o$treatment$kruskal.test$statistic),
+               unname(k_n$damage$treatment$kruskal.test$statistic))
+  expect_equal(k_o$damage_o$treatment$kruskal.test$p.value,
+               k_n$damage$treatment$kruskal.test$p.value)
 })
 
 test_that("f_friedman: ordered factor is tested on its rank codes", {

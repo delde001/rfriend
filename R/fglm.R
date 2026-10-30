@@ -175,7 +175,16 @@
 #'     \item{summary}{Output of \code{summary(glm_fit)}.}
 #'     \item{drop1}{Type II Analysis of Deviance table from \code{stats::drop1()}.}
 #'     \item{diagnostics}{DHARMa residual checks and hat-value based leverage diagnostics.}
-#'     \item{posthoc}{Estimated marginal means, pairwise comparisons, CLD letters, and summary table.}
+#'     \item{post_hoc}{The post hoc comparisons, stored as
+#'       \code{post_hoc[[term]]} with \code{emmeans}, \code{pairs}, \code{cld}
+#'       (the table with letters), \code{cld_text} (the footer) and
+#'       \code{caution}: the structure of \code{\link{f_aov}},
+#'       \code{\link{f_lm}} and \code{\link{f_lmer}}. \code{f_glm()} compares
+#'       the cells of all categorical predictors together, so there is one
+#'       table: \code{post_hoc$treatment} for one factor,
+#'       \code{post_hoc[["block:treatment"]]} for two. It also holds
+#'       \code{emmeans_table} and \code{data_summary_table} (observed
+#'       descriptives). \code{NULL} for an intercept-only model.}
 #'     \item{sep_flag}{Logical indicating whether complete separation was detected.}
 #'     \item{event_coding}{For a categorical binomial response: a list with the
 #'       \code{event} and \code{non_event} levels, their counts, the number of
@@ -1357,15 +1366,15 @@ This plot shows your residuals (errors) on the Y-axis against the model's predic
 
       # An intercept-only model (y ~ 1) has nothing to compare: skip the
       # post hoc step instead of failing inside emmeans.
-      output_list[[response_name]][["posthoc"]] <- if (length(all.vars(formula[[3]])) == 0L) {
+      output_list[[response_name]][["post_hoc"]] <- if (length(all.vars(formula[[3]])) == 0L) {
         NULL
       } else {
-        perform_posthoc(
+        glm_post_hoc_structure(perform_posthoc(
           glm_fit, adjust, sig_effects, response_name, predictor_names, data,
           sep_flag    = sep_flag_early,
           emm_is_cells = emm_is_cells,
           cat_preds   = cat_preds
-        )
+        ))
       }
 
 
@@ -1515,9 +1524,9 @@ This plot shows your residuals (errors) on the Y-axis against the model's predic
         }
       }
 
-      if (!is.null(output_list[[response_name]][["posthoc"]])) {
+      if (!is.null(output_list[[response_name]][["post_hoc"]])) {
       cat(paste("\n## Observed Descriptives Table of: ", deparse(current_formula), "  \n"))
-      f_pander(f_conditional_round(output_list[[response_name]][['posthoc']][['data_summary_table']], digits = 3))
+      f_pander(f_conditional_round(glm_post_hoc_entry(output_list[[response_name]][["post_hoc"]])[['data_summary_table']], digits = 3))
       # Add footnote
       cat(
         "**TIP:** These values represent your actual observed sample characteristics.
@@ -1815,7 +1824,7 @@ main findings in the *Results* section, you **must** use the Emmeans table below
 
 
       # An intercept-only model (y ~ 1) has no post hoc analysis.
-      if (is.null(output_list[[response_name]][["posthoc"]])) {
+      if (is.null(output_list[[response_name]][["post_hoc"]])) {
         cat("\n**No post hoc analysis:** the model has no predictors (intercept only).  \n\n")
       } else {
       # Pagebreak
@@ -1878,7 +1887,7 @@ main findings in the *Results* section, you **must** use the Emmeans table below
       # --- DYNAMIC TEXT LOGIC START ---
 
       # 1. Get the table to check names
-      ph_table_check <- output_list[[response_name]][['posthoc']][['post_hoc_summary_table']]
+      ph_table_check <- glm_post_hoc_entry(output_list[[response_name]][["post_hoc"]])[['cld']]
 
       # 2. Determine the Label (Rate vs Prob vs Mean)
       if (isTRUE(emm_is_cells_out)) {
@@ -1951,9 +1960,9 @@ main findings in the *Results* section, you **must** use the Emmeans table below
 
       cat("&nbsp;\n  \n")
       cat(paste("\n**Post Hoc Summary Table** of glm call: ", deparse(current_formula), "  \n"))
-      f_pander(f_conditional_round(output_list[[response_name]][['posthoc']][['post_hoc_summary_table']], digits = 3))
+      f_pander(f_conditional_round(glm_post_hoc_entry(output_list[[response_name]][["post_hoc"]])[['cld']], digits = 3))
       # Add footnote
-      cat(output_list[[response_name]][['posthoc']][['cld_text']])
+      cat(glm_post_hoc_entry(output_list[[response_name]][["post_hoc"]])[['cld_text']])
       # --- DYNAMIC TEXT LOGIC END ---
 
       # ---- Effect plot(s) --------------------------------------------------
@@ -1965,8 +1974,8 @@ main findings in the *Results* section, you **must** use the Emmeans table below
       # plots (both orientations), matching f_aov(). Otherwise one means
       # plot per categorical main effect.
       if (isTRUE(effect_plots)) {
-        emm_obj_doc  <- output_list[[response_name]][["posthoc"]][["emm"]]
-        ph_tab_doc   <- output_list[[response_name]][["posthoc"]][["post_hoc_summary_table"]]
+        emm_obj_doc  <- glm_post_hoc_entry(output_list[[response_name]][["post_hoc"]])[["emmeans"]]
+        ph_tab_doc   <- glm_post_hoc_entry(output_list[[response_name]][["post_hoc"]])[["cld"]]
         cat_preds_pl <- cat_preds_out
         sig_ints_pl  <- sig_ints_out
         mf_doc       <- tryCatch(glm_fit$model, error = function(e) NULL)
@@ -2773,6 +2782,9 @@ main findings in the *Results* section, you **must** use the Emmeans table below
       output_list <- generate_report()
     )
   )
+  for (nm in names(output_list)) {
+    if (is.list(output_list[[nm]])) class(output_list[[nm]]) <- c("f_glm_response", "list")
+  }
   class(output_list) <- "f_glm"
   for (na_msg in unique(na_notes)) message(na_msg)
 
@@ -2826,9 +2838,9 @@ main findings in the *Results* section, you **must** use the Emmeans table below
     # show the location were the file is saved
     message(paste0("Saving output in: ", output_path))
 
-    # Extract all post_hoc_summary_table tables and keep their names
-    post_hoc_tables <- lapply(output_list, function(obj)
-      obj$posthoc$post_hoc_summary_table)
+    # The post hoc table (letters) of every response, one sheet each
+    post_hoc_tables <- lapply(output_list[vapply(output_list, is.list, logical(1))],
+                              function(obj) glm_post_hoc_entry(obj$post_hoc)$cld)
 
     # Assign names to the list for Excel sheet names based on response names
     names(post_hoc_tables) <- response_names
@@ -2880,6 +2892,56 @@ main findings in the *Results* section, you **must** use the Emmeans table below
 }
 
 # Print method for f_glm objects
+# post_hoc[[term]] from the flat list of perform_posthoc(). f_glm() compares
+# the cells of all categorical predictors together, so the key is those
+# predictors joined by ":" ("treatment", "block:treatment").
+glm_post_hoc_structure <- function(ph) {
+  if (is.null(ph)) return(NULL)
+  vars <- if (inherits(ph$emm, "emmGrid")) names(ph$emm@levels) else character(0)
+  key <- if (length(vars)) paste(vars, collapse = ":") else "all"
+  out <- list()
+  out[[key]] <- list(emmeans            = ph$emm,
+                     pairs              = ph$pairs,
+                     cld                = ph$post_hoc_summary_table,
+                     cld_text           = ph$cld_text,
+                     caution            = NULL,
+                     emmeans_table      = ph$emmeans_table,
+                     data_summary_table = ph$data_summary_table)
+  out
+}
+
+# The one post hoc entry of an f_glm() response (NULL when there is none).
+glm_post_hoc_entry <- function(post_hoc) {
+  if (is.null(post_hoc) || length(post_hoc) == 0L) return(NULL)
+  post_hoc[[1L]]
+}
+
+glm_old_posthoc_stop <- function() {
+  stop("'posthoc' is not an element of an f_glm() result: the post hoc is ",
+       "stored as 'post_hoc', per term, as in f_aov(), f_lm() and f_lmer(). ",
+       "Use x$<response>$post_hoc (names() shows the term, e.g. ",
+       "x$<response>$post_hoc$treatment$cld for the table with letters).",
+       call. = FALSE)
+}
+
+#' @export
+`$.f_glm_response` <- function(x, name) {
+  if (identical(name, "posthoc")) glm_old_posthoc_stop()
+  NextMethod()
+}
+
+#' @export
+`[[.f_glm_response` <- function(x, i, ...) {
+  if (identical(i, "posthoc")) glm_old_posthoc_stop()
+  NextMethod()
+}
+
+#' @export
+print.f_glm_response <- function(x, ...) {
+  print(unclass(x), ...)
+  invisible(x)
+}
+
 # Dispersion verdict for one fitted GLM (BUGS #35). Used for the stored
 # $dispersion element, the warning in f_glm() and print.f_glm(), with the same
 # rules as the report: the DHARMa test (rounded to 4 decimals, significant when
@@ -2987,12 +3049,13 @@ print.f_glm <- function(x, ...) {
     }
 
     cat("\n--- Post hoc Comparisons of:", category, "---\n")
-    if (is.null(sublist$posthoc)) {
+    if (is.null(sublist$post_hoc)) {
       cat("None: the model has no predictors (intercept only).\n")
     } else {
-      print(sublist$posthoc$post_hoc_summary_table)
+      ph_entry <- glm_post_hoc_entry(sublist$post_hoc)
+      print(ph_entry$cld)
       cat("___________________________\n")
-      cat(sublist$posthoc$cld_text)
+      cat(ph_entry$cld_text)
     }
     cat("\n   \n")
   }

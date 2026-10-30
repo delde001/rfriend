@@ -122,7 +122,7 @@ test_that("f_glm return list has all expected elements per response", {
 
   expect_true("mpg" %in% names(result))
   resp <- result$mpg
-  required_keys <- c("model", "summary", "diagnostics", "posthoc",
+  required_keys <- c("model", "summary", "diagnostics", "post_hoc",
                      "drop1", "lrt", "sig_effects", "sep_flag",
                      "lrt_null_dev", "lrt_resid_dev", "lrt_pct_explained")
   expect_true(all(required_keys %in% names(resp)),
@@ -197,7 +197,7 @@ test_that("with separation: LRT pairwise letters differ between groups", {
   result <- run_glm(vs ~ cyl, family = binomial, data = mtcars_cat,
                     output_type = "default")
 
-  letters_col <- result$vs$posthoc$post_hoc_summary_table$Letter
+  letters_col <- result$vs$post_hoc[[1]]$cld$Letter
 
   # LRT should produce differentiation - not all the same letter
   expect_false(all(letters_col == letters_col[1]),
@@ -218,7 +218,7 @@ test_that("non-significant model gives 'ns' letters for all groups", {
                     output_type = "default")
 
   expect_false(result$y$sig_effects)
-  letters_col <- result$y$posthoc$post_hoc_summary_table$Letter
+  letters_col <- result$y$post_hoc[[1]]$cld$Letter
   expect_true(all(letters_col == "ns"))
 })
 
@@ -229,7 +229,7 @@ test_that("sig_effects is TRUE and normal letters for am ~ cyl", {
                     output_type = "default")
 
   expect_true(result$am$sig_effects)
-  letters_col <- result$am$posthoc$post_hoc_summary_table$Letter
+  letters_col <- result$am$post_hoc[[1]]$cld$Letter
   expect_false(all(letters_col == "ns"))
   expect_false(all(letters_col == "-"))
 })
@@ -361,7 +361,7 @@ test_that("all adjust methods produce valid post-hoc tables", {
     result <- run_glm(am ~ cyl, family = binomial, data = mtcars_cat,
                       adjust = adj, output_type = "default")
 
-    ph <- result$am$posthoc$post_hoc_summary_table
+    ph <- result$am$post_hoc[[1]]$cld
     expect_true(is.data.frame(ph),
                 info = paste("adjust =", adj, "did not return data.frame"))
     expect_true("Letter" %in% names(ph),
@@ -614,7 +614,7 @@ test_that("with continuous covariate: post-hoc table rows = factor levels only",
             output_type = "default")
   )
 
-  ph <- result$mpg$posthoc$post_hoc_summary_table
+  ph <- result$mpg$post_hoc[[1]]$cld
   # emmeans over cyl only (3 levels), hp held at mean
   expect_equal(nrow(ph), 3L)
 })
@@ -629,7 +629,7 @@ test_that("type = 'response' gives probability column for binomial", {
   result <- run_glm(am ~ cyl, family = binomial, data = mtcars_cat,
                     type = "response", output_type = "default")
 
-  ph <- result$am$posthoc$post_hoc_summary_table
+  ph <- result$am$post_hoc[[1]]$cld
   expect_true("prob" %in% names(ph))
   # Probabilities must lie in [0, 1]
   expect_true(all(ph$prob >= 0 & ph$prob <= 1, na.rm = TRUE))
@@ -641,7 +641,7 @@ test_that("type = 'link' gives emmean column on logit scale for binomial", {
   result <- run_glm(am ~ cyl, family = binomial, data = mtcars_cat,
                     type = "link", output_type = "default")
 
-  ph <- result$am$posthoc$post_hoc_summary_table
+  ph <- result$am$post_hoc[[1]]$cld
   # Should have an emmean-like column (possibly renamed "emmean..")
   emm_present <- any(grepl("emmean", names(ph), ignore.case = TRUE))
   expect_true(emm_present)
@@ -657,7 +657,7 @@ test_that("post-hoc table has required columns", {
   result <- run_glm(am ~ cyl, family = binomial, data = mtcars_cat,
                     output_type = "default")
 
-  ph <- result$am$posthoc$post_hoc_summary_table
+  ph <- result$am$post_hoc[[1]]$cld
   expect_true(is.data.frame(ph))
   expect_true("Letter" %in% names(ph))
   expect_true("n"      %in% names(ph))
@@ -670,7 +670,7 @@ test_that("post-hoc table has one row per factor level", {
   result <- run_glm(am ~ cyl, family = binomial, data = mtcars_cat,
                     output_type = "default")
 
-  ph <- result$am$posthoc$post_hoc_summary_table
+  ph <- result$am$post_hoc[[1]]$cld
   expect_equal(nrow(ph), nlevels(mtcars_cat$cyl))  # 3
 })
 
@@ -680,7 +680,7 @@ test_that("cld_text is a non-empty string", {
   result <- run_glm(am ~ cyl, family = binomial, data = mtcars_cat,
                     output_type = "default")
 
-  cld <- result$am$posthoc$cld_text
+  cld <- result$am$post_hoc[[1]]$cld_text
   expect_type(cld, "character")
   expect_true(nchar(cld) > 0)
 })
@@ -866,7 +866,7 @@ test_that("descriptive summary table reflects fitted rows, not original data", {
   # Primary assertion: the per-group n column in the post-hoc summary
   # table sums to nobs(model), not nrow(df). If the table were built
   # from the raw input data, sum(ph$n) would equal nrow(df) (= 80).
-  ph <- res[[1]]$posthoc$post_hoc_summary_table
+  ph <- res[[1]]$post_hoc[[1]]$cld
   expect_false(is.null(ph))
   expect_true("n" %in% names(ph))
   expect_equal(sum(ph$n, na.rm = TRUE), sum(keep))
@@ -1032,7 +1032,7 @@ test_that("an intercept-only model runs and skips the post hoc step (BUGS #23)",
   # the counts are overdispersed: f_glm() says so (BUGS #35)
   expect_warning(g <- f_glm(chloroplast_count ~ 1, data = wk6, family = "poisson"),
                  "overdispersion detected", fixed = TRUE)
-  expect_null(g$chloroplast_count$posthoc)
+  expect_null(g$chloroplast_count$post_hoc)
   expect_equal(unname(coef(g$chloroplast_count$model)),
                log(mean(wk6$chloroplast_count)))
   txt <- capture.output(print(g))
