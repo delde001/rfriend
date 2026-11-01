@@ -16,6 +16,11 @@
 #'\item Environment Clearing: Removes all objects from the global environment.
 #'\item Session Restart: Restarts the R session (only available in 'RStudio').
 #' }
+#' Removing objects does not detach packages. Without \code{restart = TRUE},
+#' \code{f_clear()} lists the packages that are still attached, apart from
+#' the packages R attaches at start-up and 'rfriend' itself. A script that
+#' runs after \code{f_clear()} may still depend on one of them; only a
+#' restart shows a missing \code{library()} call.
 #'
 #' @note The \code{restart} parameter requires 'RStudio' and its API package ('rstudioapi') to be installed and available.
 #'
@@ -66,7 +71,28 @@ f_clear <- function(env = TRUE, gc = TRUE, console = TRUE, graph = TRUE, restart
       # Restarting R session
       rstudioapi::restartSession()
       } else {
-  message("To also restart R use: f_clear(restart = TRUE)")
+      extra <- attached_extra_packages()
+      if (length(extra) > 0) {
+        message("Still attached: ", paste(extra, collapse = ", "),
+                ". For a clean session use: f_clear(restart = TRUE)")
+      } else {
+        message("To also restart R use: f_clear(restart = TRUE)")
+      }
     }
   }
+
+
+#' Packages attached beyond the start-up set
+#'
+#' Returns the names of the attached packages that R does not attach at
+#' start-up, leaving out 'rfriend' itself, in search-path order.
+#'
+#' @param search_path Character vector as returned by \code{search()}.
+#' @return Character vector of package names (possibly empty).
+#' @keywords internal
+#' @noRd
+attached_extra_packages <- function(search_path = search()) {
+  pkgs <- sub("^package:", "", search_path[startsWith(search_path, "package:")])
+  setdiff(pkgs, c("base", getOption("defaultPackages"), "rfriend"))
+}
 

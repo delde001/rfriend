@@ -31,6 +31,11 @@ Provides a convenient way to clear different components of the R environment, in
 \item Environment Clearing: Removes all objects from the global environment.
 \item Session Restart: Restarts the R session (only available in 'RStudio').
 }
+Removing objects does not detach packages. Without \code{restart = TRUE},
+\code{f_clear()} lists the packages that are still attached, apart from
+the packages R attaches at start-up and 'rfriend' itself. A script that
+runs after \code{f_clear()} may still depend on one of them; only a
+restart shows a missing \code{library()} call.
 }
 \note{
 The \code{restart} parameter requires 'RStudio' and its API package ('rstudioapi') to be installed and available.

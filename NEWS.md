@@ -218,6 +218,13 @@ These still work in 3.2.1 but will be removed in the next release.
 
 ## Minor Changes
 
+* **`f_clear()` names the packages that are still attached.** Removing
+  objects does not detach packages, so a script can still depend on a
+  package loaded by hand. Without `restart = TRUE`, `f_clear()` now lists
+  them, for example `Still attached: ggplot2, dplyr. For a clean session
+  use: f_clear(restart = TRUE)`. The packages R attaches at start-up and
+  rfriend itself are left out. Nothing is detached.
+
 * **`f_stat_wizard()` is marked as experimental (beta).** The help page now
   shows a lifecycle "experimental" badge and says that the recommendations
   can be wrong and can change between versions, in line with the "BETA" line
