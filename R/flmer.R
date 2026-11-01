@@ -177,6 +177,9 @@
 #'   values, the
 #'   observed descriptives table (raw-data n, mean, sd, se, min, Q1,
 #'   median, Q3, max grouped by the categorical fixed-effect predictors),
+#'   the slopes of numeric predictors (\code{slopes}, with their standard error
+#'   and confidence interval; per factor level when the numeric predictor
+#'   interacts with a factor, from \code{emmeans::emtrends()}),
 #'   post hoc results (if any; per main-effect terms plus, for a
 #'   significant categorical interaction, a cell-means entry keyed by the
 #'   interaction term name), diagnostic plots, and convergence
@@ -2057,6 +2060,18 @@ not independent; do not report them as clean per-group standard deviations.\n"
     }
     set_out("data_summary_table", data_summary_table)
 
+    ## ---------- Slopes of numeric predictors ------------------------------
+    slopes <- lmer_slopes_table(fit, numeric_predictors, cat_predictors, ddf, alpha)
+    if (!is.null(slopes$table)) {
+      set_out("slopes", slopes$table)
+      cat("\n### Slopes of numeric predictors\n")
+      f_pander(f_conditional_round(slopes$table, digits = 4))
+    }
+    if (!is.null(slopes$note)) {
+      set_out("note_slopes", slopes$note)
+      cat("\n", slopes$note, "  \n", sep = "")
+    }
+
     ## ---------- Post hoc on factor fixed effects -------------------------
     ## Matches f_aov(): emmeans are shown for EVERY categorical fixed-effect
     ## term (not only the significant ones). Non-significant terms get their
@@ -3090,8 +3105,8 @@ not independent; do not report them as clean per-group standard deviations.\n"
       if (length(numeric_in_anova) > 0L) {
         cat("\n**Note on numeric covariate(s):** ",
             paste(numeric_in_anova, collapse = ", "),
-            ". Their slopes are reported in the coefficient table ",
-            "above; no pairwise post hoc is performed.  \n\n", sep = "")
+            ". Their slopes are in the slopes table above; ",
+            "no pairwise post hoc is performed.  \n\n", sep = "")
       }
 
       # Note about interaction term(s) present but not significant: suggest
@@ -3615,6 +3630,14 @@ print.f_lmer <- function(x, ...) {
       f_pander(f_conditional_round(sub$fixed_effects, digits = 4))
     }
 
+    if (!is.null(sub$slopes)) {
+      cat("\n--- Slopes of numeric predictors ---\n")
+      f_pander(f_conditional_round(sub$slopes, digits = 4))
+    }
+    if (!is.null(sub$note_slopes)) {
+      cat("\n", sub$note_slopes, "\n", sep = "")
+    }
+
     if (!is.null(sub$data_summary_table)) {
       cat("\n--- Observed descriptives (by fixed-effect factor levels) ---\n")
       f_pander(f_conditional_round(sub$data_summary_table, digits = 3,
@@ -3834,4 +3857,69 @@ plot.f_lmer <- function(x, ...) {
     for (rn in resp_names) plot_one(x[[rn]], label = rn)
   }
   invisible(x)
+}
+
+
+# Slopes of numeric predictors, for the printout and the report. A numeric term
+# gets no post hoc table, so without this its size is only in the coefficient
+# table. With a factor interaction the slope is given per level, through
+# emmeans::emtrends(), so nobody has to add up coefficients. Terms without one
+# clear slope (numeric x numeric, or a transformed term in the interaction) are
+# named in the note, not silently dropped.
+# Returns list(table = data.frame or NULL, note = character or NULL).
+lmer_slopes_table <- function(fit, numeric_predictors, cat_predictors, ddf, alpha) {
+  if (length(numeric_predictors) == 0L) return(list(table = NULL, note = NULL))
+  all_terms <- attr(stats::terms(fit, fixed.only = TRUE), "term.labels")
+  lmer_df <- switch(ddf,
+                    "Satterthwaite" = "satterthwaite",
+                    "Kenward-Roger" = "kenward-roger",
+                    "lme4"          = "asymptotic")
+  rows <- list()
+  skipped <- character(0)
+  for (num in numeric_predictors) {
+    parts <- strsplit(all_terms, ":", fixed = TRUE)
+    with_num <- parts[vapply(parts, function(p) num %in% p, logical(1))]
+    others <- setdiff(unique(unlist(with_num)), num)
+    if (!all(others %in% cat_predictors)) {
+      skipped <- c(skipped, num)
+      next
+    }
+    specs <- if (length(others) > 0L) others else stats::as.formula("~ 1")
+    tb <- tryCatch(
+      as.data.frame(summary(emmeans::emtrends(fit, specs = specs, var = num,
+                                              level = 1 - alpha,
+                                              lmer.df = lmer_df))),
+      error = function(e) conditionMessage(e)
+    )
+    if (is.character(tb)) {
+      skipped <- c(skipped, paste0(num, " (", tb, ")"))
+      next
+    }
+    level <- if (length(others) > 0L) {
+      do.call(paste, c(lapply(tb[others], as.character), sep = ", "))
+    } else {
+      "(all)"
+    }
+    rows[[num]] <- data.frame(
+      Predictor = num,
+      Level     = level,
+      Slope     = tb[[paste0(num, ".trend")]],
+      SE        = tb[["SE"]],
+      df        = tb[["df"]],
+      lower.CL  = tb[[grep("(lower\\.CL|LCL)$", names(tb))[1]]],
+      upper.CL  = tb[[grep("(upper\\.CL|UCL)$", names(tb))[1]]],
+      stringsAsFactors = FALSE
+    )
+  }
+  list(
+    table = if (length(rows) > 0L) {
+      out <- do.call(rbind, rows)
+      rownames(out) <- NULL
+      out
+    },
+    note = if (length(skipped) > 0L) {
+      paste0("No single slope for: ", paste(skipped, collapse = "; "),
+             ". See the coefficient table or emmeans::emtrends().")
+    }
+  )
 }

@@ -217,6 +217,9 @@ An object of class \code{f_lmer}: a named list containing the
   values, the
   observed descriptives table (raw-data n, mean, sd, se, min, Q1,
   median, Q3, max grouped by the categorical fixed-effect predictors),
+  the slopes of numeric predictors (\code{slopes}, with their standard error
+  and confidence interval; per factor level when the numeric predictor
+  interacts with a factor, from \code{emmeans::emtrends()}),
   post hoc results (if any; per main-effect terms plus, for a
   significant categorical interaction, a cell-means entry keyed by the
   interaction term name), diagnostic plots, and convergence

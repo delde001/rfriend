@@ -457,3 +457,62 @@ test_that("rmd output_type stores the markdown string on result$rmd", {
   expect_true(is.character(res$rmd))
   expect_true(nchar(res$rmd) > 0)
 })
+
+# ---------------------------------------------------------------------------
+# Slopes of numeric predictors
+# ---------------------------------------------------------------------------
+test_that("f_lmer() gives the slope of a numeric predictor, in $slopes and the printout", {
+  skip_if_not_installed("lme4")
+  data(sleepstudy, package = "lme4", envir = environment())
+  res <- suppressMessages(f_lmer(Reaction ~ Days + (1 | Subject), data = sleepstudy))
+  sl <- res$Reaction$slopes
+  expect_equal(sl$Predictor, "Days")
+  expect_equal(sl$Level, "(all)")
+  cf <- res$Reaction$coefficients
+  expect_equal(sl$Slope, cf$Estimate[cf$Term == "Days"], tolerance = 1e-6)
+  expect_equal(sl$SE, cf$`Std. Error`[cf$Term == "Days"], tolerance = 1e-6)
+  expect_true(sl$lower.CL < sl$Slope && sl$Slope < sl$upper.CL)
+  txt <- paste(utils::capture.output(print(res)), collapse = "\n")
+  expect_match(txt, "--- Slopes of numeric predictors ---", fixed = TRUE)
+})
+
+test_that("f_lmer() gives the slope per level with a numeric x factor interaction", {
+  res <- suppressMessages(f_lmer(height_cm ~ treatment * time_weeks + (1 | plant_id),
+                                 data = plant_trial))
+  sl <- res$height_cm$slopes
+  expect_setequal(sl$Level, c("control", "drought", "high_N", "low_N"))
+  slope <- stats::setNames(sl$Slope, sl$Level)
+  expect_equal(slope[["control"]], 4.67, tolerance = 1e-6)
+  expect_equal(slope[["drought"]], 2.125, tolerance = 1e-6)
+  expect_equal(slope[["low_N"]], 3.675, tolerance = 1e-6)
+  expect_equal(slope[["high_N"]], 4.40, tolerance = 1e-6)
+})
+
+test_that("f_lmer() has no slopes table without a numeric predictor", {
+  wk6 <- subset(plant_trial, time_weeks == 6)
+  res <- suppressMessages(f_lmer(height_cm ~ treatment + (1 | block), data = wk6))
+  expect_null(res$height_cm$slopes)
+  expect_null(res$height_cm$note_slopes)
+  txt <- paste(utils::capture.output(print(res)), collapse = "\n")
+  expect_false(grepl("Slopes of numeric predictors", txt, fixed = TRUE))
+})
+
+test_that("f_lmer() names a numeric x numeric interaction in a note", {
+  res <- suppressMessages(f_lmer(height_cm ~ chloroplast_count * time_weeks + (1 | plant_id),
+                                 data = plant_trial))
+  expect_null(res$height_cm$slopes)
+  expect_match(res$height_cm$note_slopes, "No single slope for", fixed = TRUE)
+  txt <- paste(utils::capture.output(print(res)), collapse = "\n")
+  expect_match(txt, "No single slope for", fixed = TRUE)
+})
+
+test_that("f_lmer() slopes appear in the report and work with Kenward-Roger", {
+  skip_if_not_installed("pbkrtest")
+  data(sleepstudy, package = "lme4", envir = environment())
+  rmd <- suppressMessages(f_lmer(Reaction ~ Days + (1 + Days | Subject), data = sleepstudy,
+                                 ddf = "Kenward-Roger", output_type = "rmd"))$rmd
+  expect_match(rmd, "### Slopes of numeric predictors", fixed = TRUE)
+  res <- suppressMessages(f_lmer(Reaction ~ Days + (1 + Days | Subject), data = sleepstudy,
+                                 ddf = "Kenward-Roger"))
+  expect_equal(round(res$Reaction$slopes$df), 17)
+})

@@ -89,6 +89,15 @@ objects. Please read them before updating scripts.
 
 ## New Features in Existing Functions
 
+* **`f_lmer()`: a table with the slopes of numeric predictors.** A factor gets
+  a post hoc table, but the slope of a numeric predictor was not in the printout.
+  The printout and the report now have a "Slopes of numeric predictors" table,
+  also stored as `$slopes`, with the slope, its standard error, df and confidence
+  interval. When the numeric predictor interacts with a factor, the slope is
+  given per level (from `emmeans::emtrends()`), so you do not have to add up
+  coefficients. A numeric predictor without one clear slope, such as in a
+  numeric x numeric interaction, is named in a note (`$note_slopes`).
+
 * **`f_remove_outliers()` can keep the rows and set only values to `NA`.**
   With `set_na = TRUE` the rows stay and only the outlier values become
   missing, so the other measurements of that plant stay in the analysis.
