@@ -325,6 +325,19 @@ f_summary.data.frame <- function(x,
     n_obs <- sum(!is.na(vec))
     if (show_n)
       result["n"] <- n_obs
+    # A group with only missing values (for example one plant per treatment
+    # and block, and that plant is missing) has nothing to summarise: report
+    # n = 0 and NA for every statistic, instead of NaN, Inf and -Inf with
+    # raw min()/max() warnings (BUGS #38).
+    if (n_obs == 0) {
+      stat_names <- c(mean = show_mean, sd = show_sd, se = show_se,
+                      CI_lower = show_ci, CI_upper = show_ci,
+                      min = show_min, Q1 = show_Q1, median = show_median,
+                      Q3 = show_Q3, max = show_max,
+                      skew = show_skew, kurt = show_kurtosis)
+      for (nm in names(stat_names)[stat_names]) result[nm] <- NA_real_
+      return(result)
+    }
     if (show_mean)
       result["mean"] <- mean(vec, na.rm = TRUE)
     if (show_sd)

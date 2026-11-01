@@ -278,6 +278,14 @@ These still work in 3.2.1 but will be removed in the next release.
 
 ## Bug Fixes
 
+* **`f_summary()`: a group with only missing values gives `NA`, without
+  warnings.** In a design with one row per group, such as one plant per
+  treatment and block, a missing value leaves a group empty. `f_summary()`,
+  and with it the data summary table of `f_aov()` and other functions, then
+  printed the base R warnings "no non-missing arguments to min; returning
+  Inf" (and to max) and showed `NaN`, `Inf` and `-Inf`. An empty group now
+  has `n = 0` and `NA` for every statistic.
+
 * **`f_conditional_round()`: a rounded ANOVA table prints its values.** The
   rounded numbers are text, but the result kept classes such as `anova`, so
   `print()` showed nonsense (1, 2, 2, 2 instead of 1556.868, 3, 28.391, ...)

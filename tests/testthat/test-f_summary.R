@@ -653,3 +653,43 @@ test_that("missing x AND data errors with informative message", {
     "missing"
   ))
 })
+
+# ---------------------------------------------------------------------------
+# D. A group with only missing values (BUGS #38)
+# ---------------------------------------------------------------------------
+test_that("a group with only NA gives n = 0 and NA, without warnings", {
+  wk6 <- subset(plant_trial, time_weeks == 6)
+  wk6$height_cm[wk6$plant_id %in% c("P03", "P14")] <- NA
+  expect_no_warning(
+    res <- f_summary(wk6, "height_cm", c("treatment", "block"),
+                     show_name = FALSE, digits = NULL)$output_df
+  )
+  empty <- res[res$n == 0, ]
+  expect_equal(nrow(empty), 2)
+  expect_setequal(paste(empty$treatment, empty$block), c("control B3", "high_N B4"))
+  stat_cols <- setdiff(names(res), c("treatment", "block", "n"))
+  expect_true(all(is.na(as.matrix(empty[, stat_cols]))))
+  expect_false(any(is.infinite(as.matrix(res[, stat_cols]))))
+  expect_false(any(is.nan(as.matrix(res[, stat_cols]))))
+  full <- res[res$n > 0, ]
+  expect_false(anyNA(full$mean))
+})
+
+test_that("a column with only NA gives n = 0 and NA, without warnings", {
+  d <- data.frame(y = c(NA_real_, NA_real_, NA_real_))
+  expect_no_warning(res <- f_summary(d, "y", digits = NULL)$output_df)
+  expect_equal(res$n, 0)
+  expect_true(is.na(res$mean) && !is.nan(res$mean))
+  expect_true(is.na(res$min) && is.na(res$max))
+})
+
+test_that("f_aov() with a missing plot in a block design gives no min/max warnings", {
+  wk6 <- subset(plant_trial, time_weeks == 6)
+  wk6$height_cm[wk6$plant_id %in% c("P03", "P14")] <- NA
+  w <- character(0)
+  res <- withCallingHandlers(
+    suppressMessages(f_aov(height_cm ~ treatment + block, data = wk6)),
+    warning = function(cnd) { w <<- c(w, conditionMessage(cnd)); invokeRestart("muffleWarning") })
+  expect_false(any(grepl("no non-missing arguments", w, fixed = TRUE)))
+  expect_equal(round(res$height_cm$aov_summary["treatment", "F value"], 2), 42.21)
+})
