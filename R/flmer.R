@@ -1208,9 +1208,10 @@ steps (generalised mixed model, transformation).
     ## per-term estimated-means plots and post hoc letters, which become
     ## crowded when a factor has many levels.
     ##
-    ## CIs use the Wald approximation (Estimate +/- z * SE) on the same
-    ## quantities already in the coefficient table, so the plot matches the
-    ## table. The intercept is dropped by default: it is the reference-cell
+    ## CIs are Estimate +/- t * SE with the df of the coefficient table, so
+    ## the interval agrees with the p-value that sets the colour and with
+    ## the slopes table. A z value would be too narrow in small designs.
+    ## The intercept is dropped by default: it is the reference-cell
     ## mean, not an "effect", and its magnitude usually dwarfs the others,
     ## squashing the informative rows.
     if (isTRUE(effect_plots)) {
@@ -1224,12 +1225,13 @@ steps (generalised mixed model, transformation).
         cf <- cf[cf$Term != "(Intercept)", , drop = FALSE]
         if (nrow(cf) == 0L) stop("only an intercept; nothing to plot")
 
-        zcrit <- stats::qnorm(1 - alpha / 2)
+        if (!"df" %in% names(cf)) stop("no df column")
+        tcrit <- stats::qt(1 - alpha / 2, df = cf[["df"]])
         fp_df <- data.frame(
           label = cf$Term,
           est   = cf[[est_col]],
-          lower = cf[[est_col]] - zcrit * cf[[se_col]],
-          upper = cf[[est_col]] + zcrit * cf[[se_col]],
+          lower = cf[[est_col]] - tcrit * cf[[se_col]],
+          upper = cf[[est_col]] + tcrit * cf[[se_col]],
           stringsAsFactors = FALSE
         )
         # Coefficient significance is the coefficient p-value (Wald t/z).
@@ -1243,7 +1245,7 @@ steps (generalised mixed model, transformation).
         build_forest_plot(
           fp_df,
           title    = paste0("Fixed-effect coefficients of ", response_name),
-          x_label  = "Estimate (95% CI)",
+          x_label  = paste0("Estimate (", 100 * (1 - alpha), "% CI)"),
           order_by = "model")
       }, error = function(e) NULL)
 
@@ -1267,7 +1269,7 @@ steps (generalised mixed model, transformation).
         ref_cap <- build_coef_ref_caption(fit, fixed_only = TRUE)
 
         cat("*Each row is a fixed-effect coefficient (the intercept is ",
-            "omitted) with its ", 100 * (1 - alpha), "% Wald CI. ",
+            "omitted) with its ", 100 * (1 - alpha), "% confidence interval (t, with the df of the coefficient table). ",
             "The dashed line marks zero: a coefficient at zero has no effect ",
             "relative to its reference. Points to the right increase the ",
             "response, points to the left decrease it. A CI that touches or ",

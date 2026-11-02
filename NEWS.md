@@ -287,6 +287,11 @@ These still work in 3.2.1 but will be removed in the next release.
 
 ## Bug Fixes
 
+* `f_lmer()`: the coefficient forest plot now uses a t interval with the df of
+  the coefficient table, as the p-value and the slopes table do. It used a z
+  interval, which was too narrow in small designs. The axis label follows
+  `alpha`.
+
 * **`f_summary()`: a group with only missing values gives `NA`, without
   warnings.** In a design with one row per group, such as one plant per
   treatment and block, a missing value leaves a group empty. `f_summary()`,

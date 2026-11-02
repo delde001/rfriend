@@ -516,3 +516,21 @@ test_that("f_lmer() slopes appear in the report and work with Kenward-Roger", {
                                  ddf = "Kenward-Roger"))
   expect_equal(round(res$Reaction$slopes$df), 17)
 })
+
+test_that("f_lmer() forest plot: t interval with the df of the table, label follows alpha", {
+  skip_if_not_installed("lme4")
+  skip_if_not_installed("lmerTest")
+  data(sleepstudy, package = "lme4", envir = environment())
+  r <- suppressMessages(f_lmer(Reaction ~ Days + (1 + Days | Subject),
+                               data = sleepstudy))$Reaction
+  cf <- r$coefficients[r$coefficients$Term == "Days", ]
+  fp <- r$coef_forest_plot
+  half <- stats::qt(0.975, cf$df) * cf$`Std. Error`
+  expect_equal(fp$data$lower, cf$Estimate - half)
+  expect_equal(fp$data$upper, cf$Estimate + half)
+  expect_equal(fp$labels$x, "Estimate (95% CI)")
+
+  r99 <- suppressMessages(f_lmer(Reaction ~ Days + (1 + Days | Subject),
+                                 data = sleepstudy, alpha = 0.01))$Reaction
+  expect_equal(r99$coef_forest_plot$labels$x, "Estimate (99% CI)")
+})
