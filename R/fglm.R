@@ -132,7 +132,7 @@
 #'
 #' It fits a Generalized Linear Model (GLM) using the specified formula, family, and data. Model diagnostics are performed with DHARMa (simulation-based residual checks including a KS test, dispersion test, and outlier test). High-leverage observations are flagged using hat values.
 #'
-#' Significance of each predictor is assessed via Type II Analysis of Deviance (\code{stats::drop1()}). If significant effects are found, post hoc pairwise comparisons are performed using estimated marginal means from \code{emmeans()} with the chosen p-value adjustment method (default: Sidak). When complete separation is detected, the function falls back to likelihood ratio test (LRT) based pairwise comparisons, which are robust to separation.
+#' Significance of each predictor is assessed via Type II Analysis of Deviance (\code{stats::drop1()}). If significant effects are found, post hoc pairwise comparisons are performed using estimated marginal means from \code{emmeans()} with the chosen p-value adjustment method (default: Sidak). When (quasi-)complete separation is detected, the function falls back to likelihood ratio test (LRT) based pairwise comparisons, which are robust to separation.
 #'
 #' \strong{Effect and interaction plots.} When \code{effect_plots = TRUE}, an
 #' estimated marginal means plot (estimate \eqn{\pm} 95\% CI on the response
@@ -185,7 +185,7 @@
 #'       \code{post_hoc[["block:treatment"]]} for two. It also holds
 #'       \code{emmeans_table} and \code{data_summary_table} (observed
 #'       descriptives). \code{NULL} for an intercept-only model.}
-#'     \item{sep_flag}{Logical indicating whether complete separation was detected.}
+#'     \item{sep_flag}{Logical indicating whether (quasi-)complete separation was detected.}
 #'     \item{event_coding}{For a categorical binomial response: a list with the
 #'       \code{event} and \code{non_event} levels, their counts, the number of
 #'       missing values, whether levels were \code{pooled}, the probability
@@ -613,7 +613,7 @@ f_glm <- function(
     ))
   }
 
-  # LRT-based pairwise comparisons -- robust to complete separation.
+  # LRT-based pairwise comparisons -- robust to (quasi-)complete separation.
   # For each pair of factor levels, fits a reduced model with those levels merged,
   # then takes the LRT vs the full model. Letters assigned via compact_letters().
   # Returns a named character vector of letters (names = factor levels), or NULL.
@@ -832,7 +832,7 @@ f_glm <- function(
         # Explain that LRT-based pairwise tests were used instead of Wald
         cld_text <- paste0(
           "\n**[!] Separation detected, LRT pairwise comparisons used:**  \n",
-          "Complete separation was detected (at least one group perfectly predicts the outcome), ",
+          "(Quasi-)complete separation was detected (at least one group has only one outcome), ",
           "making Wald-based pairwise tests unreliable. ",
           "Letters were assigned using **likelihood ratio tests** (LRT): for each pair of groups, ",
           "a reduced model with those groups merged was compared against the full model via LRT. ",
@@ -1134,7 +1134,7 @@ This plot shows your residuals (errors) on the Y-axis against the model's predic
       )
 
       # sig_effects: based on LRT p-value from drop1 (not Wald z-tests).
-      # Wald p-values are unreliable under complete separation -- LRT is robust.
+      # Wald p-values are unreliable under (quasi-)complete separation -- LRT is robust.
       # If drop1 failed, fall back to Wald as a last resort.
       sig_effects <- {
         drop1_res_sig <- output_list[[response_name]][["drop1"]]
@@ -1564,11 +1564,11 @@ main findings in the *Results* section, you **must** use the Emmeans table below
       # Convergence / separation warning
       if (!glm_fit$converged) {
         cat("**WARNING:** The model did not converge. Coefficient estimates are unreliable. ",
-            "Check for complete separation or consider a different model specification.  \n\n")
+            "Check for (quasi-)complete separation or consider a different model specification.  \n\n")
       }
       if (any(is.na(coef(glm_fit)))) {
         cat("**WARNING:** One or more coefficients are NA, indicating perfect collinearity ",
-            "or complete separation.  \n\n")
+            "or (quasi-)complete separation.  \n\n")
       }
 
       # Reuse the sep_flag already computed and stored above

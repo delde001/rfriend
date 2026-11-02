@@ -156,7 +156,7 @@ An object of class 'f_glm' (a named list, one entry per response variable) conta
       \code{post_hoc[["block:treatment"]]} for two. It also holds
       \code{emmeans_table} and \code{data_summary_table} (observed
       descriptives). \code{NULL} for an intercept-only model.}
-    \item{sep_flag}{Logical indicating whether complete separation was detected.}
+    \item{sep_flag}{Logical indicating whether (quasi-)complete separation was detected.}
     \item{event_coding}{For a categorical binomial response: a list with the
       \code{event} and \code{non_event} levels, their counts, the number of
       missing values, whether levels were \code{pooled}, the probability
@@ -214,7 +214,7 @@ and stored in \code{out$<response>$event_coding}.
 
 It fits a Generalized Linear Model (GLM) using the specified formula, family, and data. Model diagnostics are performed with DHARMa (simulation-based residual checks including a KS test, dispersion test, and outlier test). High-leverage observations are flagged using hat values.
 
-Significance of each predictor is assessed via Type II Analysis of Deviance (\code{stats::drop1()}). If significant effects are found, post hoc pairwise comparisons are performed using estimated marginal means from \code{emmeans()} with the chosen p-value adjustment method (default: Sidak). When complete separation is detected, the function falls back to likelihood ratio test (LRT) based pairwise comparisons, which are robust to separation.
+Significance of each predictor is assessed via Type II Analysis of Deviance (\code{stats::drop1()}). If significant effects are found, post hoc pairwise comparisons are performed using estimated marginal means from \code{emmeans()} with the chosen p-value adjustment method (default: Sidak). When (quasi-)complete separation is detected, the function falls back to likelihood ratio test (LRT) based pairwise comparisons, which are robust to separation.
 
 \strong{Effect and interaction plots.} When \code{effect_plots = TRUE}, an
 estimated marginal means plot (estimate \eqn{\pm} 95\% CI on the response

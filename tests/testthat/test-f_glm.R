@@ -1040,3 +1040,14 @@ test_that("an intercept-only model runs and skips the post hoc step (BUGS #23)",
   b <- suppressMessages(f_glm(infected ~ 1, data = wk6, family = "binomial", event = "yes"))
   expect_equal(unname(coef(b$infected$model)), qlogis(5 / 20))
 })
+
+test_that("f_glm() report names (quasi-)complete separation", {
+  d <- data.frame(g = rep(c("a", "b"), each = 12),
+                  y = c(rep("no", 12), rep("yes", 9), rep("no", 3)))
+  r <- suppressWarnings(suppressMessages(
+    f_glm(y ~ g, data = d, family = "binomial", event = "yes",
+          output_type = "rmd", intro_text = FALSE)))
+  expect_true(any(grepl("(Quasi-)complete separation was detected", r$rmd, fixed = TRUE)) ||
+                any(grepl("(quasi-)complete separation", r$rmd, fixed = TRUE)))
+  expect_false(any(grepl("Complete separation was detected", r$rmd, fixed = TRUE)))
+})

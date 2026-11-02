@@ -287,6 +287,10 @@ These still work in 3.2.1 but will be removed in the next release.
 
 ## Bug Fixes
 
+* `f_glm()`: the report now says "(Quasi-)complete separation", as the console
+  warning does. It said "Complete separation" also when other groups still had
+  both outcomes.
+
 * `f_lmer()`: the coefficient forest plot now uses a t interval with the df of
   the coefficient table, as the p-value and the slopes table do. It used a z
   interval, which was too narrow in small designs. The axis label follows
