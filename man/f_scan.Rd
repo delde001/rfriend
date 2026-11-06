@@ -108,9 +108,9 @@ column; column names with dots from \code{read.csv()}; and, with
 \code{id_col}, the number of rows per ID. A bare data frame call checks
 every column; a formula call (or \code{columns =}) checks only the
 columns it names. The check only reports and never changes the data. It
-is stored as \code{attr(result, "data_check")}; the five lowest and
-highest values per numeric column are printed with
-\code{print(attr(result, "data_check"), extremes = TRUE)}. The flag for
+is stored as \code{attr(result, "data_check")} and printed first: a list of
+possible problems, then tables of the text and numeric columns, with the
+four lowest and highest values per numeric column. The flag for
 labels written differently is a rule of thumb and cannot know which
 labels your design intended: check those with
 \code{f_factors(..., levels = )}.}

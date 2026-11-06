@@ -99,11 +99,14 @@ objects. Please read them before updating scripts.
   `id_col` it also counts the rows per ID and names IDs with an unusual number
   of rows. A bare data frame call checks every column; a formula call checks
   only the formula variables. The check only reports and never changes the
-  data. It is stored as `attr(result, "data_check")`, so the result keeps one
-  element per scanned column. The five lowest and highest values per numeric
-  column are stored and printed with `print(result, extremes = TRUE)`; the
-  Word, PDF and rmd reports always show them. `check = FALSE` switches the
-  check off; `print(result, data_check = FALSE)` hides it.
+  data. It is printed first: a list of possible problems ("Check these"),
+  then a table of the text columns and a table of the numeric columns with
+  the missing values and the four lowest and highest values. A column with
+  many values, such as an ID column, is summarised in one line. The check is
+  stored as `attr(result, "data_check")`, so the result keeps one element per
+  scanned column, and it is also the first section of the Word, PDF and rmd
+  reports. `check = FALSE` switches the check off;
+  `print(result, data_check = FALSE)` hides it.
 
 * **`f_rename_vector()`: factors, `trim` and a warning for typing errors.**
   A factor now keeps its class: its levels are renamed in their order (it

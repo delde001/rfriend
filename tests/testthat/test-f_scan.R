@@ -929,7 +929,7 @@ test_that("data check: flags spaces, style, numbers stored as text and missing v
   expect_identical(dc$text$count_txt$not_numeric, "n/a")
   expect_identical(dc$numeric$height_cm$n_missing, 1L)
   expect_identical(dc$numeric$height_cm$highest[1], 145)
-  expect_length(dc$numeric$height_cm$lowest, 5L)
+  expect_length(dc$numeric$height_cm$lowest, 4L)
 })
 
 test_that("data check: labels that differ only in case or underscores are flagged together", {
@@ -962,6 +962,8 @@ test_that("data check: id_col reports rows per ID and unusual IDs", {
   dc <- attr(f_scan(d, id_col = "plot", open_generated_files = FALSE), "data_check")
   expect_identical(dc$id$n_ids, 4L)
   expect_identical(dc$id$unusual, "P1")
+  txt <- paste(utils::capture.output(print(dc)), collapse = "\n")
+  expect_match(txt, "plot: P1 has 2 rows; most IDs have 3", fixed = TRUE)
   expect_null(dc$text$plot)
   expect_error(f_scan(d, id_col = "plant", open_generated_files = FALSE),
                "is not a column of the data")
@@ -973,21 +975,34 @@ test_that("data check: dotted column names from read.csv() are reported", {
   expect_identical(dc$dotted, "Height..cm.")
 })
 
-test_that("data check: printed by default, extremes only on request", {
+test_that("data check: printed first, as a list of problems and tables", {
   res <- f_scan(make_messy_trial(), open_generated_files = FALSE)
   txt <- paste(utils::capture.output(print(res, boxplot = FALSE, histogram = FALSE,
                                            qqplot = FALSE, main_plot = FALSE)),
                collapse = "\n")
   expect_match(txt, "--- Data check ---", fixed = TRUE)
-  expect_match(txt, "leading or trailing space: \" high_N\"", fixed = TRUE)
-  expect_false(grepl("highest 145", txt, fixed = TRUE))
-  txt2 <- paste(utils::capture.output(print(attr(res, "data_check"), extremes = TRUE)),
-                collapse = "\n")
-  expect_match(txt2, "highest 145", fixed = TRUE)
+  expect_match(txt, "Check these (", fixed = TRUE)
+  expect_match(txt, "treatment: leading or trailing space in \" high_N\"", fixed = TRUE)
+  expect_match(txt, "Lowest 4", fixed = TRUE)
+  expect_match(txt, "145, 31, 30, 27", fixed = TRUE)
   txt3 <- paste(utils::capture.output(print(res, data_check = FALSE, boxplot = FALSE,
                                             histogram = FALSE, qqplot = FALSE,
                                             main_plot = FALSE)), collapse = "\n")
   expect_false(grepl("Data check", txt3, fixed = TRUE))
+})
+
+test_that("data check: a clean data frame prints 'No problems found.'", {
+  d   <- data.frame(y = c(1.2, 2.3, 3.1, 4.8), g = c("a", "b", "a", "b"))
+  txt <- paste(utils::capture.output(print(attr(f_scan(d, open_generated_files = FALSE),
+                                                "data_check"))), collapse = "\n")
+  expect_match(txt, "No problems found.", fixed = TRUE)
+})
+
+test_that("data check: an ID column with many values is summarised in one line", {
+  d   <- data.frame(id = paste0("P", sprintf("%02d", rep(1:20, each = 2))), y = 1:40)
+  txt <- paste(utils::capture.output(print(attr(f_scan(d, open_generated_files = FALSE),
+                                                "data_check"))), collapse = "\n")
+  expect_match(txt, "20 values, 2 rows each", fixed = TRUE)
 })
 
 test_that("data check: the data are not changed", {
@@ -1007,5 +1022,5 @@ test_that("data check: included in the rmd report", {
   res <- f_scan(make_messy_trial(), output_type = "rmd", outliers = FALSE,
                 open_generated_files = FALSE)
   expect_match(res$rmd, "# Data check of", fixed = TRUE)
-  expect_match(res$rmd, "highest 145", fixed = TRUE)
+  expect_match(res$rmd, "145, 31, 30, 27", fixed = TRUE)
 })

@@ -55,9 +55,9 @@
 #'   \code{id_col}, the number of rows per ID. A bare data frame call checks
 #'   every column; a formula call (or \code{columns =}) checks only the
 #'   columns it names. The check only reports and never changes the data. It
-#'   is stored as \code{attr(result, "data_check")}; the five lowest and
-#'   highest values per numeric column are printed with
-#'   \code{print(attr(result, "data_check"), extremes = TRUE)}. The flag for
+#'   is stored as \code{attr(result, "data_check")} and printed first: a list of
+#'   possible problems, then tables of the text and numeric columns, with the
+#'   four lowest and highest values per numeric column. The flag for
 #'   labels written differently is a rule of thumb and cannot know which
 #'   labels your design intended: check those with
 #'   \code{f_factors(..., levels = )}.
@@ -649,9 +649,9 @@ f_scan.data.frame <- function(x,
   # render = TRUE: also produces ggsave PNGs + markdown (needed for word/pdf/rmd)
   # render = FALSE: only builds the R objects (plots, tables) -- much faster
   generate_report <- function(render = FALSE) {
-    # Data check first in the Word, PDF or rmd report, with the extreme values
+    # Data check first in the Word, PDF or rmd report
     if (render && !is.null(data_check_obj)) {
-      dc_lines <- utils::capture.output(print(data_check_obj, extremes = TRUE))
+      dc_lines <- utils::capture.output(print(data_check_obj))
       cat("\n# Data check of ", data_name, "  \n\n```\n",
           paste(dc_lines, collapse = "\n"), "\n```\n  \n", sep = "")
       if (output_type != "rmd") {
@@ -1190,8 +1190,6 @@ header-includes:
 #' @param digits Integer. Decimal places for printed tables. Default \code{3}.
 #' @param data_check Logical. Print the data check (shown only if
 #'   \code{check = TRUE} was used during \code{f_scan})? Default \code{TRUE}.
-#' @param extremes Logical. Print the five lowest and highest values of each
-#'   numeric column in the data check? Default \code{FALSE}.
 #' @param ... Further arguments passed to or from other methods. Currently
 #'   unused by the \code{f_scan} methods themselves, but accepted so the
 #'   methods remain consistent with the base generics \code{print},
@@ -1209,13 +1207,12 @@ print.f_scan <- function(x,
                          advice = TRUE,
                          digits = 3,
                          data_check = TRUE,
-                         extremes = FALSE,
                          ...
                          ) {
   # Data check first: it is about the data, not about one variable
   dc <- attr(x, "data_check")
   if (data_check && !is.null(dc)) {
-    print(dc, extremes = extremes)
+    print(dc)
   }
 
   # Loop over each category (a, b, etc.)

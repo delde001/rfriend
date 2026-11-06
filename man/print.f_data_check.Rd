@@ -4,16 +4,14 @@
 \alias{print.f_data_check}
 \title{Print the data check of f_scan()}
 \usage{
-\method{print}{f_data_check}(x, extremes = FALSE, max_values = 12L, ...)
+\method{print}{f_data_check}(x, max_values = 12L, ...)
 }
 \arguments{
 \item{x}{An \code{f_data_check} object.}
 
-\item{extremes}{Logical. Also print the lowest and highest values of each
-numeric column? Default \code{FALSE}.}
-
-\item{max_values}{Integer. Maximum number of distinct values printed per
-text column; the rest are counted. Default \code{12}.}
+\item{max_values}{Integer. Maximum number of distinct values listed per
+text column; a column with more values (such as an ID column) is
+summarised in one line. Default \code{12}.}
 
 \item{...}{Not used.}
 }
@@ -22,5 +20,7 @@ text column; the rest are counted. Default \code{12}.}
 }
 \description{
 Prints the data check that \code{\link{f_scan}} stores as
-\code{attr(result, "data_check")}.
+\code{attr(result, "data_check")}: first a list of possible problems, then
+a table of the text columns, a table of the numeric columns with the
+lowest and highest values, and the rows per ID.
 }

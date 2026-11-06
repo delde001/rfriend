@@ -10,7 +10,7 @@
 #             the formula variables for a formula call)
 #   id_col    optional column that identifies the experimental unit
 #   n_extreme number of lowest and highest values stored per numeric column
-scan_data_check <- function(data, columns, id_col = NULL, n_extreme = 5L) {
+scan_data_check <- function(data, columns, id_col = NULL, n_extreme = 4L) {
 
   columns <- unique(c(columns, id_col))
   columns <- columns[columns %in% names(data)]
@@ -101,83 +101,142 @@ scan_data_check <- function(data, columns, id_col = NULL, n_extreme = 5L) {
 # Internal: quote labels for printing, so leading spaces stay visible.
 dc_quote <- function(x) paste0("\"", x, "\"", collapse = ", ")
 
+# Internal: numbers as short text, each on its own scale (20, not 20.0).
+dc_num <- function(v) {
+  if (!length(v)) return("-")
+  paste(vapply(v, function(z) format(z, digits = 6, trim = TRUE), character(1)),
+        collapse = ", ")
+}
+
+# Internal: one table row; the last cell wraps under itself when too long.
+dc_row <- function(cells, widths, width = getOption("width", 80L)) {
+  n    <- length(cells)
+  pad  <- function(z, w) paste0(z, strrep(" ", max(0L, w - nchar(z))))
+  lead <- if (n > 1L) paste(mapply(pad, cells[-n], widths[-n]), collapse = "  ") else ""
+  lead <- paste0("  ", lead, if (n > 1L) "  " else "")
+  room <- max(20L, width - nchar(lead))
+  last <- strwrap(cells[n], width = room)
+  if (!length(last)) last <- ""
+  cat(lead, last[1], "\n", sep = "")
+  for (l in last[-1]) cat(strrep(" ", nchar(lead)), l, "\n", sep = "")
+}
+
+# Internal: every flag as one line "column: problem", in the order of the data.
+dc_flags <- function(x) {
+  f <- character(0)
+  if (length(x$dotted))
+    f <- c(f, paste0(paste(x$dotted, collapse = ", "),
+                     ": dots in the column name (from spaces or brackets in the file); ",
+                     "rename with f_rename_columns()"))
+  for (col in names(x$text)) {
+    tx <- x$text[[col]]
+    if (length(tx$spaces))
+      f <- c(f, paste0(col, ": leading or trailing space in ", dc_quote(tx$spaces)))
+    for (s in tx$similar)
+      f <- c(f, paste0(col, ": may be the same label: ", dc_quote(s)))
+    if (length(tx$style))
+      f <- c(f, paste0(col, ": written differently from the other labels: ",
+                       dc_quote(tx$style)))
+    if (length(tx$not_numeric))
+      f <- c(f, paste0(col, ": numbers stored as text; not a number: ",
+                       dc_quote(tx$not_numeric)))
+    if (tx$n_missing > 0L)
+      f <- c(f, paste0(col, ": ", tx$n_missing, " missing values"))
+  }
+  for (col in names(x$numeric)) {
+    m <- x$numeric[[col]]$n_missing
+    if (m > 0L) f <- c(f, paste0(col, ": ", m, " missing value", if (m > 1L) "s"))
+  }
+  if (!is.null(x$id) && length(x$id$unusual))
+    f <- c(f, paste0(x$id$id_col, ": ",
+                     paste(sprintf("%s has %d row%s", x$id$unusual,
+                                   as.integer(x$id$rows_per_id[x$id$unusual]),
+                                   ifelse(as.integer(x$id$rows_per_id[x$id$unusual]) == 1L, "", "s")),
+                           collapse = ", "),
+                     "; most IDs have ", x$id$usual))
+  f
+}
+
 #' Print the data check of f_scan()
 #'
 #' Prints the data check that \code{\link{f_scan}} stores as
-#' \code{attr(result, "data_check")}.
+#' \code{attr(result, "data_check")}: first a list of possible problems, then
+#' a table of the text columns, a table of the numeric columns with the
+#' lowest and highest values, and the rows per ID.
 #'
 #' @param x An \code{f_data_check} object.
-#' @param extremes Logical. Also print the lowest and highest values of each
-#'   numeric column? Default \code{FALSE}.
-#' @param max_values Integer. Maximum number of distinct values printed per
-#'   text column; the rest are counted. Default \code{12}.
+#' @param max_values Integer. Maximum number of distinct values listed per
+#'   text column; a column with more values (such as an ID column) is
+#'   summarised in one line. Default \code{12}.
 #' @param ... Not used.
 #' @return \code{x}, invisibly.
 #' @export
 #' @method print f_data_check
-print.f_data_check <- function(x, extremes = FALSE, max_values = 12L, ...) {
+print.f_data_check <- function(x, max_values = 12L, ...) {
   cat("\n--- Data check ---\n")
-  cat(x$n_rows, "rows;", length(x$columns), "of", x$n_cols,
-      "columns checked. The check reports; it does not change the data.\n")
+  cat(x$n_rows, " rows; ", length(x$columns), " of ", x$n_cols,
+      " columns checked. The check only reports; it does not change the data.\n",
+      sep = "")
 
-  if (length(x$dotted)) {
-    cat("\nColumn names with dots (from spaces or brackets in the file): ",
-        paste(x$dotted, collapse = ", "),
-        "\n  -> rename them with f_rename_columns().\n", sep = "")
+  flags <- dc_flags(x)
+  if (length(flags)) {
+    cat("\nCheck these (", length(flags), "):\n", sep = "")
+    room <- max(30L, getOption("width", 80L) - 4L)
+    for (f in flags) {
+      l <- strwrap(f, width = room)
+      cat("  ! ", l[1], "\n", sep = "")
+      for (r in l[-1]) cat("    ", r, "\n", sep = "")
+    }
+  } else {
+    cat("\nNo problems found.\n")
   }
 
   if (length(x$text)) {
-    cat("\nText columns (value and number of rows):\n")
+    cat("\nText columns\n")
+    w <- max(nchar(c("Column", names(x$text))))
+    dc_row(c("Column", "Values (rows)"), w)
     for (col in names(x$text)) {
-      tx   <- x$text[[col]]
-      tab  <- tx$values
+      tab  <- x$text[[col]]$values
       labs <- ifelse(is.na(names(tab)), "NA", paste0("\"", names(tab), "\""))
-      shown <- utils::head(seq_along(tab), max_values)
-      line <- paste(sprintf("%s (%d)", labs[shown], as.integer(tab)[shown]),
-                    collapse = ", ")
-      if (length(tab) > max_values)
-        line <- paste0(line, ", ... and ", length(tab) - max_values,
-                       " more values")
-      cat("  ", col, ": ", line, "\n", sep = "")
-      if (length(tx$spaces))
-        cat("    ! leading or trailing space: ", dc_quote(tx$spaces), "\n", sep = "")
-      for (s in tx$similar)
-        cat("    ! may be the same label: ", dc_quote(s), "\n", sep = "")
-      if (length(tx$style))
-        cat("    ! written differently from the other labels: ",
-            dc_quote(tx$style), "\n", sep = "")
-      if (length(tx$not_numeric))
-        cat("    ! numbers stored as text; these values are not numbers: ",
-            dc_quote(tx$not_numeric), "\n", sep = "")
+      n    <- as.integer(tab)
+      if (length(tab) > max_values) {
+        rows <- if (min(n) == max(n)) paste(n[1], "rows each")
+                else paste(min(n), "to", max(n), "rows each")
+        cell <- paste0(length(tab), " values, ", rows)
+      } else {
+        # non-breaking spaces keep a value and its count on one line
+        cell <- paste(gsub(" ", "\u00a0", sprintf("%s (%d)", labs, n)), collapse = ", ")
+      }
+      dc_row(c(col, cell), w)
     }
   }
 
   if (length(x$numeric)) {
-    cat("\nNumeric columns:\n")
+    cat("\nNumeric columns\n")
+    k   <- x$n_extreme
+    low <- vapply(x$numeric, function(m) dc_num(m$lowest), character(1))
+    hig <- vapply(x$numeric, function(m) dc_num(m$highest), character(1))
+    mis <- vapply(x$numeric, function(m) as.character(m$n_missing), character(1))
+    w   <- c(max(nchar(c("Column", names(x$numeric)))),
+             nchar("Missing"),
+             max(nchar(c(paste("Lowest", k), low))))
+    dc_row(c("Column", "Missing", paste("Lowest", k), paste("Highest", k)), w)
     for (col in names(x$numeric)) {
-      nm <- x$numeric[[col]]
-      if (extremes) {
-        cat(sprintf("  %s: %d missing; lowest %s; highest %s\n", col,
-                    nm$n_missing, paste(nm$lowest, collapse = ", "),
-                    paste(nm$highest, collapse = ", ")))
-      } else {
-        cat(sprintf("  %s: %d missing\n", col, nm$n_missing))
-      }
+      dc_row(c(col, formatC(mis[[col]], width = nchar("Missing")), low[[col]],
+               hig[[col]]), w)
     }
-    if (!extremes)
-      cat("  The ", x$n_extreme, " lowest and highest values per column: ",
-          "print(result, extremes = TRUE).\n", sep = "")
   }
 
   if (!is.null(x$id)) {
-    cat("\nRows per ", x$id$id_col, ":\n", sep = "")
+    cat("\nRows per ", x$id$id_col, "\n", sep = "")
     per <- table(as.integer(x$id$rows_per_id))
-    cat("  ", x$id$n_ids, " IDs; ",
-        paste(sprintf("%s IDs with %s rows", as.integer(per), names(per)),
-              collapse = ", "), "\n", sep = "")
-    if (length(x$id$unusual))
-      cat("    ! not ", x$id$usual, " rows: ",
-          paste(x$id$unusual, collapse = ", "), "\n", sep = "")
+    if (length(per) == 1L) {
+      cat("  ", x$id$n_ids, " IDs, ", names(per), " rows each\n", sep = "")
+    } else {
+      cat("  ", x$id$n_ids, " IDs: ",
+          paste(sprintf("%s with %s rows", as.integer(per), names(per)),
+                collapse = ", "), "\n", sep = "")
+    }
   }
   cat("\n")
   invisible(x)

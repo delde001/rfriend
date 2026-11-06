@@ -17,7 +17,6 @@
   advice = TRUE,
   digits = 3,
   data_check = TRUE,
-  extremes = FALSE,
   ...
 )
 
@@ -40,9 +39,6 @@
 
 \item{data_check}{Logical. Print the data check (shown only if
 \code{check = TRUE} was used during \code{f_scan})? Default \code{TRUE}.}
-
-\item{extremes}{Logical. Print the five lowest and highest values of each
-numeric column in the data check? Default \code{FALSE}.}
 
 \item{...}{Further arguments passed to or from other methods. Currently
 unused by the \code{f_scan} methods themselves, but accepted so the
