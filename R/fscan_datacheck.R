@@ -174,13 +174,20 @@ dc_flags <- function(x) {
 #' @method print f_data_check
 print.f_data_check <- function(x, max_values = 12L, ...) {
   cat("\n--- Data check ---\n")
-  cat(x$n_rows, " rows; ", length(x$columns), " of ", x$n_cols,
-      " columns checked.\nThis check only reports; it does not change the data.\n",
-      sep = "")
+  cat(
+    "This check only reports potential issues;\nit does not change the data.\n",
+    x$n_rows,
+    " rows; ",
+    length(x$columns),
+    " of ",
+    x$n_cols,
+    " columns were checked.\n",
+    sep = ""
+  )
 
   flags <- dc_flags(x)
   if (length(flags)) {
-    cat("\nCheck these (", length(flags), "):\n", sep = "")
+    cat("\nCheck these ", length(flags), " issues:\n", sep = "")
     room <- max(30L, getOption("width", 80L) - 4L)
     for (f in flags) {
       l <- strwrap(f, width = room)
@@ -192,7 +199,7 @@ print.f_data_check <- function(x, max_values = 12L, ...) {
   }
 
   if (length(x$text)) {
-    cat("\nText columns\n")
+    cat("\nText columns:\n")
     w <- max(nchar(c("Column", names(x$text))))
     dc_row(c("Column", "Values (rows)"), w)
     for (col in names(x$text)) {
@@ -213,7 +220,7 @@ print.f_data_check <- function(x, max_values = 12L, ...) {
   }
 
   if (length(x$numeric)) {
-    cat("\nNumeric columns\n")
+    cat("\nNumeric columns:\n")
     k   <- x$n_extreme
     low <- vapply(x$numeric, function(m) dc_num(m$lowest), character(1))
     hig <- vapply(x$numeric, function(m) dc_num(m$highest), character(1))
