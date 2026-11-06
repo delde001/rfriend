@@ -175,7 +175,7 @@ dc_flags <- function(x) {
 print.f_data_check <- function(x, max_values = 12L, ...) {
   cat("\n--- Data check ---\n")
   cat(x$n_rows, " rows; ", length(x$columns), " of ", x$n_cols,
-      " columns checked. The check only reports; it does not change the data.\n",
+      " columns checked.\nThis check only reports; it does not change the data.\n",
       sep = "")
 
   flags <- dc_flags(x)
