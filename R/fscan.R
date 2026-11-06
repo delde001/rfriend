@@ -46,9 +46,28 @@
 #'   Defaults to \code{file.path(tempdir(), "dataname_fscan.pdf")}.
 #' @param save_in_wdir Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.
 #' @param digits Integer. Decimal places for printed tables in 'pdf' and 'Word' output files. Default \code{3}.
+#' @param check Logical. If \code{TRUE} (default), runs a data check before
+#'   the plots and tables: every value of each text column with its count,
+#'   with flags for leading or trailing spaces, labels that differ only in
+#'   case, spaces or underscores, labels written differently from the others,
+#'   and numbers stored as text; the number of missing values per numeric
+#'   column; column names with dots from \code{read.csv()}; and, with
+#'   \code{id_col}, the number of rows per ID. A bare data frame call checks
+#'   every column; a formula call (or \code{columns =}) checks only the
+#'   columns it names. The check only reports and never changes the data. It
+#'   is stored as \code{attr(result, "data_check")}; the five lowest and
+#'   highest values per numeric column are printed with
+#'   \code{print(attr(result, "data_check"), extremes = TRUE)}. The flag for
+#'   labels written differently is a rule of thumb and cannot know which
+#'   labels your design intended: check those with
+#'   \code{f_factors(..., levels = )}.
+#' @param id_col Character string or \code{NULL}. Column that identifies the
+#'   experimental unit (for example a plant ID). The data check then reports
+#'   the number of rows per ID and lists IDs with an unusual number of rows.
+#'   Default \code{NULL}.
 #' @param ... Further arguments forwarded to \code{f_scan.data.frame}.
 #'
-#' @return A list of class \code{f_scan} containing plots, the summary table, and the outlier table. Using the option "output_type", it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print, summary and plot methods for 'f_scan' objects.
+#' @return A list of class \code{f_scan} containing plots, the summary table, and the outlier table. With \code{check = TRUE} the data check is attached as \code{attr(result, "data_check")} (class \code{f_data_check}). Using the option "output_type", it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print, summary and plot methods for 'f_scan' objects.
 #'
 #' @details
 #' \code{f_scan} automatically adapts the visualization based on the number of grouping variables provided:
@@ -352,6 +371,8 @@ f_scan.data.frame <- function(x,
                               save_as = NULL,
                               save_in_wdir = FALSE,
                               digits = NULL,
+                              check = TRUE,
+                              id_col = NULL,
                               ...) {
 
 
@@ -374,6 +395,23 @@ f_scan.data.frame <- function(x,
       "Character string specifying the output format (output_type = ) should be either: 'pdf', 'word', 'excel', 'console','rmd', 'default'"
     )
   }
+  if (!is.logical(check) || length(check) != 1L || is.na(check)) {
+    stop("f_scan(): 'check' must be TRUE or FALSE.", call. = FALSE)
+  }
+  if (!is.null(id_col)) {
+    if (!is.character(id_col) || length(id_col) != 1L) {
+      stop("f_scan(): 'id_col' must be one column name, for example id_col = \"plant_id\".",
+           call. = FALSE)
+    }
+    if (!id_col %in% names(data)) {
+      stop("f_scan(): id_col '", id_col, "' is not a column of the data. Columns: ",
+           paste(names(data), collapse = ", "), ".", call. = FALSE)
+    }
+  }
+
+  # Columns for the data check: every column for a bare data.frame call,
+  # only the named columns for a formula call or 'columns ='.
+  check_cols <- if (is.null(columns)) names(data) else c(columns, group_vars)
 
   # Default 'columns' to all numeric columns in 'data' so that a bare call
   # like f_scan(mtcars) works analogously to f_boxplot(mtcars). Any
@@ -443,11 +481,20 @@ f_scan.data.frame <- function(x,
     }
   }
 
+  # Data check on the data as the user gave it: before fancy names and
+  # before grouping columns become factors.
+  data_check_obj <- NULL
+  if (check) {
+    data_check_obj <- scan_data_check(data, columns = check_cols, id_col = id_col)
+  }
+
   # Rename the data.frame with fancy names if fancy_names are provided.
+  # fancy_names may hold names for columns that are not scanned, so a name
+  # without a match is expected here (warn_unmatched = FALSE).
   if (!is.null(fancy_names)) {
     data        <- f_rename_columns(data, fancy_names)
-    target_cols <- f_rename_vector(target_cols, fancy_names)
-    group_vars  <- f_rename_vector(group_vars, fancy_names)
+    target_cols <- f_rename_vector(target_cols, fancy_names, warn_unmatched = FALSE)
+    group_vars  <- f_rename_vector(group_vars, fancy_names, warn_unmatched = FALSE)
   }
 
   # Handle Grouping Variables
@@ -602,6 +649,17 @@ f_scan.data.frame <- function(x,
   # render = TRUE: also produces ggsave PNGs + markdown (needed for word/pdf/rmd)
   # render = FALSE: only builds the R objects (plots, tables) -- much faster
   generate_report <- function(render = FALSE) {
+    # Data check first in the Word, PDF or rmd report, with the extreme values
+    if (render && !is.null(data_check_obj)) {
+      dc_lines <- utils::capture.output(print(data_check_obj, extremes = TRUE))
+      cat("\n# Data check of ", data_name, "  \n\n```\n",
+          paste(dc_lines, collapse = "\n"), "\n```\n  \n", sep = "")
+      if (output_type != "rmd") {
+        cat("
+<div style=\"page-break-after: always;\"></div>
+\\newpage")
+      }
+    }
     for (target_col in target_cols) {
       plot_data <- data
       # When the user did not supply any group_vars, inject a constant
@@ -985,7 +1043,11 @@ f_scan.data.frame <- function(x,
     class(output_list) <- "f_scan"
   }
 
-
+  # The data check is an attribute, so the list keeps one element per
+  # scanned column (print, summary, plot and the Excel sheets loop over them).
+  if (!is.null(data_check_obj)) {
+    attr(output_list, "data_check") <- data_check_obj
+  }
 
   # Here the documents are constructed.
   if (output_type %in% c("word", "pdf")) {
@@ -1126,6 +1188,10 @@ header-includes:
 #' @param boxplot,histogram,qqplot,main_plot Logical. Which plots to print? All default \code{TRUE}.
 #' @param advice Logical. Print statistical test recommendations? Default \code{TRUE} (shown only if \code{advice=TRUE} was used during \code{f_scan}).
 #' @param digits Integer. Decimal places for printed tables. Default \code{3}.
+#' @param data_check Logical. Print the data check (shown only if
+#'   \code{check = TRUE} was used during \code{f_scan})? Default \code{TRUE}.
+#' @param extremes Logical. Print the five lowest and highest values of each
+#'   numeric column in the data check? Default \code{FALSE}.
 #' @param ... Further arguments passed to or from other methods. Currently
 #'   unused by the \code{f_scan} methods themselves, but accepted so the
 #'   methods remain consistent with the base generics \code{print},
@@ -1142,8 +1208,16 @@ print.f_scan <- function(x,
                          main_plot = TRUE,
                          advice = TRUE,
                          digits = 3,
+                         data_check = TRUE,
+                         extremes = FALSE,
                          ...
                          ) {
+  # Data check first: it is about the data, not about one variable
+  dc <- attr(x, "data_check")
+  if (data_check && !is.null(dc)) {
+    print(dc, extremes = extremes)
+  }
+
   # Loop over each category (a, b, etc.)
   for (category in names(x)) {
     # Get the sublist for this category

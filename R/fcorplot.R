@@ -237,10 +237,10 @@ f_corplot <- function(data,
   ##########################################################################
   if (!is.null(fancy_names)) {
     data         <- f_rename_columns(data, fancy_names)
-    color_factor <- f_rename_vector(color_factor, fancy_names)
-    shape_factor <- f_rename_vector(shape_factor, fancy_names)
+    color_factor <- f_rename_vector(color_factor, fancy_names, warn_unmatched = FALSE)
+    shape_factor <- f_rename_vector(shape_factor, fancy_names, warn_unmatched = FALSE)
     if (!is.null(ordinal_vars) && ordinal_vars %in% names(fancy_names)) {
-      ordinal_vars <- f_rename_vector(ordinal_vars, fancy_names)
+      ordinal_vars <- f_rename_vector(ordinal_vars, fancy_names, warn_unmatched = FALSE)
     }
   }
 

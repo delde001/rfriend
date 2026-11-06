@@ -348,7 +348,7 @@ f_bestNormalize <- function(data,
 
   rownames(output) <- NULL
   Transf_name <- class(bn_obj$chosen_transform)[1]
-  Transf_name <- f_rename_vector(Transf_name, prettynames)
+  Transf_name <- f_rename_vector(Transf_name, prettynames, warn_unmatched = FALSE)
 
 
   # Normality check on transformed data

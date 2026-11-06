@@ -32,6 +32,8 @@ f_scan(x, ...)
   save_as = NULL,
   save_in_wdir = FALSE,
   digits = NULL,
+  check = TRUE,
+  id_col = NULL,
   ...
 )
 }
@@ -96,9 +98,30 @@ Defaults to \code{file.path(tempdir(), "dataname_fscan.pdf")}.}
 \item{save_in_wdir}{Logical. If \code{TRUE}, saves the file in the working directory. Default is \code{FALSE}, this avoid unintended changes to the global environment. If \code{save_as} location is specified \code{save_in_wdir} is overwritten by \code{save_as}.}
 
 \item{digits}{Integer. Decimal places for printed tables in 'pdf' and 'Word' output files. Default \code{3}.}
+
+\item{check}{Logical. If \code{TRUE} (default), runs a data check before
+the plots and tables: every value of each text column with its count,
+with flags for leading or trailing spaces, labels that differ only in
+case, spaces or underscores, labels written differently from the others,
+and numbers stored as text; the number of missing values per numeric
+column; column names with dots from \code{read.csv()}; and, with
+\code{id_col}, the number of rows per ID. A bare data frame call checks
+every column; a formula call (or \code{columns =}) checks only the
+columns it names. The check only reports and never changes the data. It
+is stored as \code{attr(result, "data_check")}; the five lowest and
+highest values per numeric column are printed with
+\code{print(attr(result, "data_check"), extremes = TRUE)}. The flag for
+labels written differently is a rule of thumb and cannot know which
+labels your design intended: check those with
+\code{f_factors(..., levels = )}.}
+
+\item{id_col}{Character string or \code{NULL}. Column that identifies the
+experimental unit (for example a plant ID). The data check then reports
+the number of rows per ID and lists IDs with an unusual number of rows.
+Default \code{NULL}.}
 }
 \value{
-A list of class \code{f_scan} containing plots, the summary table, and the outlier table. Using the option "output_type", it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print, summary and plot methods for 'f_scan' objects.
+A list of class \code{f_scan} containing plots, the summary table, and the outlier table. With \code{check = TRUE} the data check is attached as \code{attr(result, "data_check")} (class \code{f_data_check}). Using the option "output_type", it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print, summary and plot methods for 'f_scan' objects.
 }
 \description{
 Creates a 3-panel diagnostic dashboard to check data distribution and assumptions. It can also output a data summary table and identify outliers.

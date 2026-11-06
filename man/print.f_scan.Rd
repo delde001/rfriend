@@ -16,6 +16,8 @@
   main_plot = TRUE,
   advice = TRUE,
   digits = 3,
+  data_check = TRUE,
+  extremes = FALSE,
   ...
 )
 
@@ -35,6 +37,12 @@
 \item{advice}{Logical. Print statistical test recommendations? Default \code{TRUE} (shown only if \code{advice=TRUE} was used during \code{f_scan}).}
 
 \item{digits}{Integer. Decimal places for printed tables. Default \code{3}.}
+
+\item{data_check}{Logical. Print the data check (shown only if
+\code{check = TRUE} was used during \code{f_scan})? Default \code{TRUE}.}
+
+\item{extremes}{Logical. Print the five lowest and highest values of each
+numeric column in the data check? Default \code{FALSE}.}
 
 \item{...}{Further arguments passed to or from other methods. Currently
 unused by the \code{f_scan} methods themselves, but accepted so the

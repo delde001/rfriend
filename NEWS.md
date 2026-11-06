@@ -89,6 +89,31 @@ objects. Please read them before updating scripts.
 
 ## New Features in Existing Functions
 
+* **`f_scan()`: a data check before the plots (`check = TRUE`, default).**
+  Before any analysis, `f_scan()` now reports problems in the raw data: every
+  value of each text column with its count, with flags for leading or trailing
+  spaces (`" high_N"`), labels that differ only in case, spaces or underscores
+  (`"low_N"` and `"Low N"`), labels written differently from the others, and
+  numbers stored as text (`"n/a"`); the number of missing values per numeric
+  column; and column names with dots from `read.csv()`. With the new argument
+  `id_col` it also counts the rows per ID and names IDs with an unusual number
+  of rows. A bare data frame call checks every column; a formula call checks
+  only the formula variables. The check only reports and never changes the
+  data. It is stored as `attr(result, "data_check")`, so the result keeps one
+  element per scanned column. The five lowest and highest values per numeric
+  column are stored and printed with `print(result, extremes = TRUE)`; the
+  Word, PDF and rmd reports always show them. `check = FALSE` switches the
+  check off; `print(result, data_check = FALSE)` hides it.
+
+* **`f_rename_vector()`: factors, `trim` and a warning for typing errors.**
+  A factor now keeps its class: its levels are renamed in their order (it
+  stopped with a `vapply` error before). `trim = TRUE` removes leading and
+  trailing spaces before renaming. A name in `name_map` that does not occur
+  in the vector gives a warning, because it usually is a typing error;
+  `warn_unmatched = FALSE` silences it. Character vectors are renamed exactly
+  as before, and the internal calls in `f_scan()`, `f_corplot()` and
+  `f_bestNormalize()` do not warn.
+
 * **`f_lmer()`: a table with the slopes of numeric predictors.** A factor gets
   a post hoc table, but the slope of a numeric predictor was not in the printout.
   The printout and the report now have a "Slopes of numeric predictors" table,

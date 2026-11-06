@@ -893,3 +893,119 @@ test_that("print.f_scan: multi-column output shows a 'Variable:' header per resp
   expect_match(out_txt, "mpg", fixed = TRUE)
   expect_match(out_txt, "hp",  fixed = TRUE)
 })
+
+
+# =============================================================================
+# 18. DATA CHECK (check = TRUE, id_col)
+# =============================================================================
+# The data check reports problems in the raw data and never changes it. It is
+# stored as an attribute, so the list keeps one element per scanned column.
+# =============================================================================
+
+make_messy_trial <- function() {
+  data.frame(
+    plot      = paste0("P", rep(1:4, each = 3)),
+    treatment = rep(c(" high_N", "control", "drought", "Low N"), each = 3),
+    height_cm = c(20, 21, 22, 30, 31, 145, 25, 26, 27, 23, 24, NA),
+    count_txt = c(as.character(1:11), "n/a"),
+    stringsAsFactors = FALSE
+  )
+}
+
+test_that("data check: on by default, stored as an attribute, names unchanged", {
+  d   <- make_messy_trial()
+  res <- f_scan(d, open_generated_files = FALSE)
+  dc  <- attr(res, "data_check")
+  expect_s3_class(dc, "f_data_check")
+  expect_identical(names(res), "height_cm")
+  expect_null(attr(f_scan(d, check = FALSE, open_generated_files = FALSE), "data_check"))
+})
+
+test_that("data check: flags spaces, style, numbers stored as text and missing values", {
+  dc <- attr(f_scan(make_messy_trial(), open_generated_files = FALSE), "data_check")
+  tr <- dc$text$treatment
+  expect_identical(tr$spaces, " high_N")
+  expect_identical(tr$style, "Low N")
+  expect_identical(dc$text$count_txt$not_numeric, "n/a")
+  expect_identical(dc$numeric$height_cm$n_missing, 1L)
+  expect_identical(dc$numeric$height_cm$highest[1], 145)
+  expect_length(dc$numeric$height_cm$lowest, 5L)
+})
+
+test_that("data check: labels that differ only in case or underscores are flagged together", {
+  d  <- data.frame(y = 1:6, g = c("low_N", "Low N", "high_N", "high_N", "control", "control"))
+  dc <- attr(f_scan(d, open_generated_files = FALSE), "data_check")
+  expect_true(any(vapply(dc$text$g$similar, function(s) setequal(s, c("low_N", "Low N")),
+                         logical(1))))
+})
+
+test_that("data check: a clean data frame gives no flags", {
+  d  <- data.frame(y = c(1.2, 2.3, 3.1, 4.8), g = c("a", "b", "a", "b"))
+  dc <- attr(f_scan(d, open_generated_files = FALSE), "data_check")
+  expect_length(dc$text$g$spaces, 0L)
+  expect_length(dc$text$g$similar, 0L)
+  expect_length(dc$text$g$style, 0L)
+  expect_length(dc$text$g$not_numeric, 0L)
+  expect_length(dc$dotted, 0L)
+})
+
+test_that("data check: a formula call checks only the formula variables", {
+  d  <- make_messy_trial()
+  dc <- attr(f_scan(height_cm ~ treatment, data = d, open_generated_files = FALSE),
+             "data_check")
+  expect_setequal(dc$columns, c("height_cm", "treatment"))
+  expect_null(dc$text$count_txt)
+})
+
+test_that("data check: id_col reports rows per ID and unusual IDs", {
+  d  <- make_messy_trial()[-1, ]
+  dc <- attr(f_scan(d, id_col = "plot", open_generated_files = FALSE), "data_check")
+  expect_identical(dc$id$n_ids, 4L)
+  expect_identical(dc$id$unusual, "P1")
+  expect_null(dc$text$plot)
+  expect_error(f_scan(d, id_col = "plant", open_generated_files = FALSE),
+               "is not a column of the data")
+})
+
+test_that("data check: dotted column names from read.csv() are reported", {
+  d  <- data.frame(Height..cm. = c(1, 2, 3), g = c("a", "b", "c"))
+  dc <- attr(f_scan(d, open_generated_files = FALSE), "data_check")
+  expect_identical(dc$dotted, "Height..cm.")
+})
+
+test_that("data check: printed by default, extremes only on request", {
+  res <- f_scan(make_messy_trial(), open_generated_files = FALSE)
+  txt <- paste(utils::capture.output(print(res, boxplot = FALSE, histogram = FALSE,
+                                           qqplot = FALSE, main_plot = FALSE)),
+               collapse = "\n")
+  expect_match(txt, "--- Data check ---", fixed = TRUE)
+  expect_match(txt, "leading or trailing space: \" high_N\"", fixed = TRUE)
+  expect_false(grepl("highest 145", txt, fixed = TRUE))
+  txt2 <- paste(utils::capture.output(print(attr(res, "data_check"), extremes = TRUE)),
+                collapse = "\n")
+  expect_match(txt2, "highest 145", fixed = TRUE)
+  txt3 <- paste(utils::capture.output(print(res, data_check = FALSE, boxplot = FALSE,
+                                            histogram = FALSE, qqplot = FALSE,
+                                            main_plot = FALSE)), collapse = "\n")
+  expect_false(grepl("Data check", txt3, fixed = TRUE))
+})
+
+test_that("data check: the data are not changed", {
+  d   <- make_messy_trial()
+  res <- f_scan(d, open_generated_files = FALSE)
+  expect_identical(d, make_messy_trial())
+})
+
+test_that("data check: 'check' must be TRUE or FALSE", {
+  expect_error(f_scan(make_messy_trial(), check = "yes"), "'check' must be TRUE or FALSE")
+})
+
+test_that("data check: included in the rmd report", {
+  skip_on_cran()
+  # outliers = FALSE: the outlier table in reports raises a pander 'digits'
+  # warning that is not part of the data check (BUGS-rfriend.md #43)
+  res <- f_scan(make_messy_trial(), output_type = "rmd", outliers = FALSE,
+                open_generated_files = FALSE)
+  expect_match(res$rmd, "# Data check of", fixed = TRUE)
+  expect_match(res$rmd, "highest 145", fixed = TRUE)
+})
