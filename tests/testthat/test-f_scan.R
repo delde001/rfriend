@@ -981,7 +981,7 @@ test_that("data check: printed first, as a list of problems and tables", {
                                            qqplot = FALSE, main_plot = FALSE)),
                collapse = "\n")
   expect_match(txt, "--- Data check ---", fixed = TRUE)
-  expect_match(txt, "Check these (", fixed = TRUE)
+  expect_match(txt, "Check these ", fixed = TRUE)
   expect_match(txt, "treatment: leading or trailing space in \" high_N\"", fixed = TRUE)
   expect_match(txt, "Lowest 4", fixed = TRUE)
   expect_match(txt, "145, 31, 30, 27", fixed = TRUE)
@@ -1023,4 +1023,12 @@ test_that("data check: included in the rmd report", {
                 open_generated_files = FALSE)
   expect_match(res$rmd, "# Data check of", fixed = TRUE)
   expect_match(res$rmd, "145, 31, 30, 27", fixed = TRUE)
+})
+
+test_that("data check: printed labels keep their real spaces, so they can be copied", {
+  d   <- data.frame(y = 1:6, g = rep(c(" high_N", "Low N", "control"), 2))
+  txt <- paste(utils::capture.output(print(attr(f_scan(d, open_generated_files = FALSE),
+                                                "data_check"))), collapse = "\n")
+  expect_match(txt, "\"Low N\"", fixed = TRUE)
+  expect_match(txt, "\" high_N\"", fixed = TRUE)
 })

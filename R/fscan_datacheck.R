@@ -204,8 +204,9 @@ print.f_data_check <- function(x, max_values = 12L, ...) {
                 else paste(min(n), "to", max(n), "rows each")
         cell <- paste0(length(tab), " values, ", rows)
       } else {
-        # non-breaking spaces keep a value and its count on one line
-        cell <- paste(gsub(" ", "\u00a0", sprintf("%s (%d)", labs, n)), collapse = ", ")
+        # a non-breaking space keeps a value and its count on one line; the
+        # label itself keeps its real spaces, so it can be copied into code
+        cell <- paste(sprintf("%s\u00a0(%d)", labs, n), collapse = ", ")
       }
       dc_row(c(col, cell), w)
     }
