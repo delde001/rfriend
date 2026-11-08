@@ -34,7 +34,7 @@ f_summary(
   show_Q3 = TRUE,
   show_skew = FALSE,
   show_kurtosis = FALSE,
-  digits = NULL,
+  digits = 2,
   export_to_excel = FALSE,
   close_generated_files = FALSE,
   open_generated_files = interactive(),
@@ -140,8 +140,9 @@ f_summary(
 - digits:
 
   Integer. Number of decimal places for the R console output. Default is
-  `2`. If `NULL`, no rounding is applied. (Note: This does not affect
-  the raw numbers exported to Excel).
+  `2`. If `NULL`, no rounding is applied. Rounding only affects the
+  printed table; the returned values are never rounded. (Note: This does
+  not affect the raw numbers exported to Excel).
 
 - export_to_excel:
 
@@ -360,7 +361,7 @@ summary_formula <- f_summary(hp + disp ~ cyl + gear,
                              show_Q1 = FALSE,
                              show_Q3 = FALSE,
                              export_to_excel = TRUE)
-#> Saved output in: /tmp/RtmplsKqN3/mtcars_summary.xlsx
+#> Saved output in: /tmp/RtmplP7rcW/mtcars_summary.xlsx
 print(summary_formula)
 #> 
 #>  Variable: hp
@@ -434,17 +435,17 @@ print(summary_dist)
 #> Table continues below
 #> 
 #>  
-#> ---------------------------
-#> Sepal    Sepal    Sepal    
-#> Length   Length   Length   
-#> max      skew     kurt     
-#> -------- -------- ---------
-#> 5.800    5.767    137.992  
+#> --------------------------
+#> Sepal    Sepal    Sepal   
+#> Length   Length   Length  
+#> max      skew     kurt    
+#> -------- -------- --------
+#> 5.800    0.120    -0.253  
 #> 
-#> 7.000    5.060    124.531  
+#> 7.000    0.105    -0.533  
 #> 
-#> 7.900    5.667    151.706  
-#> ---------------------------
+#> 7.900    0.118    0.033   
+#> --------------------------
 #> 
 #> 
 #>  Variable: Petal.Length
@@ -463,17 +464,17 @@ print(summary_dist)
 #> Table continues below
 #> 
 #>  
-#> ----------------------------
-#> Petal    Petal     Petal    
-#> Length   Length    Length   
-#> max      skew      kurt     
-#> -------- --------- ---------
-#> 1.900    5.109     199.182  
+#> --------------------------
+#> Petal    Petal    Petal   
+#> Length   Length   Length  
+#> max      skew     kurt    
+#> -------- -------- --------
+#> 1.900    0.106    1.022   
 #> 
-#> 5.100    -29.124   152.427  
+#> 5.100    -0.607   0.048   
 #> 
-#> 6.900    26.384    142.742  
-#> ----------------------------
+#> 6.900    0.549    -0.154  
+#> --------------------------
 #> 
 
 # --- Example 5: Custom Print Formatting ---

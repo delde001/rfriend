@@ -13,7 +13,7 @@ can be analyzed in sequence and the generated output can be in various formats
 
     <a class="navbar-brand me-2" href="../index.html">rfriend</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -52,8 +52,9 @@ can be analyzed in sequence and the generated output can be in various formats
 <span>  <span class="va">formula</span>,</span>
 <span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  data <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  event <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  diagnostic_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  effect_plot <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  effect_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  contrast_plots <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  alpha <span class="op">=</span> <span class="fl">0.05</span>,</span>
 <span>  adjust <span class="op">=</span> <span class="st">"sidak"</span>,</span>
@@ -66,6 +67,7 @@ can be analyzed in sequence and the generated output can be in various formats
 <span>  close_generated_files <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  open_generated_files <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/interactive.html" class="external-link">interactive</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  influence_threshold <span class="op">=</span> <span class="fl">2</span>,</span>
+<span>  effect_plot <span class="op">=</span> <span class="fu">lifecycle</span><span class="fu">::</span><span class="fu"><a href="https://lifecycle.r-lib.org/reference/deprecated.html" class="external-link">deprecated</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -90,11 +92,23 @@ the result of a call to a family function. (See <code><a href="https://rdrr.io/r
 <dd><p>A data frame containing the variables in the model.</p></dd>
 
 
+<dt id="arg-event">event<a class="anchor" aria-label="anchor" href="#arg-event"></a></dt>
+<dd><p>Only for <code>family = binomial</code> (or <code>quasibinomial</code>)
+with a categorical response (factor, character or logical). The level,
+or levels, of the response that count as the event, coded 1. All other
+levels are coded 0. For example, <code>event = "yes"</code> for a response with
+levels <code>"no"</code> and <code>"yes"</code> models P(response = "yes"). Default
+<code>NULL</code>: a factor or character response then stops with a message
+listing its levels, because rfriend does not guess which outcome you
+mean. A logical response needs no <code>event</code> (<code>TRUE</code> is the
+event). See Details, "Categorical binomial responses".</p></dd>
+
+
 <dt id="arg-diagnostic-plots">diagnostic_plots<a class="anchor" aria-label="anchor" href="#arg-diagnostic-plots"></a></dt>
 <dd><p>Logical. If <code>TRUE</code>, plots are included in the output files.</p></dd>
 
 
-<dt id="arg-effect-plot">effect_plot<a class="anchor" aria-label="anchor" href="#arg-effect-plot"></a></dt>
+<dt id="arg-effect-plots">effect_plots<a class="anchor" aria-label="anchor" href="#arg-effect-plots"></a></dt>
 <dd><p>Logical. If <code>TRUE</code> (default), estimated marginal
 means plots (or interaction plots, when a categorical interaction is
 significant) are added after the post hoc table. See Details for what is
@@ -159,7 +173,10 @@ or <code>"link"</code> (on the linear predictor scale, e.g. log-odds). Default i
 <dd><p>Logical. If <code>TRUE</code>, includes a dispersion diagnostic
 section in the output: a DHARMa simulation-based test for overdispersion
 (Poisson/Binomial), the quasi-dispersion parameter (quasi-families), or a
-note explaining why the test is skipped (Bernoulli data). Default is <code>TRUE</code>.</p></dd>
+note explaining why the test is skipped (Bernoulli data). Default is <code>TRUE</code>.
+Independent of this setting, the verdict is always stored in
+<code>$dispersion</code>, printed in the console, and a significant
+overdispersion in a Poisson or binomial model gives a warning.</p></dd>
 
 
 <dt id="arg-output-type">output_type<a class="anchor" aria-label="anchor" href="#arg-output-type"></a></dt>
@@ -208,6 +225,11 @@ with hat values exceeding <code>influence_threshold * mean(hat values)</code> ar
 as high-leverage points. Default is <code>2</code>, a common rule of thumb.</p></dd>
 
 
+<dt id="arg-effect-plot">effect_plot<a class="anchor" aria-label="anchor" href="#arg-effect-plot"></a></dt>
+<dd><p><strong>Deprecated</strong> in 3.2.1. Use <code>effect_plots</code> instead. If
+supplied, its value is passed to <code>effect_plots</code> with a warning.</p></dd>
+
+
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
 <dd><p>Additional arguments passed to <code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm()</a></code>.</p></dd>
 
@@ -226,24 +248,75 @@ as high-leverage points. Default is <code>2</code>, a common rule of thumb.</p><
     <dt>diagnostics</dt>
 <dd><p>DHARMa residual checks and hat-value based leverage diagnostics.</p></dd>
 
-    <dt>posthoc</dt>
-<dd><p>Estimated marginal means, pairwise comparisons, CLD letters, and summary table.</p></dd>
+    <dt>post_hoc</dt>
+<dd><p>The post hoc comparisons, stored as
+      <code>post_hoc[[term]]</code> with <code>emmeans</code>, <code>pairs</code>, <code>cld</code>
+      (the table with letters), <code>cld_text</code> (the footer) and
+      <code>caution</code>: the structure of <code><a href="f_aov.html">f_aov</a></code>,
+      <code><a href="f_lm.html">f_lm</a></code> and <code><a href="f_lmer.html">f_lmer</a></code>. <code>f_glm()</code> compares
+      the cells of all categorical predictors together, so there is one
+      table: <code>post_hoc$treatment</code> for one factor,
+      <code>post_hoc[["block:treatment"]]</code> for two. It also holds
+      <code>emmeans_table</code> and <code>data_summary_table</code> (observed
+      descriptives). <code>NULL</code> for an intercept-only model.</p></dd>
 
     <dt>sep_flag</dt>
-<dd><p>Logical indicating whether complete separation was detected.</p></dd>
+<dd><p>Logical indicating whether (quasi-)complete separation was detected.</p></dd>
+
+    <dt>event_coding</dt>
+<dd><p>For a categorical binomial response: a list with the
+      <code>event</code> and <code>non_event</code> levels, their counts, the number of
+      missing values, whether levels were <code>pooled</code>, the probability
+      <code>label</code> and a one-sentence <code>text</code>. <code>NULL</code> for numeric
+      responses.</p></dd>
 
     <dt>lrt_pct_explained</dt>
 <dd><p>McFadden's Pseudo-R\(^2\).</p></dd>
+
+    <dt>dispersion</dt>
+<dd><p>The dispersion verdict: a list with <code>type</code>
+      (<code>"DHARMa"</code>, <code>"quasi-dispersion"</code>, <code>"not applicable"</code>
+      or <code>"not available"</code>), <code>statistic</code> (DHARMa ratio of
+      simulated vs. observed variance, or the quasi-dispersion parameter),
+      <code>p.value</code>, <code>significant</code> (<code>p.value &lt; alpha</code>),
+      <code>direction</code> (<code>"overdispersion"</code> or
+      <code>"underdispersion"</code>) and a one-sentence <code>text</code>, as printed.</p></dd>
 
 
 </dl><p>Using the option <code>output_type</code>, it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and plot methods for 'f_glm' objects.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>The function first checks if all specified variables are present in the data and ensures that the response variable is numeric.</p>
-<p>It fits a Generalized Linear Model (GLM) using the specified formula, family, and data. Model diagnostics are performed with DHARMa (simulation-based residual checks including a KS test, dispersion test, and outlier test). High-leverage observations are flagged using hat values.</p>
-<p>Significance of each predictor is assessed via Type II Analysis of Deviance (<code><a href="https://rdrr.io/r/stats/add1.html" class="external-link">stats::drop1()</a></code>). If significant effects are found, post hoc pairwise comparisons are performed using estimated marginal means from <code>emmeans()</code> with the chosen p-value adjustment method (default: Sidak). When complete separation is detected, the function falls back to likelihood ratio test (LRT) based pairwise comparisons, which are robust to separation.</p>
-<p><strong>Effect and interaction plots.</strong> When <code>effect_plot = TRUE</code>, an
+    <p>The function first checks if all specified variables are present in the data and ensures that the response variable is numeric, or a categorical response with an explicit <code>event</code> for binomial families (see below).</p>
+<p><strong>Categorical binomial responses and <code>event</code>.</strong> A binomial GLM
+models the probability of one outcome, the event (coded 1), against
+everything else (coded 0). Base <code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm()</a></code> silently treats the
+<em>first</em> factor level as 0 and all other levels as 1. Factor levels
+sort alphabetically by default, so <code>"diseased"</code>/<code>"healthy"</code>
+would model P(healthy), while <code>"no"</code>/<code>"yes"</code> models P(yes): the
+sign of every coefficient depends on how the labels happen to sort.
+<code>f_glm()</code> therefore never guesses. A factor or character response
+requires <code>event</code>; the chosen coding is printed when the model is
+fitted, shown under the model summary in the report and in
+<code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code>, used as the y-axis label of the estimated-means plots,
+and stored in <code>out$&lt;response&gt;$event_coding</code>.</p><ul><li><p><em>Two levels:</em> <code>event</code> names one of them.</p></li>
+<li><p><em>Three or more levels</em> (any number is allowed): a binomial
+    model still compares only two outcomes. <code>event</code> names one or more
+    levels as the event, e.g. <code>event = c("flowering", "fruiting")</code>, and
+    all remaining levels are pooled as 0. The report says which levels were
+    pooled. If the categories must stay separate, use a multinomial model
+    (<code><a href="https://rdrr.io/pkg/nnet/man/multinom.html" class="external-link">nnet::multinom()</a></code>) or, for ordered categories, an ordinal model
+    (<code><a href="https://rdrr.io/pkg/MASS/man/polr.html" class="external-link">MASS::polr()</a></code>) instead.</p></li>
+<li><p><em>Several responses</em> (<code>y1 + y2 ~ x</code>): an unnamed
+    <code>event</code> applies to every categorical response; use a named vector
+    or list for different events, e.g.
+    <code>event = c(infected = "yes", lodged = "lodged")</code>.</p></li>
+<li><p>Numeric 0/1 responses are used as they are (1 = event); giving
+    <code>event</code> for a numeric response is an error. Missing values stay
+    <code>NA</code>.</p></li>
+</ul><p>It fits a Generalized Linear Model (GLM) using the specified formula, family, and data. Model diagnostics are performed with DHARMa (simulation-based residual checks including a KS test, dispersion test, and outlier test). High-leverage observations are flagged using hat values.</p>
+<p>Significance of each predictor is assessed via Type II Analysis of Deviance (<code><a href="https://rdrr.io/r/stats/add1.html" class="external-link">stats::drop1()</a></code>). If significant effects are found, post hoc pairwise comparisons are performed using estimated marginal means from <code>emmeans()</code> with the chosen p-value adjustment method (default: Sidak). When (quasi-)complete separation is detected, the function falls back to likelihood ratio test (LRT) based pairwise comparisons, which are robust to separation.</p>
+<p><strong>Effect and interaction plots.</strong> When <code>effect_plots = TRUE</code>, an
 estimated marginal means plot (estimate \(\pm\) 95% CI on the response
 scale, with jittered raw data and compact-letter-display labels) is added
 after the post hoc table for each categorical predictor. For a significant
@@ -263,7 +336,7 @@ object (e.g. <code>out$y1$effect_plot_treatment</code>,
 customised afterwards. Matches <code><a href="f_aov.html">f_aov</a></code>.</p>
 <p>More response variables can be added using <code>+</code> (e.g., <code>response1 + response2 ~ predictor</code>) to fit a sequential GLM for each response variable, captured in one output file.</p>
 <p>Outputs can be generated in multiple formats ("pdf", "word", "excel" and "rmd") as specified by <code>output_type</code>. The function also closes any open 'Word' files to avoid conflicts when generating 'Word' documents. If <code>output_type = "rmd"</code> is used it is advised to use it in a chunk with {r, echo=FALSE, results='asis'}</p>
-<p>This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.</p><ul><li><p><b>Windows:</b> Install Pandoc and ensure the installation folder <br> (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.</p></li>
+<p>This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or higher), a universal document converter.</p><ul><li><p><b>Windows:</b> Install Pandoc and ensure the installation folder <br> (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.</p></li>
 <li><p><b>macOS:</b> If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.</p></li>
 <li><p><b>Linux:</b> Install Pandoc through your distribution's package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.</p></li>
 <li><p>If Pandoc is not found, this function may not work as intended.</p></li>
@@ -314,6 +387,9 @@ customised afterwards. Matches <code><a href="f_aov.html">f_aov</a></code>.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Residual deviance:  16.263  on 29 df</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> McFadden's Pseudo-R²: 0.629 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> --- Dispersion test ---</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Not applicable: 0/1 (Bernoulli) data cannot be overdispersed. </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> --- Post hoc Comparisons of: vs ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   cyl         prob           SE    asymp.LCL asymp.UCL Letter  n</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1   4 9.090909e-01 8.667842e-02 5.614275e-01 0.9873606      b 11</span>
@@ -322,7 +398,7 @@ customised afterwards. Matches <code><a href="f_aov.html">f_aov</a></code>.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ___________________________</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> **[!] Separation detected, LRT pairwise comparisons used:**  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Complete separation was detected (at least one group perfectly predicts the outcome), making Wald-based pairwise tests unreliable. Letters were assigned using **likelihood ratio tests** (LRT): for each pair of groups, a reduced model with those groups merged was compared against the full model via LRT. This approach is robust to separation.  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (Quasi-)complete separation was detected (at least one group has only one outcome), making Wald-based pairwise tests unreliable. Letters were assigned using **likelihood ratio tests** (LRT): for each pair of groups, a reduced model with those groups merged was compared against the full model via LRT. This approach is robust to separation.  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> P-values were adjusted using the **Bonferroni method (conservative approximation; base R lacks native Šidák)**.  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    </span>
@@ -334,7 +410,16 @@ customised afterwards. Matches <code><a href="f_aov.html">f_aov</a></code>.</p>
 <span class="r-in"><span>                 output_type <span class="op">=</span> <span class="st">"word"</span></span></span>
 <span class="r-in"><span>                 <span class="op">)</span></span></span>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>f_glm: (quasi-)complete separation detected for response 'vs'. Group(s) with no outcome variation: cyl=8. Maximum-likelihood estimates diverge, so Wald standard errors and back-transformed confidence intervals are not interpretable (this is why a CI can span nearly 0-1 even when a group is entirely 0 or entirely 1). Letters fall back to likelihood-ratio tests. Consider penalised/Firth logistic regression (logistf::logistf or brglm2::brglm_fit) for finite estimates.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Saving output in: /tmp/RtmplsKqN3/mtcars_mod_glm_output.docx</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Saving output in: /tmp/RtmplP7rcW/mtcars_mod_glm_output.docx</span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Factor response: name the event explicitly (models P(infected = "yes"))</span></span></span>
+<span class="r-in"><span><span class="va">glm_inf</span> <span class="op">&lt;-</span> <span class="fu">f_glm</span><span class="op">(</span><span class="va">infected</span> <span class="op">~</span> <span class="va">treatment</span>,</span></span>
+<span class="r-in"><span>                 family <span class="op">=</span> <span class="va">binomial</span>,</span></span>
+<span class="r-in"><span>                 data <span class="op">=</span> <span class="va">plant_trial</span>,</span></span>
+<span class="r-in"><span>                 event <span class="op">=</span> <span class="st">"yes"</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> f_glm(): Response 'infected' coded as 1 = "yes" (event, n = 17), 0 = "no" (n = 43). Probabilities in the output are P(infected = yes).</span>
+<span class="r-in"><span><span class="va">glm_inf</span><span class="op">$</span><span class="va">infected</span><span class="op">$</span><span class="va">event_coding</span><span class="op">$</span><span class="va">text</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Response 'infected' coded as 1 = \"yes\" (event, n = 17), 0 = \"no\" (n = 43). Probabilities in the output are P(infected = yes)."</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># GLM Poisson example with output to rmd text</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="va">warpbreaks</span><span class="op">)</span></span></span>
@@ -344,6 +429,7 @@ customised afterwards. Matches <code><a href="f_aov.html">f_aov</a></code>.</p>
 <span class="r-in"><span>                 family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span>link <span class="op">=</span> <span class="st">"log"</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>                 intro_text <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
 <span class="r-in"><span>                 output_type <span class="op">=</span> <span class="st">"rmd"</span><span class="op">)</span></span></span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>f_glm: overdispersion detected for response 'breaks': the data vary more than a poisson model assumes (DHARMa dispersion test: ratio = 4.449, p = 0). Standard errors and p-values are then too small. Refit with family = "quasipoisson", or use a negative binomial model (MASS::glm.nb).</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">glm_pos</span><span class="op">$</span><span class="va">rmd</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    </span>
@@ -353,7 +439,7 @@ customised afterwards. Matches <code><a href="f_aov.html">f_aov</a></code>.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ## Model Diagnostics of:  breaks </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplsKqN3/file1da25e8bd97a.png)    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplP7rcW/file1c2a59d8341f.png)    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ## Dispersion Diagnostics of: breaks </span>
@@ -426,7 +512,7 @@ customised afterwards. Matches <code><a href="f_aov.html">f_aov</a></code>.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ### Coefficient forest plot</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplsKqN3/file1da22d78a567.png)    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplP7rcW/file1c2a29c1725.png)    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> *Each row is a coefficient (the intercept is omitted) with its 95% Wald CI, on the log-link scale. The dashed line marks zero: a coefficient at zero has no effect relative to its reference. Points to the right increase the linear predictor (log scale), points to the left decrease it. A CI that touches or crosses zero means the term is not distinguishable from its reference at α = 0.05; a CI clear of zero is a significant effect.*  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
@@ -518,13 +604,13 @@ customised afterwards. Matches <code><a href="f_aov.html">f_aov</a></code>.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Confidence level used: 0.95  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Intervals are back-transformed from the log scale</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ## Estimated Means Plot of: breaks  (wool)  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplsKqN3/file1da21d121414.png)    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplP7rcW/file1c2a20846452.png)    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> *Points are (jittered) raw data on the response scale; estimates are model estimated marginal means back-transformed through the log link to the response scale with 95% CI. Groups sharing a letter are not significantly different (α = 0.05); groups with different letters are significantly different. Sharing a letter indicates insufficient evidence of a difference, not proof that the groups are identical.*   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ## Estimated Means Plot of: breaks  (tension)  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplsKqN3/file1da23ed7f2a2.png)    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplP7rcW/file1c2a54ae01ea.png)    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> *Points are (jittered) raw data on the response scale; estimates are model estimated marginal means back-transformed through the log link to the response scale with 95% CI. Groups sharing a letter are not significantly different (α = 0.05); groups with different letters are significantly different. Sharing a letter indicates insufficient evidence of a difference, not proof that the groups are identical.*   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>

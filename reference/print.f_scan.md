@@ -20,6 +20,7 @@ print(
   main_plot = TRUE,
   advice = TRUE,
   digits = 3,
+  data_check = TRUE,
   ...
 )
 
@@ -56,6 +57,11 @@ plot(x, boxplot = TRUE, histogram = TRUE, qqplot = TRUE, main_plot = TRUE, ...)
 - digits:
 
   Integer. Decimal places for printed tables. Default `3`.
+
+- data_check:
+
+  Logical. Print the data check (shown only if `check = TRUE` was used
+  during `f_scan`)? Default `TRUE`.
 
 - ...:
 

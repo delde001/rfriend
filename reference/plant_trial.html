@@ -15,7 +15,7 @@ cited as empirical findings."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">rfriend</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -82,8 +82,11 @@ cited as empirical findings.</p>
     <code><a href="f_lmer.html">f_lmer</a></code>, <code><a href="f_t_test.html">f_t_test</a></code>).</p></dd>
 
   <dt>biomass_g</dt>
-<dd><p>Above-ground dry biomass in grams. Right-skewed, suited to
-    demonstrating <code><a href="f_bestNormalize.html">f_bestNormalize</a></code> and <code><a href="f_boxcox.html">f_boxcox</a></code>.</p></dd>
+<dd><p>Above-ground biomass in grams, estimated
+    non-destructively from plant images, so each plant is measured every
+    week. Right-skewed, suited to demonstrating
+    <code><a href="f_bestNormalize.html">f_bestNormalize</a></code> and <code><a href="f_boxcox.html">f_boxcox</a></code>; on the log
+    scale it fits the same mixed model as <code>height_cm</code>.</p></dd>
 
   <dt>chloroplast_count</dt>
 <dd><p>Chloroplasts per mesophyll cell, counted under the
@@ -94,8 +97,8 @@ cited as empirical findings.</p>
   <dt>infected</dt>
 <dd><p>Infection status, a factor with levels <code>"no"</code> and
     <code>"yes"</code>. Use directly with <code><a href="f_chisq_test.html">f_chisq_test</a></code> (paired with
-    <code><a href="df_to_table.html">df_to_table</a></code>); for a binomial <code><a href="f_glm.html">f_glm</a></code>, convert
-    to 0/1 with <code>as.numeric(infected == "yes")</code>.</p></dd>
+    <code><a href="df_to_table.html">df_to_table</a></code>); for a binomial <code><a href="f_glm.html">f_glm</a></code>, name the
+    modelled outcome with <code>event = "yes"</code>.</p></dd>
 
 
 </dl></div>
@@ -112,8 +115,12 @@ with treatment and time as fixed effects and block and plant as nested
 random effects. Treatment, time, and their interaction all have genuine
 effects built in. A deliberately messy raw version (inconsistent column
 names, injected outliers, missing values, and a stray factor label) and a
-wide-format version are distributed alongside the course materials for the
-import and cleaning modules.</p>
+wide-format version ship with the package for the import and cleaning
+modules; <code><a href="f_example_data.html">f_example_data</a></code> lists them and returns their paths.
+The Excel copy of the raw version, <code>"plant_trial_raw.xlsx"</code>, has a
+second sheet, <code>"meta_data"</code>, describing each column (meaning, unit
+and intended values), so <code><a href="https://readxl.tidyverse.org/reference/excel_sheets.html" class="external-link">readxl::excel_sheets()</a></code> has more than one
+sheet to show.</p>
     </div>
 
     <div class="section level2">
@@ -126,7 +133,7 @@ import and cleaning modules.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ treatment        : chr  "control" "control" "control" "control" ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ time_weeks       : num  2 4 6 2 4 6 2 4 6 2 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ height_cm        : num  28.8 40.9 49.7 23.7 37 41 23.5 32.1 42.9 20 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ biomass_g        : num  30.4 26.5 30.8 15.8 34.3 18.4 14.3 17.7 37.5 18 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ biomass_g        : num  19.5 34.9 29.9 12.6 22.4 18.9 10.2 20.1 21.7 12.9 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ chloroplast_count: int  31 41 35 30 35 25 28 21 47 22 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ infected         : Factor w/ 2 levels "no","yes": 1 1 2 1 1 1 2 1 1 2 ...</span>
 <span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># \dontrun{</span></span></span>

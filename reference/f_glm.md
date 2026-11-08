@@ -12,8 +12,9 @@ f_glm(
   formula,
   family = gaussian(),
   data = NULL,
+  event = NULL,
   diagnostic_plots = TRUE,
-  effect_plot = TRUE,
+  effect_plots = TRUE,
   contrast_plots = FALSE,
   alpha = 0.05,
   adjust = "sidak",
@@ -26,6 +27,7 @@ f_glm(
   close_generated_files = FALSE,
   open_generated_files = interactive(),
   influence_threshold = 2,
+  effect_plot = lifecycle::deprecated(),
   ...
 )
 ```
@@ -51,11 +53,23 @@ f_glm(
 
   A data frame containing the variables in the model.
 
+- event:
+
+  Only for `family = binomial` (or `quasibinomial`) with a categorical
+  response (factor, character or logical). The level, or levels, of the
+  response that count as the event, coded 1. All other levels are
+  coded 0. For example, `event = "yes"` for a response with levels
+  `"no"` and `"yes"` models P(response = "yes"). Default `NULL`: a
+  factor or character response then stops with a message listing its
+  levels, because rfriend does not guess which outcome you mean. A
+  logical response needs no `event` (`TRUE` is the event). See Details,
+  "Categorical binomial responses".
+
 - diagnostic_plots:
 
   Logical. If `TRUE`, plots are included in the output files.
 
-- effect_plot:
+- effect_plots:
 
   Logical. If `TRUE` (default), estimated marginal means plots (or
   interaction plots, when a categorical interaction is significant) are
@@ -130,7 +144,9 @@ f_glm(
   output: a DHARMa simulation-based test for overdispersion
   (Poisson/Binomial), the quasi-dispersion parameter (quasi-families),
   or a note explaining why the test is skipped (Bernoulli data). Default
-  is `TRUE`.
+  is `TRUE`. Independent of this setting, the verdict is always stored
+  in `$dispersion`, printed in the console, and a significant
+  overdispersion in a Poisson or binomial model gives a warning.
 
 - output_type:
 
@@ -189,6 +205,11 @@ f_glm(
   values exceeding `influence_threshold * mean(hat values)` are flagged
   as high-leverage points. Default is `2`, a common rule of thumb.
 
+- effect_plot:
+
+  **Deprecated** in 3.2.1. Use `effect_plots` instead. If supplied, its
+  value is passed to `effect_plots` with a warning.
+
 - ...:
 
   Additional arguments passed to
@@ -216,18 +237,43 @@ variable) containing:
 
   DHARMa residual checks and hat-value based leverage diagnostics.
 
-- posthoc:
+- post_hoc:
 
-  Estimated marginal means, pairwise comparisons, CLD letters, and
-  summary table.
+  The post hoc comparisons, stored as `post_hoc[[term]]` with `emmeans`,
+  `pairs`, `cld` (the table with letters), `cld_text` (the footer) and
+  `caution`: the structure of
+  [`f_aov`](https://delde001.github.io/rfriend/reference/f_aov.md),
+  [`f_lm`](https://delde001.github.io/rfriend/reference/f_lm.md) and
+  [`f_lmer`](https://delde001.github.io/rfriend/reference/f_lmer.md).
+  `f_glm()` compares the cells of all categorical predictors together,
+  so there is one table: `post_hoc$treatment` for one factor,
+  `post_hoc[["block:treatment"]]` for two. It also holds `emmeans_table`
+  and `data_summary_table` (observed descriptives). `NULL` for an
+  intercept-only model.
 
 - sep_flag:
 
-  Logical indicating whether complete separation was detected.
+  Logical indicating whether (quasi-)complete separation was detected.
+
+- event_coding:
+
+  For a categorical binomial response: a list with the `event` and
+  `non_event` levels, their counts, the number of missing values,
+  whether levels were `pooled`, the probability `label` and a
+  one-sentence `text`. `NULL` for numeric responses.
 
 - lrt_pct_explained:
 
   McFadden's Pseudo-R\\^2\\.
+
+- dispersion:
+
+  The dispersion verdict: a list with `type` (`"DHARMa"`,
+  `"quasi-dispersion"`, `"not applicable"` or `"not available"`),
+  `statistic` (DHARMa ratio of simulated vs. observed variance, or the
+  quasi-dispersion parameter), `p.value`, `significant`
+  (`p.value < alpha`), `direction` (`"overdispersion"` or
+  `"underdispersion"`) and a one-sentence `text`, as printed.
 
 Using the option `output_type`, it can also generate output in the form
 of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and
@@ -236,7 +282,40 @@ plot methods for 'f_glm' objects.
 ## Details
 
 The function first checks if all specified variables are present in the
-data and ensures that the response variable is numeric.
+data and ensures that the response variable is numeric, or a categorical
+response with an explicit `event` for binomial families (see below).
+
+**Categorical binomial responses and `event`.** A binomial GLM models
+the probability of one outcome, the event (coded 1), against everything
+else (coded 0). Base [`glm()`](https://rdrr.io/r/stats/glm.html)
+silently treats the *first* factor level as 0 and all other levels as 1.
+Factor levels sort alphabetically by default, so
+`"diseased"`/`"healthy"` would model P(healthy), while `"no"`/`"yes"`
+models P(yes): the sign of every coefficient depends on how the labels
+happen to sort. `f_glm()` therefore never guesses. A factor or character
+response requires `event`; the chosen coding is printed when the model
+is fitted, shown under the model summary in the report and in
+[`print()`](https://rdrr.io/r/base/print.html), used as the y-axis label
+of the estimated-means plots, and stored in
+`out$<response>$event_coding`.
+
+- *Two levels:* `event` names one of them.
+
+- *Three or more levels* (any number is allowed): a binomial model still
+  compares only two outcomes. `event` names one or more levels as the
+  event, e.g. `event = c("flowering", "fruiting")`, and all remaining
+  levels are pooled as 0. The report says which levels were pooled. If
+  the categories must stay separate, use a multinomial model
+  ([`nnet::multinom()`](https://rdrr.io/pkg/nnet/man/multinom.html)) or,
+  for ordered categories, an ordinal model
+  ([`MASS::polr()`](https://rdrr.io/pkg/MASS/man/polr.html)) instead.
+
+- *Several responses* (`y1 + y2 ~ x`): an unnamed `event` applies to
+  every categorical response; use a named vector or list for different
+  events, e.g. `event = c(infected = "yes", lodged = "lodged")`.
+
+- Numeric 0/1 responses are used as they are (1 = event); giving `event`
+  for a numeric response is an error. Missing values stay `NA`.
 
 It fits a Generalized Linear Model (GLM) using the specified formula,
 family, and data. Model diagnostics are performed with DHARMa
@@ -248,11 +327,11 @@ Significance of each predictor is assessed via Type II Analysis of
 Deviance ([`stats::drop1()`](https://rdrr.io/r/stats/add1.html)). If
 significant effects are found, post hoc pairwise comparisons are
 performed using estimated marginal means from `emmeans()` with the
-chosen p-value adjustment method (default: Sidak). When complete
+chosen p-value adjustment method (default: Sidak). When (quasi-)complete
 separation is detected, the function falls back to likelihood ratio test
 (LRT) based pairwise comparisons, which are robust to separation.
 
-**Effect and interaction plots.** When `effect_plot = TRUE`, an
+**Effect and interaction plots.** When `effect_plots = TRUE`, an
 estimated marginal means plot (estimate \\\pm\\ 95% CI on the response
 scale, with jittered raw data and compact-letter-display labels) is
 added after the post hoc table for each categorical predictor. For a
@@ -283,8 +362,8 @@ Outputs can be generated in multiple formats ("pdf", "word", "excel" and
 {r, echo=FALSE, results='asis'}
 
 This function requires
-\[Pandoc\](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3
-or higher), a universal document converter.
+\[Pandoc\](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or
+higher), a universal document converter.
 
 - **Windows:** Install Pandoc and ensure the installation folder  
   (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your
@@ -346,6 +425,9 @@ print(glm_bin)
 #> Residual deviance:  16.263  on 29 df
 #> McFadden's Pseudo-R²: 0.629 
 #> 
+#> --- Dispersion test ---
+#> Not applicable: 0/1 (Bernoulli) data cannot be overdispersed. 
+#> 
 #> --- Post hoc Comparisons of: vs ---
 #>   cyl         prob           SE    asymp.LCL asymp.UCL Letter  n
 #> 1   4 9.090909e-01 8.667842e-02 5.614275e-01 0.9873606      b 11
@@ -354,7 +436,7 @@ print(glm_bin)
 #> ___________________________
 #> 
 #> **[!] Separation detected, LRT pairwise comparisons used:**  
-#> Complete separation was detected (at least one group perfectly predicts the outcome), making Wald-based pairwise tests unreliable. Letters were assigned using **likelihood ratio tests** (LRT): for each pair of groups, a reduced model with those groups merged was compared against the full model via LRT. This approach is robust to separation.  
+#> (Quasi-)complete separation was detected (at least one group has only one outcome), making Wald-based pairwise tests unreliable. Letters were assigned using **likelihood ratio tests** (LRT): for each pair of groups, a reduced model with those groups merged was compared against the full model via LRT. This approach is robust to separation.  
 #> P-values were adjusted using the **Bonferroni method (conservative approximation; base R lacks native Šidák)**.  
 #> 
 #>    
@@ -366,7 +448,16 @@ glm_bin_word <- f_glm(vs ~ cyl,
                  output_type = "word"
                  )
 #> Warning: f_glm: (quasi-)complete separation detected for response 'vs'. Group(s) with no outcome variation: cyl=8. Maximum-likelihood estimates diverge, so Wald standard errors and back-transformed confidence intervals are not interpretable (this is why a CI can span nearly 0-1 even when a group is entirely 0 or entirely 1). Letters fall back to likelihood-ratio tests. Consider penalised/Firth logistic regression (logistf::logistf or brglm2::brglm_fit) for finite estimates.
-#> Saving output in: /tmp/RtmplsKqN3/mtcars_mod_glm_output.docx
+#> Saving output in: /tmp/RtmplP7rcW/mtcars_mod_glm_output.docx
+
+# Factor response: name the event explicitly (models P(infected = "yes"))
+glm_inf <- f_glm(infected ~ treatment,
+                 family = binomial,
+                 data = plant_trial,
+                 event = "yes")
+#> f_glm(): Response 'infected' coded as 1 = "yes" (event, n = 17), 0 = "no" (n = 43). Probabilities in the output are P(infected = yes).
+glm_inf$infected$event_coding$text
+#> [1] "Response 'infected' coded as 1 = \"yes\" (event, n = 17), 0 = \"no\" (n = 43). Probabilities in the output are P(infected = yes)."
 
 # GLM Poisson example with output to rmd text
 data(warpbreaks)
@@ -376,6 +467,7 @@ glm_pos <- f_glm(breaks ~ wool + tension,
                  family = poisson(link = "log"),
                  intro_text = FALSE,
                  output_type = "rmd")
+#> Warning: f_glm: overdispersion detected for response 'breaks': the data vary more than a poisson model assumes (DHARMa dispersion test: ratio = 4.449, p = 0). Standard errors and p-values are then too small. Refit with family = "quasipoisson", or use a negative binomial model (MASS::glm.nb).
 cat(glm_pos$rmd)
 #> 
 #>    
@@ -385,7 +477,7 @@ cat(glm_pos$rmd)
 #> 
 #> ## Model Diagnostics of:  breaks 
 #>    
-#> ![](/tmp/RtmplsKqN3/file1da25e8bd97a.png)    
+#> ![](/tmp/RtmplP7rcW/file1c2a59d8341f.png)    
 #>   
 #> 
 #> ## Dispersion Diagnostics of: breaks 
@@ -458,7 +550,7 @@ cat(glm_pos$rmd)
 #> 
 #> 
 #> ### Coefficient forest plot
-#> ![](/tmp/RtmplsKqN3/file1da22d78a567.png)    
+#> ![](/tmp/RtmplP7rcW/file1c2a29c1725.png)    
 #>   
 #> *Each row is a coefficient (the intercept is omitted) with its 95% Wald CI, on the log-link scale. The dashed line marks zero: a coefficient at zero has no effect relative to its reference. Points to the right increase the linear predictor (log scale), points to the left decrease it. A CI that touches or crosses zero means the term is not distinguishable from its reference at α = 0.05; a CI clear of zero is a significant effect.*  
 #>   
@@ -550,13 +642,13 @@ cat(glm_pos$rmd)
 #> Confidence level used: 0.95  
 #> Intervals are back-transformed from the log scale
 #> ## Estimated Means Plot of: breaks  (wool)  
-#> ![](/tmp/RtmplsKqN3/file1da21d121414.png)    
+#> ![](/tmp/RtmplP7rcW/file1c2a20846452.png)    
 #>   
 #> *Points are (jittered) raw data on the response scale; estimates are model estimated marginal means back-transformed through the log link to the response scale with 95% CI. Groups sharing a letter are not significantly different (α = 0.05); groups with different letters are significantly different. Sharing a letter indicates insufficient evidence of a difference, not proof that the groups are identical.*   
 #>   
 #> 
 #> ## Estimated Means Plot of: breaks  (tension)  
-#> ![](/tmp/RtmplsKqN3/file1da23ed7f2a2.png)    
+#> ![](/tmp/RtmplP7rcW/file1c2a54ae01ea.png)    
 #>   
 #> *Points are (jittered) raw data on the response scale; estimates are model estimated marginal means back-transformed through the log link to the response scale with 95% CI. Groups sharing a letter are not significantly different (α = 0.05); groups with different letters are significantly different. Sharing a letter indicates insufficient evidence of a difference, not proof that the groups are identical.*   
 #>   

@@ -20,9 +20,10 @@ f_lmer(
   alpha = 0.05,
   adjust = "sidak",
   diagnostic_plots = TRUE,
-  effect_plot = TRUE,
+  effect_plots = TRUE,
   contrast_plots = FALSE,
   post_hoc = TRUE,
+  by = NULL,
   intro_text = TRUE,
   output_type = "default",
   save_as = NULL,
@@ -30,6 +31,7 @@ f_lmer(
   close_generated_files = FALSE,
   open_generated_files = interactive(),
   norm_plots = lifecycle::deprecated(),
+  effect_plot = lifecycle::deprecated(),
   ...
 )
 ```
@@ -104,7 +106,7 @@ f_lmer(
   Q-Q of level-1 residuals, Q-Q of random-effect BLUPs, scale-location)
   are included in the output.
 
-- effect_plot:
+- effect_plots:
 
   Logical. If `TRUE` (default), an estimated marginal means plot
   (estimate \\\pm\\ 95% CI, with jittered raw data and
@@ -163,28 +165,43 @@ f_lmer(
 
 - post_hoc:
 
-  Logical. If `TRUE` (default), runs
-  [`emmeans::emmeans()`](https://rvlenth.github.io/emmeans/reference/emmeans.html)
-  pairwise comparisons **only when** the linear mixed model finds a
-  significant fixed-effect term (ANOVA p-value below `alpha`). The post
-  hoc is performed on each significant factor fixed-effect term
-  separately. Numeric covariates are skipped because their slope is
-  already reported in the fixed-effects coefficient table; pairwise
-  contrasts are not meaningful for a continuous predictor. If no
-  fixed-effect term is significant, no post hoc is run. When a
-  significant interaction between categorical factors is present, an
-  additional **cell-means** post hoc table is produced for that
-  interaction (estimated mean for every factor-level combination,
-  compared simultaneously, with a compact letter display and pairwise
-  contrasts), matching
-  [`f_aov`](https://delde001.github.io/rfriend/reference/f_aov.md). It
-  is stored alongside the main-effect results under the interaction term
-  name, e.g. `out$y1$post_hoc[["a:b"]]`. In addition, when a main-effect
-  term takes part in a significant interaction, a caution note is
-  printed directly above that term's marginal-means table (and the
-  term's heading is annotated), warning that the marginal means average
-  over the interacting factor and can hide or reverse the real pattern;
-  the interaction cell-means table and plot(s) should be read instead.
+  Which post hoc tables to build; the same syntax as
+  [`f_aov`](https://delde001.github.io/rfriend/reference/f_aov.md).
+  `TRUE` (default) or `NULL`: every categorical fixed-effect main effect
+  gets its own marginal-means table
+  ([`emmeans::emmeans()`](https://rvlenth.github.io/emmeans/reference/emmeans.html)
+  pairwise comparisons with a compact letter display). A term that is
+  not significant is still tabulated, with letters shown as `"ns"`,
+  because the estimates and CIs are often needed for manuscript tables.
+  Numeric covariates get no table: their slope is already reported in
+  the fixed-effects coefficient table, and pairwise contrasts are not
+  meaningful for a continuous predictor. Every significant interaction
+  between categorical factors gets an additional **cell-means** table
+  (estimated mean for every factor-level combination, compared
+  simultaneously, with a compact letter display and pairwise contrasts),
+  stored under the interaction term name, e.g.
+  `out$y1$post_hoc[["a:b"]]`. When a main-effect term takes part in a
+  significant interaction, a caution note is printed directly above that
+  term's marginal-means table (and the heading is annotated), warning
+  that the marginal means average over the interacting factor and can
+  hide or reverse the real pattern; read the interaction cell-means
+  table and plot(s) instead. `FALSE`: no post hoc. A character vector of
+  terms: only those tables, e.g. `post_hoc = "treatment"` or
+  `post_hoc = "treatment:week"` (tabulated with `"ns"` letters when not
+  significant). Unknown or misspelled names stop with a "did you mean"
+  error.
+
+- by:
+
+  `NULL` (default) or one categorical fixed-effect predictor, used with
+  `post_hoc` for simple effects: `post_hoc = "treatment", by = "week"`
+  compares the treatments within each week
+  (`emmeans(model, ~ treatment | week)`), with letters and the p-value
+  adjustment computed per level of `by`, stored as
+  `out$y1$post_hoc[["treatment | week"]]`. The rules are those of
+  [`f_aov`](https://delde001.github.io/rfriend/reference/f_aov.md): `by`
+  requires `post_hoc`, must not also be named in it, and cannot be
+  combined with an interaction term there.
 
 - intro_text:
 
@@ -232,9 +249,13 @@ f_lmer(
 
 - norm_plots:
 
-  \`r lifecycle::badge("deprecated")\` Deprecated in version 4.0.0. Use
-  `diagnostic_plots` instead. If supplied, its value is passed through
-  to `diagnostic_plots` with a warning.
+  **Deprecated** in 3.2.0. Use `diagnostic_plots` instead. If supplied,
+  its value is passed to `diagnostic_plots` with a warning.
+
+- effect_plot:
+
+  **Deprecated** in 3.2.1. Use `effect_plots` instead. If supplied, its
+  value is passed to `effect_plots` with a warning.
 
 - ...:
 
@@ -259,14 +280,17 @@ components and ICC (plus a per-grouping-factor ICC breakdown in
 `icc_by_group` when the model has two or more intercept grouping
 factors), the R\\^2\\ values, the observed descriptives table (raw-data
 n, mean, sd, se, min, Q1, median, Q3, max grouped by the categorical
-fixed-effect predictors), post hoc results (if any; per main-effect
-terms plus, for a significant categorical interaction, a cell-means
-entry keyed by the interaction term name), diagnostic plots, and
-convergence diagnostics. When more than one response variable is
-supplied on the left-hand side, these elements are nested one level deep
-under each response name, e.g. `out$y1$fixed_effects`,
-`out$y2$fixed_effects`. When `output_type = "rmd"` the markdown string
-is stored in `$rmd`.
+fixed-effect predictors), the slopes of numeric predictors (`slopes`,
+with their standard error and confidence interval; per factor level when
+the numeric predictor interacts with a factor, from
+[`emmeans::emtrends()`](https://rvlenth.github.io/emmeans/reference/emtrends.html)),
+post hoc results (if any; per main-effect terms plus, for a significant
+categorical interaction, a cell-means entry keyed by the interaction
+term name), diagnostic plots, and convergence diagnostics. When more
+than one response variable is supplied on the left-hand side, these
+elements are nested one level deep under each response name, e.g.
+`out$y1$fixed_effects`, `out$y2$fixed_effects`. When
+`output_type = "rmd"` the markdown string is stored in `$rmd`.
 
 ## Details
 
@@ -412,7 +436,7 @@ usually means the random-effects structure is too complex for the data
 (often a random slope with too few levels) - simplify the model before
 interpreting results.
 
-This function requires Pandoc (\>= 1.12.3) for `pdf`, `word` and `rmd`
+This function requires Pandoc (\>= 3.1) for `pdf`, `word` and `rmd`
 output. See
 [`f_aov`](https://delde001.github.io/rfriend/reference/f_aov.md) for
 installation notes.
@@ -492,6 +516,16 @@ print(f_lmer_out)
 #> -------------------------------------------------
 #> 
 #> 
+#> --- Slopes of numeric predictors ---
+#> 
+#> ---------------------------------------------------------------------
+#> Predictor   Level   Slope     SE       df         lower     upper    
+#>                                                   CL        CL       
+#> ----------- ------- --------- -------- ---------- --------- ---------
+#> Days        (all)   10.4673   0.8042   161.0000   8.8791    12.0555  
+#> ---------------------------------------------------------------------
+#> 
+#> 
 #> --- Random-effects variance components ---
 #> 
 #> ----------------------------------------------
@@ -541,7 +575,7 @@ f_lmer(Reaction ~ Days + (1 + Days | Subject),
        ddf  = "Kenward-Roger",
        output_type = "word"
        )
-#> Saving output in: /tmp/RtmplsKqN3/sleepstudy_lmer_output.docx
+#> Saving output in: /tmp/RtmplP7rcW/sleepstudy_lmer_output.docx
 
 # 3) A factor fixed effect triggers a post hoc test.
 #    Bin Days into three sleep-deprivation phases so that the
@@ -624,6 +658,7 @@ f_lmer(Reaction ~ Phase + (1 | Subject),
 #> --- Post hoc comparisons ---
 #> 
 #> * Phase *
+#> Letters are compared within this table only.
 #> Estimated marginal means with compact letter display:
 #> 
 #> --------------------------------------------------------------------
@@ -653,7 +688,7 @@ f_lmer(Reaction ~ Days + (1 | Subject),
        diagnostic_plots = FALSE,
        output_type = "word"
        )
-#> Saving output in: /tmp/RtmplsKqN3/sleepstudy_lmer_output.docx
+#> Saving output in: /tmp/RtmplP7rcW/sleepstudy_lmer_output.docx
 
 # 5) Get the raw markdown back for embedding in an R Markdown
 #    document. Use it inside a chunk with results = 'asis'.
@@ -841,9 +876,9 @@ cat(f_lmer_rmd_out$rmd)
 #> 
 #> 
 #> ### Coefficient forest plot
-#> ![](/tmp/RtmplsKqN3/file1da2501665af.png)    
+#> ![](/tmp/RtmplP7rcW/file1c2a1fe7d975.png)    
 #>   
-#> *Each row is a fixed-effect coefficient (the intercept is omitted) with its 95% Wald CI. The dashed line marks zero: a coefficient at zero has no effect relative to its reference. Points to the right increase the response, points to the left decrease it. A CI that touches or crosses zero means the term is not distinguishable from its reference at α = 0.05; a CI clear of zero is a significant effect.*  
+#> *Each row is a fixed-effect coefficient (the intercept is omitted) with its 95% confidence interval (t, with the df of the coefficient table). The dashed line marks zero: a coefficient at zero has no effect relative to its reference. Points to the right increase the response, points to the left decrease it. A CI that touches or crosses zero means the term is not distinguishable from its reference at α = 0.05; a CI clear of zero is a significant effect.*  
 #>   
 #> *Continuous term (Days) has no reference level; the estimate is the change per one-unit increase (on the scale stated above), so zero means no association.*  
 #> 
@@ -898,7 +933,7 @@ cat(f_lmer_rmd_out$rmd)
 #> 
 #> 
 #> ## Diagnostic plots
-#> ![](/tmp/RtmplsKqN3/file1da27f1fe415.png)   
+#> ![](/tmp/RtmplP7rcW/file1c2a16305ecf.png)   
 #>   
 #> 
 #> *Top-left:* residuals should scatter randomly around zero with no funnel shape. *Top-right:* level-1 residuals should fall on the line. *Bottom-left:* the random-effect BLUPs should also be approximately normal - this is the LMM-specific assumption most users forget. *Bottom-right:* the spread of residuals should be roughly constant across fitted values.
@@ -916,7 +951,17 @@ cat(f_lmer_rmd_out$rmd)
 #> *Note: Shapiro-Wilk on the level-1 residuals is significant (p = 0.0026), but the residual Q-Q plot is essentially straight apart from the tails (tail-trimmed quantile correlation = 0.997, skewness = 0.2577). This pattern reflects a few outliers or heavy but symmetric tails rather than systematic skew, and linear mixed models are robust to it. No transformation or change of family is recommended on this basis alone; inspect the Q-Q plot and any flagged outliers instead.*
 #> 
 #> 
-#> **Note on numeric covariate(s):** Days. Their slopes are reported in the coefficient table above; no pairwise post hoc is performed.  
+#> ### Slopes of numeric predictors
+#> 
+#> ---------------------------------------------------------------------
+#> Predictor   Level   Slope     SE       df         lower     upper    
+#>                                                   CL        CL       
+#> ----------- ------- --------- -------- ---------- --------- ---------
+#> Days        (all)   10.4673   0.8042   161.0000   8.8791    12.0555  
+#> ---------------------------------------------------------------------
+#> 
+#> 
+#> **Note on numeric covariate(s):** Days. Their slopes are in the slopes table above; no pairwise post hoc is performed.  
 
 # 6) Two response variables analysed in one call. A separate model
 #    is fit for each, sharing the same right-hand side. The results
@@ -968,6 +1013,22 @@ f_lmer(height_cm ~ treatment * time_weeks + (1 | block/plant_id),
 #> 
 #> treatment:time_weeks   3       36.0000   10.7393    < 0.001   *    
 #> -------------------------------------------------------------------
+#> 
+#> 
+#> --- Slopes of numeric predictors ---
+#> 
+#> ----------------------------------------------------------------------
+#> Predictor    Level     Slope    SE       df        lower     upper    
+#>                                                    CL        CL       
+#> ------------ --------- -------- -------- --------- --------- ---------
+#> time_weeks   control   4.6700   0.3484   36.0000   3.9634    5.3766   
+#> 
+#> time_weeks   drought   2.1250   0.3484   36.0000   1.4184    2.8316   
+#> 
+#> time_weeks   high_N    4.4000   0.3484   36.0000   3.6934    5.1066   
+#> 
+#> time_weeks   low_N     3.6750   0.3484   36.0000   2.9684    4.3816   
+#> ----------------------------------------------------------------------
 #> 
 #> 
 #> --- Observed descriptives (by fixed-effect factor levels) ---
@@ -1046,6 +1107,16 @@ f_lmer(height_cm ~ treatment * time_weeks + (1 | block/plant_id),
 #> --- Post hoc comparisons ---
 #> 
 #> * treatment *
+#> Letters are compared within this table only.
+#> **[!] Interpret with caution:** `treatment` takes part in the significant
+#> interaction(s) `treatment:time_weeks`. The estimated marginal means below
+#> average over the other term(s) in that interaction, so they can hide or
+#> even reverse the real pattern - the effect of `treatment` depends on the
+#> level/value of the interacting term(s). For `treatment:time_weeks` see the
+#> slope plot(s) below (model-fitted lines per `treatment` level): the
+#> covariate slope differs across `treatment`, so a single averaged effect is
+#> misleading.
+#> 
 #> Estimated marginal means with compact letter display:
 #> 
 #> ---------------------------------------------------------------------
@@ -1077,7 +1148,7 @@ f_lmer(height_cm ~ treatment * time_weeks + (1 | block/plant_id),
        contrast_plots = TRUE,
        output_type = "word"
        )
-#> Saving output in: /tmp/RtmplsKqN3/plant_trial_lmer_output.docx
+#> Saving output in: /tmp/RtmplP7rcW/plant_trial_lmer_output.docx
 #> NOTE: Results may be misleading due to involvement in interactions
 # }
 ```

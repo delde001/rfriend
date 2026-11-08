@@ -1,5 +1,712 @@
 # Changelog
 
+## rfriend 3.2.1 (development version)
+
+### Breaking Changes
+
+These changes can change your results or break code that reads the
+returned objects. Please read them before updating scripts.
+
+- **`plant_trial`: new `biomass_g` values.** The column is now
+  above-ground biomass *estimated non-destructively from plant images*,
+  so measuring the same plant in weeks 2, 4 and 6 is realistic (dry
+  biomass needs a destructive harvest). It now includes a plant effect:
+  a mixed model on log biomass no longer gives a singular fit. All other
+  columns are unchanged. The raw, Excel and SPSS copies in
+  `inst/extdata` are updated in the same way. Results and examples that
+  use `biomass_g` change.
+
+- **One structure for the results of the test functions.** Every test
+  function stores its results per response (`out$height_cm`). Two
+  functions were exceptions; they now follow the same rules:
+
+  - [`f_kruskal_test()`](https://delde001.github.io/rfriend/reference/f_kruskal_test.md)
+    stores its results per response, then per predictor:
+    `out$biomass_g$treatment` instead of `out$biomass_g_treatment`. The
+    Excel output has one sheet per response (per response and predictor
+    when a call has several predictors; before, the sheet names did not
+    match then).
+  - [`f_glm()`](https://delde001.github.io/rfriend/reference/f_glm.md)
+    stores its post hoc as `post_hoc[[term]]`, with `emmeans`, `pairs`,
+    `cld` (the table with letters), `cld_text` and `caution`, as
+    [`f_aov()`](https://delde001.github.io/rfriend/reference/f_aov.md),
+    [`f_lm()`](https://delde001.github.io/rfriend/reference/f_lm.md) and
+    [`f_lmer()`](https://delde001.github.io/rfriend/reference/f_lmer.md)
+    do. Before, it was `posthoc`, with `emm` and
+    `post_hoc_summary_table`. The calculation is unchanged:
+    [`f_glm()`](https://delde001.github.io/rfriend/reference/f_glm.md)
+    compares the cells of all categorical predictors together, so there
+    is one table, `post_hoc$treatment` for one factor and
+    `post_hoc[["block:treatment"]]` for two. An old name now stops with
+    a message that gives the new path, instead of silently returning
+    `NULL`, for example: “‘biomass_g_treatment’ is not an element of an
+    f_kruskal_test() result: … Use x$`biomass_g`$treatment instead.”
+
+- **Misspelled arguments now stop with an error.** Before, a typo such
+  as `adjsut = "holm"` was silently ignored and the function ran with
+  the default setting, so you could get a different analysis than you
+  asked for without noticing. Now the function stops and suggests the
+  right name:
+  `Unknown argument(s) in f_kruskal_test(): 'adjsut' (did you mean 'adjust'?)`.
+  This applies to
+  [`f_aov()`](https://delde001.github.io/rfriend/reference/f_aov.md),
+  [`f_boxcox()`](https://delde001.github.io/rfriend/reference/f_boxcox.md),
+  [`f_boxplot()`](https://delde001.github.io/rfriend/reference/f_boxplot.md),
+  [`f_friedman()`](https://delde001.github.io/rfriend/reference/f_friedman.md),
+  [`f_kruskal_test()`](https://delde001.github.io/rfriend/reference/f_kruskal_test.md),
+  [`f_lm()`](https://delde001.github.io/rfriend/reference/f_lm.md),
+  [`f_outliers()`](https://delde001.github.io/rfriend/reference/f_outliers.md),
+  [`f_scan()`](https://delde001.github.io/rfriend/reference/f_scan.md),
+  [`f_stat_wizard()`](https://delde001.github.io/rfriend/reference/f_stat_wizard.md),
+  [`f_summary()`](https://delde001.github.io/rfriend/reference/f_summary.md),
+  [`f_t_test()`](https://delde001.github.io/rfriend/reference/f_t_test.md)
+  and
+  [`f_wilcox_test()`](https://delde001.github.io/rfriend/reference/f_wilcox_test.md).
+  Scripts that contained a typo will now stop; fix the spelling it
+  suggests.
+
+- **Post hoc tests in
+  [`f_aov()`](https://delde001.github.io/rfriend/reference/f_aov.md) and
+  [`f_lm()`](https://delde001.github.io/rfriend/reference/f_lm.md): one
+  table per factor.** With more than one factor in the model (for
+  example `y ~ treatment + week`), rfriend used to make a single table
+  comparing every combination of all factors (treatment x week) and
+  labelled it “Marginal Means”. You now get one table per factor (all
+  treatments, averaged over the weeks; all weeks, averaged over the
+  treatments) and, when an interaction is significant, an extra table
+  for the combinations. See the new `post_hoc` argument below. The old
+  single table is still available for one release (see Deprecated).
+
+- **Automatic transformations are kept only when they help.**
+  [`f_aov()`](https://delde001.github.io/rfriend/reference/f_aov.md),
+  [`f_lm()`](https://delde001.github.io/rfriend/reference/f_lm.md) and
+  [`f_t_test()`](https://delde001.github.io/rfriend/reference/f_t_test.md)
+  apply Box-Cox (or bestNormalize) automatically when the residuals do
+  not look normal. Before, the transformed result was always reported,
+  even when the transformation made the residuals *less* normal. Now
+  rfriend compares the residual check before and after: if the
+  transformation does not improve it, the untransformed analysis is
+  reported and the report says so, e.g. “Transformation not kept.
+  Box-Cox did not improve the normality of the residuals (Shapiro-Wilk p
+  = 0.0375 before, 0.0252 after).” (When the transformation was
+  triggered only by unequal variances, the variance test is compared
+  instead.) If you name a response in `force_transformation`, it is
+  always transformed. Some analyses that were transformed in 3.2.0 are
+  therefore reported untransformed now.
+
+- **[`f_lm()`](https://delde001.github.io/rfriend/reference/f_lm.md):
+  the plain result names now always hold the untransformed model.**
+  `$anova`, `$summary` and `$coefficients` describe the model on the
+  original response. When the response was transformed, the transformed
+  model is in `$transformed_anova`, `$transformed_summary` and
+  `$transformed_coefficients` (these are `NULL` otherwise). In 3.2.0 the
+  plain names held the transformed model whenever a transformation was
+  applied. What [`print()`](https://rdrr.io/r/base/print.html) and the
+  report show has not changed. To get the table that was reported:
+  `tab <- if (out$y$Response_Transformed) out$y$transformed_anova else out$y$anova`.
+  [`f_aov()`](https://delde001.github.io/rfriend/reference/f_aov.md)
+  already worked this way (`$aov_summary` untransformed,
+  `$transformed_aov_summary` transformed).
+
+- **[`f_aov()`](https://delde001.github.io/rfriend/reference/f_aov.md)
+  now analyses block designs.**
+  [`f_aov()`](https://delde001.github.io/rfriend/reference/f_aov.md)
+  skipped any analysis in which one group combination had only one
+  observation, saying the model was “saturated”. That also blocked
+  ordinary designs such as a randomised complete block design
+  (`height ~ block + treatment`, one plant per treatment per block),
+  which can be analysed perfectly well.
+  [`f_aov()`](https://delde001.github.io/rfriend/reference/f_aov.md) now
+  only skips a model that truly has no degrees of freedom left for the
+  error. For such a model no F-test exists, so `force_aov = TRUE` now
+  stops with an explanation instead of fitting it.
+
+### New Features in Existing Functions
+
+- **[`f_scan()`](https://delde001.github.io/rfriend/reference/f_scan.md):
+  a data check before the plots (`check = TRUE`, default).** Before any
+  analysis,
+  [`f_scan()`](https://delde001.github.io/rfriend/reference/f_scan.md)
+  now reports problems in the raw data: every value of each text column
+  with its count, with flags for leading or trailing spaces
+  (`" high_N"`), labels that differ only in case, spaces or underscores
+  (`"low_N"` and `"Low N"`), labels written differently from the others,
+  and numbers stored as text (`"n/a"`); the number of missing values per
+  numeric column; and column names with dots from
+  [`read.csv()`](https://rdrr.io/r/utils/read.table.html). With the new
+  argument `id_col` it also counts the rows per ID and names IDs with an
+  unusual number of rows. A bare data frame call checks every column; a
+  formula call checks only the formula variables. The check only reports
+  and never changes the data. It is printed first: a list of possible
+  problems (“Check these”), then a table of the text columns and a table
+  of the numeric columns with the missing values and the four lowest and
+  highest values. A column with many values, such as an ID column, is
+  summarised in one line. The check is stored as
+  `attr(result, "data_check")`, so the result keeps one element per
+  scanned column, and it is also the first section of the Word, PDF and
+  rmd reports. `check = FALSE` switches the check off;
+  `print(result, data_check = FALSE)` hides it.
+
+- **[`f_rename_vector()`](https://delde001.github.io/rfriend/reference/f_rename_vector.md):
+  factors, `trim` and a warning for typing errors.** A factor now keeps
+  its class: its levels are renamed in their order (it stopped with a
+  `vapply` error before). `trim = TRUE` removes leading and trailing
+  spaces before renaming. A name in `name_map` that does not occur in
+  the vector gives a warning, because it usually is a typing error;
+  `warn_unmatched = FALSE` silences it. Character vectors are renamed
+  exactly as before, and the internal calls in
+  [`f_scan()`](https://delde001.github.io/rfriend/reference/f_scan.md),
+  [`f_corplot()`](https://delde001.github.io/rfriend/reference/f_corplot.md)
+  and
+  [`f_bestNormalize()`](https://delde001.github.io/rfriend/reference/f_bestNormalize.md)
+  do not warn.
+
+- **[`f_lmer()`](https://delde001.github.io/rfriend/reference/f_lmer.md):
+  a table with the slopes of numeric predictors.** A factor gets a post
+  hoc table, but the slope of a numeric predictor was not in the
+  printout. The printout and the report now have a “Slopes of numeric
+  predictors” table, also stored as `$slopes`, with the slope, its
+  standard error, df and confidence interval. When the numeric predictor
+  interacts with a factor, the slope is given per level (from
+  [`emmeans::emtrends()`](https://rvlenth.github.io/emmeans/reference/emtrends.html)),
+  so you do not have to add up coefficients. A numeric predictor without
+  one clear slope, such as in a numeric x numeric interaction, is named
+  in a note (`$note_slopes`).
+
+- **[`f_remove_outliers()`](https://delde001.github.io/rfriend/reference/f_remove_outliers.md)
+  can keep the rows and set only values to `NA`.** With `set_na = TRUE`
+  the rows stay and only the outlier values become missing, so the other
+  measurements of that plant stay in the analysis. With an
+  [`f_outliers()`](https://delde001.github.io/rfriend/reference/f_outliers.md)
+  result, exactly the flagged values in the column(s) where they were
+  flagged are cleared; `columns` limits this to some checked columns. By
+  hand, give row numbers (or IDs with `by`) and the columns:
+  `f_remove_outliers(df, c(21, 32), set_na = TRUE, columns = "biomass_g")`.
+  The message says which values were set to `NA`.
+
+- **Removed rows with missing values are reported in the console.** The
+  test and model functions leave out rows with a missing value (NA) in
+  the columns of the formula, as R does. Until now only the Word, PDF
+  and R Markdown reports said so.
+  [`f_aov()`](https://delde001.github.io/rfriend/reference/f_aov.md),
+  [`f_lm()`](https://delde001.github.io/rfriend/reference/f_lm.md),
+  [`f_glm()`](https://delde001.github.io/rfriend/reference/f_glm.md),
+  [`f_lmer()`](https://delde001.github.io/rfriend/reference/f_lmer.md),
+  [`f_t_test()`](https://delde001.github.io/rfriend/reference/f_t_test.md),
+  [`f_wilcox_test()`](https://delde001.github.io/rfriend/reference/f_wilcox_test.md),
+  [`f_kruskal_test()`](https://delde001.github.io/rfriend/reference/f_kruskal_test.md)
+  and
+  [`f_friedman()`](https://delde001.github.io/rfriend/reference/f_friedman.md)
+  now also print a message, for example
+  `3 rows with missing values (NA) removed from analysis (NA in: height_cm).`
+  Functions that drop NA rows per response
+  ([`f_glm()`](https://delde001.github.io/rfriend/reference/f_glm.md),
+  [`f_friedman()`](https://delde001.github.io/rfriend/reference/f_friedman.md))
+  name the response. No message when nothing was removed.
+
+- **[`f_stat_wizard()`](https://delde001.github.io/rfriend/reference/f_stat_wizard.md)
+  recognises ordinal responses.** A response stored as an ordered factor
+  (for example a leaf-damage score from 1 to 5,
+  `factor(score, ordered = TRUE)`) is now classified as ordinal. The
+  wizard recommends a rank-based test on the rank codes of the levels:
+  [`f_wilcox_test()`](https://delde001.github.io/rfriend/reference/f_wilcox_test.md)
+  for two groups,
+  [`f_kruskal_test()`](https://delde001.github.io/rfriend/reference/f_kruskal_test.md)
+  for three or more, the paired versions or
+  [`f_friedman()`](https://delde001.github.io/rfriend/reference/f_friedman.md)
+  when `id_col` is given, and a Spearman correlation for a numeric
+  predictor. With several predictors or random effects it points to
+  ordinal regression
+  ([`MASS::polr`](https://rdrr.io/pkg/MASS/man/polr.html),
+  `ordinal::clmm`). Before, an ordered factor was treated as unordered
+  categories (chi-square test). A numeric response of whole numbers on a
+  short scale (at most 10 values up to 10) is still analysed as count
+  data, but the report now says that it may be a score and shows how to
+  store it as an ordered factor.
+
+- **Choose your post hoc tables: new `post_hoc` and `by` arguments** in
+  [`f_aov()`](https://delde001.github.io/rfriend/reference/f_aov.md),
+  [`f_lm()`](https://delde001.github.io/rfriend/reference/f_lm.md) and
+  [`f_lmer()`](https://delde001.github.io/rfriend/reference/f_lmer.md),
+  with the same meaning in all three:
+
+  - By default you get a table for each factor and, for each significant
+    interaction, a table of all combinations. A factor that is not
+    significant is still shown, with `ns` instead of letters. A factor
+    that is part of a significant interaction gets an “Interpret with
+    caution” note, because its average over the other factor can hide
+    what happens at each level. Numeric predictors get no table.
+  - `post_hoc = "treatment"` shows only that table. This is the way to
+    leave blocks out of the comparisons: the block stays in the model,
+    but nobody needs letters for blocks:
+    `f_aov(height ~ block + treatment, data = d, post_hoc = "treatment")`.
+    `post_hoc = "treatment:week"` shows the table of all combinations;
+    `post_hoc = FALSE` turns the post hoc off.
+  - `by = "week"` (together with `post_hoc = "treatment"`) compares the
+    treatments separately within each week. This needs far fewer
+    comparisons than the full combination table (for 4 treatments x 3
+    weeks: 18 instead of 66), so it has more power.
+  - Each table has its own letters, its own p-value adjustment and its
+    own footer, and says “Letters are compared within this table only.”
+    A misspelled term name stops with a “did you mean” suggestion.
+  - The tables are returned as `out$y$post_hoc[["treatment"]]`,
+    `out$y$post_hoc[["treatment:week"]]` or
+    `out$y$post_hoc[["treatment | week"]]`, each with the same parts in
+    all three functions (`emmeans`, `pairs`, `cld`, `cld_text`,
+    `caution`).
+  - Plots and Excel output follow the tables: a factor left out of
+    `post_hoc` gets no plot, the letters on a plot come from that
+    factor’s own table, and the Excel file has one sheet per table. For
+    `by`,
+    [`f_aov()`](https://delde001.github.io/rfriend/reference/f_aov.md)
+    draws a plot with the letters per level of `by`.
+
+- **[`f_glm()`](https://delde001.github.io/rfriend/reference/f_glm.md):
+  yes/no responses with a new `event` argument.** For a logistic
+  regression (`family = binomial`) on a factor such as `infected`
+  (“no”/“yes”), write `event = "yes"` to say which outcome you model.
+  This matters: R’s own [`glm()`](https://rdrr.io/r/stats/glm.html)
+  silently models the second level in alphabetical order, so the labels
+  “healthy”/“diseased” would give you P(healthy) and turn every effect
+  around. rfriend does not guess; without `event` it stops and shows the
+  levels and the call to use. The chosen coding is printed, shown in the
+  report and on the plots (“P(infected = yes)”), and stored in
+  `out$y$event_coding`. With three or more levels, `event` can name one
+  or more levels; the others are combined and the report says which.
+  Logical (`TRUE`/`FALSE`) responses need no `event`.
+
+- **[`f_stat_wizard()`](https://delde001.github.io/rfriend/reference/f_stat_wizard.md)
+  knows the newer functions.** It now recommends
+  [`f_lm()`](https://delde001.github.io/rfriend/reference/f_lm.md) for a
+  numeric predictor,
+  [`f_friedman()`](https://delde001.github.io/rfriend/reference/f_friedman.md)
+  for repeated measurements that are not normal, and
+  [`f_lmer()`](https://delde001.github.io/rfriend/reference/f_lmer.md)
+  for repeated measurements that are. Its suggested
+  [`f_glm()`](https://delde001.github.io/rfriend/reference/f_glm.md)
+  code for a yes/no factor includes `event`, and `run = TRUE` can run
+  all of these.
+
+- **Reports say which scale a test is on.** The ANOVA and t-test
+  headings in
+  [`f_aov()`](https://delde001.github.io/rfriend/reference/f_aov.md),
+  [`f_lm()`](https://delde001.github.io/rfriend/reference/f_lm.md) and
+  [`f_t_test()`](https://delde001.github.io/rfriend/reference/f_t_test.md)
+  now read, for example, “ANOVA on Box-Cox transformed height_cm (lambda
+  = -0.131)” or “ANOVA on height_cm (untransformed)”.
+
+- **Easier checks on transformed results.**
+  [`f_aov()`](https://delde001.github.io/rfriend/reference/f_aov.md)
+  always returns `$transformed_aov_summary` (it is `NULL` when nothing
+  was transformed), and
+  [`f_t_test()`](https://delde001.github.io/rfriend/reference/f_t_test.md)
+  returns `$transformed_t_test` in the same way, so
+  [`is.null()`](https://rdrr.io/r/base/NULL.html) tells you reliably
+  whether a transformation was used.
+
+- **[`f_pander()`](https://delde001.github.io/rfriend/reference/f_pander.md)
+  prints
+  [`f_summary()`](https://delde001.github.io/rfriend/reference/f_summary.md)
+  results directly** instead of warning and printing an untidy list.
+
+- **[`f_remove_outliers()`](https://delde001.github.io/rfriend/reference/f_remove_outliers.md)
+  works when no outliers were found.** It now accepts the `NULL` that
+  [`f_outliers()`](https://delde001.github.io/rfriend/reference/f_outliers.md)
+  returns in that case and gives your data back unchanged, so the
+  find-then-remove steps also run on clean data.
+
+### Deprecated
+
+These still work in 3.2.1 but will be removed in the next release.
+
+- [`f_aov()`](https://delde001.github.io/rfriend/reference/f_aov.md):
+  `$post_hoc_summary_table`, `$summary_table` and `$cld_text`;
+  [`f_lm()`](https://delde001.github.io/rfriend/reference/f_lm.md):
+  `$post_hoc_summary_table`, `$emmeans_table` and `$cld_text`. They used
+  to hold the single post hoc table. They now hold the combinations
+  table if there is a significant interaction, otherwise the first
+  table. Use `$post_hoc[[name]]` instead.
+
+- [`f_t_test()`](https://delde001.github.io/rfriend/reference/f_t_test.md):
+  `$t_test_transformed` is now called `$transformed_t_test`.
+
+- **Plot switches have the same names in all test functions.** The
+  figures in a report are switched with `diagnostic_plots` (assumption
+  and residual checks) and `effect_plots` (effect, estimated-means,
+  interaction and coefficient forest plots); `contrast_plots` is
+  unchanged. The old names still work, with a deprecation warning:
+
+  - [`f_aov()`](https://delde001.github.io/rfriend/reference/f_aov.md):
+    `norm_plots` is now `diagnostic_plots`, `interaction_plots` is now
+    `effect_plots`.
+  - [`f_lm()`](https://delde001.github.io/rfriend/reference/f_lm.md),
+    [`f_t_test()`](https://delde001.github.io/rfriend/reference/f_t_test.md),
+    [`f_wilcox_test()`](https://delde001.github.io/rfriend/reference/f_wilcox_test.md):
+    `norm_plots` is now `diagnostic_plots`.
+  - [`f_glm()`](https://delde001.github.io/rfriend/reference/f_glm.md),
+    [`f_lmer()`](https://delde001.github.io/rfriend/reference/f_lmer.md):
+    `effect_plot` is now `effect_plots`.
+  - [`f_kruskal_test()`](https://delde001.github.io/rfriend/reference/f_kruskal_test.md),
+    [`f_friedman()`](https://delde001.github.io/rfriend/reference/f_friedman.md):
+    `plot` is replaced by `diagnostic_plots` (density plot /
+    within-block trace plot) and `effect_plots` (boxplot with letters);
+    `plot` sets both.
+  - New:
+    [`f_t_test()`](https://delde001.github.io/rfriend/reference/f_t_test.md)
+    and
+    [`f_wilcox_test()`](https://delde001.github.io/rfriend/reference/f_wilcox_test.md)
+    get `effect_plots` for the main effect plot, which could not be
+    switched off before.
+
+### Minor Changes
+
+- **[`f_clear()`](https://delde001.github.io/rfriend/reference/f_clear.md)
+  names the packages that are still attached.** Removing objects does
+  not detach packages, so a script can still depend on a package loaded
+  by hand. Without `restart = TRUE`,
+  [`f_clear()`](https://delde001.github.io/rfriend/reference/f_clear.md)
+  now lists them, for example
+  `Still attached: ggplot2, dplyr. For a clean session use: f_clear(restart = TRUE)`.
+  The packages R attaches at start-up and rfriend itself are left out.
+  Nothing is detached.
+
+- **[`f_stat_wizard()`](https://delde001.github.io/rfriend/reference/f_stat_wizard.md)
+  is marked as experimental (beta).** The help page now shows a
+  lifecycle “experimental” badge and says that the recommendations can
+  be wrong and can change between versions, in line with the “BETA” line
+  the wizard already prints in its disclaimer. The function itself is
+  unchanged.
+
+- **Printed messages use plain ASCII punctuation.** Messages and report
+  lines of
+  [`f_stat_wizard()`](https://delde001.github.io/rfriend/reference/f_stat_wizard.md),
+  [`f_aov()`](https://delde001.github.io/rfriend/reference/f_aov.md),
+  [`f_corplot()`](https://delde001.github.io/rfriend/reference/f_corplot.md)
+  and [`f_glm()`](https://delde001.github.io/rfriend/reference/f_glm.md)
+  used an em dash (a long dash), which is not ASCII and does not always
+  display or render to PDF correctly. They now use a colon, semicolon or
+  comma, for example “WARN: Unbalanced pairing: 60 subject x group
+  combination(s) are missing”. The pairing lines of the
+  [`f_stat_wizard()`](https://delde001.github.io/rfriend/reference/f_stat_wizard.md)
+  report also use a plain “x” instead of a multiplication sign (“20
+  subjects x 3 groups”). In
+  [`f_glm()`](https://delde001.github.io/rfriend/reference/f_glm.md),
+  the placeholder shown in the Letter column when LRT letters cannot be
+  computed is now `"-"` instead of an em dash. Code that tests for the
+  old placeholder should test for `"-"`.
+
+- **`unique_num_threshold` can now be spelled correctly** in
+  [`f_factors()`](https://delde001.github.io/rfriend/reference/f_factors.md)
+  and
+  [`f_corplot()`](https://delde001.github.io/rfriend/reference/f_corplot.md).
+  The argument was named `unique_num_treshold` (missing the “h”), next
+  to the correctly spelled `repeats_threshold`. Both spellings are now
+  accepted, so existing scripts keep working; the help pages use the
+  correct spelling. Giving both spellings with different values stops
+  with an error.
+
+- The help for `repeats_threshold`
+  ([`f_factors()`](https://delde001.github.io/rfriend/reference/f_factors.md),
+  [`f_corplot()`](https://delde001.github.io/rfriend/reference/f_corplot.md))
+  now describes what the code does: a numeric column becomes a factor
+  only when a value occurs *more than* `repeats_threshold` times, so
+  with the default of 2 a value has to occur at least three times. The
+  help said 2 repeats were enough. The behaviour itself has not changed.
+
+- The package description (DESCRIPTION) has been rewritten to give a
+  short overview of what rfriend does, including the newer functions
+  [`f_lm()`](https://delde001.github.io/rfriend/reference/f_lm.md),
+  [`f_friedman()`](https://delde001.github.io/rfriend/reference/f_friedman.md),
+  [`f_lmer()`](https://delde001.github.io/rfriend/reference/f_lmer.md)
+  and
+  [`f_stat_wizard()`](https://delde001.github.io/rfriend/reference/f_stat_wizard.md),
+  and now links to the GitHub repository as well as the website.
+
+- The example workbook `plant_trial_raw.xlsx` (see
+  [`f_example_data()`](https://delde001.github.io/rfriend/reference/f_example_data.md))
+  has a second sheet, `meta_data`: a codebook with the meaning, unit and
+  intended values of each column. The raw data on the first sheet is
+  unchanged. Handy for practising
+  [`readxl::excel_sheets()`](https://readxl.tidyverse.org/reference/excel_sheets.html)
+  and `read_excel(sheet = )` on a workbook with more than one sheet. The
+  [`?plant_trial`](https://delde001.github.io/rfriend/reference/plant_trial.md)
+  help page now mentions it, and its `infected` entry uses
+  `f_glm(..., event = "yes")` instead of converting to 0/1.
+
+- The minimum Pandoc version (needed for Word and PDF output) is now
+  stated the same way everywhere: Pandoc 3.1 or higher. DESCRIPTION used
+  to say 3.2 and the help pages 1.12.3.
+
+- The README has been rewritten and now shows an example report
+  (`man/figures/report-example.png`).
+
+### Bug Fixes
+
+- [`f_glm()`](https://delde001.github.io/rfriend/reference/f_glm.md):
+  the report now says “(Quasi-)complete separation”, as the console
+  warning does. It said “Complete separation” also when other groups
+  still had both outcomes.
+
+- [`f_lmer()`](https://delde001.github.io/rfriend/reference/f_lmer.md):
+  the coefficient forest plot now uses a t interval with the df of the
+  coefficient table, as the p-value and the slopes table do. It used a z
+  interval, which was too narrow in small designs. The axis label
+  follows `alpha`.
+
+- **[`f_summary()`](https://delde001.github.io/rfriend/reference/f_summary.md):
+  a group with only missing values gives `NA`, without warnings.** In a
+  design with one row per group, such as one plant per treatment and
+  block, a missing value leaves a group empty.
+  [`f_summary()`](https://delde001.github.io/rfriend/reference/f_summary.md),
+  and with it the data summary table of
+  [`f_aov()`](https://delde001.github.io/rfriend/reference/f_aov.md) and
+  other functions, then printed the base R warnings “no non-missing
+  arguments to min; returning Inf” (and to max) and showed `NaN`, `Inf`
+  and `-Inf`. An empty group now has `n = 0` and `NA` for every
+  statistic.
+
+- **[`f_conditional_round()`](https://delde001.github.io/rfriend/reference/f_conditional_round.md):
+  a rounded ANOVA table prints its values.** The rounded numbers are
+  text, but the result kept classes such as `anova`, so
+  [`print()`](https://rdrr.io/r/base/print.html) showed nonsense (1, 2,
+  2, 2 instead of 1556.868, 3, 28.391, …) without a warning. The result
+  is now a plain data frame (or tibble), and
+  [`print()`](https://rdrr.io/r/base/print.html) shows the rounded
+  values. `na_string` is now also used for the columns of a data frame;
+  before, they always got `"-"`.
+
+- **[`f_glm()`](https://delde001.github.io/rfriend/reference/f_glm.md):
+  overdispersion is no longer silent in the console.** The DHARMa
+  dispersion test ran, but its verdict appeared only in the Word, PDF or
+  R Markdown report. A Poisson model with more spread than it assumes
+  (which makes p-values too small) gave no warning in the console. Now:
+
+  - a significant overdispersion in a Poisson or binomial model gives a
+    warning that names the fix (`family = "quasipoisson"` or
+    `"quasibinomial"`, or a negative binomial model for counts);
+  - the console printout has a “Dispersion test” section;
+  - the result has a new element `$dispersion` with the verdict (type,
+    statistic, p-value, whether it is significant, direction, and the
+    printed text). The rules are those of the report: not applicable to
+    0/1 data, the quasi-dispersion parameter for quasi-families.
+    `dispersion_test = FALSE` still only leaves the section out of the
+    report.
+
+- **[`f_factors()`](https://delde001.github.io/rfriend/reference/f_factors.md)
+  handles ordered factors.** Three problems with ordinal data are
+  solved:
+
+  - `properties = TRUE` stopped with “values must be length 1” as soon
+    as *any* column in the data was an ordered factor. The table now
+    shows “ordered” as the class.
+  - `ref` on an ordered factor gave the base R error “‘relevel’ only for
+    unordered factors”. It now stops with a clear message: an ordered
+    factor uses its level order, not a reference level.
+  - `ordered` could only be passed on to
+    [`factor()`](https://rdrr.io/r/base/factor.html) and then applied to
+    all converted columns. New argument `ordered`: the names of the
+    columns to order (`ordered = "damage"`), or `TRUE`/`FALSE` for all
+    converted columns. New argument `levels`: the level order per
+    column, e.g. `levels = list(damage = c("low", "medium", "high"))`;
+    without it the levels are sorted alphabetically. A column name that
+    does not exist or is not converted, or a value in the column that is
+    not one of the given levels (it would silently become `NA`), stops
+    with an error.
+
+- **[`f_long()`](https://delde001.github.io/rfriend/reference/f_long.md):
+  helpers such as `starts_with()` work.** The help page offered
+  `measure_columns = starts_with("Measure")`, but any helper stopped
+  with an error (“must be used within a *selecting* function”, or “could
+  not find function” without dplyr loaded), because the argument was
+  checked with [`is.null()`](https://rdrr.io/r/base/NULL.html) before
+  the selection. Helpers now work in `measure_columns` and `keep_cols`,
+  also without loading dplyr. Column names, column numbers and a
+  variable that holds `NULL` behave as before. A selection that matches
+  no columns now stops with a clear message.
+
+- **`bad_rows$row_id` works on an
+  [`f_outliers()`](https://delde001.github.io/rfriend/reference/f_outliers.md)
+  result.** The result is a list of tables (`output_df`, or one per
+  checked column), so `bad_rows$row_id` returned `NULL` without a
+  warning, and `df$x[bad_rows$row_id] <- NA` silently changed nothing.
+  `$` now reaches the columns of the outlier table: `bad_rows$row_id`
+  gives the flagged rows (with several checked columns: all of them),
+  and with one checked column any column of the table works. A name that
+  is not part of the result stops with an error that lists what is
+  available. `[[` keeps the standard list behaviour.
+
+- **“Removed 1 outlier row.”**
+  [`f_remove_outliers()`](https://delde001.github.io/rfriend/reference/f_remove_outliers.md)
+  now uses the singular and plural correctly (“outlier row” / “outlier
+  rows”).
+
+- **`f_example_data(dest = "data")` creates the folder.** When the
+  folder did not exist yet, the file was copied to a *file* named `data`
+  (no extension), with a message that looked like success. A `dest`
+  without a file extension (or ending in `/`) is now a folder: it is
+  created if needed, with a message, and the original file name is kept.
+  A `dest` with a file extension whose folder does not exist stops with
+  a clear message.
+
+- **`subset` can pick two groups in
+  [`f_t_test()`](https://delde001.github.io/rfriend/reference/f_t_test.md)
+  and
+  [`f_wilcox_test()`](https://delde001.github.io/rfriend/reference/f_wilcox_test.md).**
+  `f_t_test(y ~ treatment, data = d, subset = treatment %in% c("A", "B"))`
+  stopped with “Grouping variable must have exactly 2 levels”, because
+  the two-group check ran on the full data before `subset` was applied.
+  The check now runs after the subset and the removal of missing values,
+  and the error names the levels it found.
+
+- **[`f_t_test()`](https://delde001.github.io/rfriend/reference/f_t_test.md)
+  and
+  [`f_wilcox_test()`](https://delde001.github.io/rfriend/reference/f_wilcox_test.md)
+  reports counted `subset` rows as missing.** With `subset`, the report
+  line “Removed n rows with missing values” also counted the rows that
+  `subset` left out. It now counts only the rows removed because of NA.
+
+- **Ordinal responses in the rank tests.**
+  [`f_kruskal_test()`](https://delde001.github.io/rfriend/reference/f_kruskal_test.md)
+  and
+  [`f_friedman()`](https://delde001.github.io/rfriend/reference/f_friedman.md)
+  stopped with an internal error (“‘type’ must be 1 or 3 for ordered
+  factors”) when the response was an ordered factor, such as a score
+  stored with `factor(score, ordered = TRUE)`. Rank tests use only the
+  order of the values, so
+  [`f_kruskal_test()`](https://delde001.github.io/rfriend/reference/f_kruskal_test.md),
+  [`f_friedman()`](https://delde001.github.io/rfriend/reference/f_friedman.md)
+  and
+  [`f_wilcox_test()`](https://delde001.github.io/rfriend/reference/f_wilcox_test.md)
+  now test an ordered-factor response on the rank codes of its levels (1
+  = lowest level) and print a message with the coding. Any other
+  non-numeric response stops with a clear message that points to
+  `factor(..., ordered = TRUE)` for scores and
+  [`f_chisq_test()`](https://delde001.github.io/rfriend/reference/f_chisq_test.md)
+  for unordered categories.
+
+- [`f_wilcox_test()`](https://delde001.github.io/rfriend/reference/f_wilcox_test.md)
+  opened the generated Word, PDF or Excel file even when run from a
+  script, because `open_generated_files` defaulted to `TRUE`. It now
+  defaults to
+  [`interactive()`](https://rdrr.io/r/base/interactive.html), as in the
+  other functions and as the help page already said.
+
+- **[`f_model_compare()`](https://delde001.github.io/rfriend/reference/f_model_compare.md)
+  accepts rfriend results.** Passing the result of
+  [`f_lm()`](https://delde001.github.io/rfriend/reference/f_lm.md),
+  [`f_aov()`](https://delde001.github.io/rfriend/reference/f_aov.md),
+  [`f_glm()`](https://delde001.github.io/rfriend/reference/f_glm.md) or
+  [`f_lmer()`](https://delde001.github.io/rfriend/reference/f_lmer.md)
+  failed with an unreadable error (“arguments imply differing number of
+  rows”). The fitted model stored in the result is now used. A result
+  with several responses, or with a response that was transformed, stops
+  with a message that says what to do instead.
+
+- **[`f_model_compare()`](https://delde001.github.io/rfriend/reference/f_model_compare.md)
+  uses a chi-square test for Poisson GLMs.** For nested GLMs only
+  binomial models got a likelihood-ratio (chi-square) test; Poisson (and
+  negative binomial) models got an F test, with R’s warning “using F
+  test with a ‘poisson’ family is inappropriate”. Families with a fixed
+  dispersion now get the chi-square test; gaussian, Gamma and quasi
+  families keep the F test.
+
+- **[`f_model_compare()`](https://delde001.github.io/rfriend/reference/f_model_compare.md)
+  compares mixed models on ML, not REML.** Models fitted with REML (the
+  [`lme4::lmer()`](https://rdrr.io/pkg/lme4/man/lmer.html) default, and
+  the models stored by
+  [`f_lmer()`](https://delde001.github.io/rfriend/reference/f_lmer.md))
+  are refitted with ML before AIC, BIC and the log-likelihood are
+  computed, with a message. Before, the REML criteria were reported,
+  which are not comparable between models with different fixed effects.
+  When [`anova()`](https://rdrr.io/r/stats/anova.html) refuses two mixed
+  models because their calls hold different data objects (as for models
+  stored by
+  [`f_lmer()`](https://delde001.github.io/rfriend/reference/f_lmer.md)),
+  the likelihood-ratio test is computed directly instead of failing.
+
+- **[`f_glm()`](https://delde001.github.io/rfriend/reference/f_glm.md)
+  with an intercept-only model (`y ~ 1`)** stopped with “‘dim’ cannot be
+  of length 0”. It now fits the model and skips the post hoc step, which
+  has nothing to compare.
+
+- [`f_summary()`](https://delde001.github.io/rfriend/reference/f_summary.md)
+  reported far too large skewness and kurtosis values (about 58 times
+  too large for 60 observations), so even perfectly symmetric data
+  looked strongly skewed. The values are now the standard sample
+  skewness and excess kurtosis (the same as SPSS and SAS report), and
+  missing values are no longer counted.
+
+- [`f_wilcox_test()`](https://delde001.github.io/rfriend/reference/f_wilcox_test.md)
+  failed when `subset` referred to a column of the data,
+  e.g. `subset = week == 6` gave “object ‘week’ not found”. It now
+  works.
+
+- [`print()`](https://rdrr.io/r/base/print.html) of an
+  [`f_lmer()`](https://delde001.github.io/rfriend/reference/f_lmer.md)
+  result showed the same footer line under every post hoc table, with
+  the wrong numbers for most of them (e.g. “3 estimates / 3 tests” under
+  a factor with 4 levels). Each table now shows its own numbers. The
+  “Interpret with caution” note for a factor that is part of a
+  significant interaction is now also shown in the console, not only in
+  the report.
+
+- [`print()`](https://rdrr.io/r/base/print.html) of an
+  [`f_aov()`](https://delde001.github.io/rfriend/reference/f_aov.md)
+  result with a transformed response showed the ANOVA table of the
+  *untransformed* response under the heading “TRANSFORMED”. It now shows
+  the transformed table.
+
+- [`f_aov()`](https://delde001.github.io/rfriend/reference/f_aov.md)
+  with an `Error()` term (repeated-measures ANOVA written as
+  `y ~ time + Error(subject/time)`) is not supported; it now says so and
+  shows the equivalent
+  [`f_lmer()`](https://delde001.github.io/rfriend/reference/f_lmer.md)
+  call, instead of skipping the analysis with a misleading message.
+
+- [`f_model_compare()`](https://delde001.github.io/rfriend/reference/f_model_compare.md)
+  on models fitted with an `Error()` term failed with an unclear
+  internal error after its warning. It now stops with a clear message
+  that suggests a mixed model instead.
+
+- [`f_stat_wizard()`](https://delde001.github.io/rfriend/reference/f_stat_wizard.md)
+  suggested chi-square code that did not run. It now suggests
+  `f_chisq_test(table(data$x, data$y))`. It also no longer suggests an
+  `f_aov(... + Error())` call.
+
+- [`f_chisq_test()`](https://delde001.github.io/rfriend/reference/f_chisq_test.md)
+  showed the second variable as `y` in its output instead of its real
+  name, and its printout ended without a line break.
+
+- The notes under the letters tables of
+  [`f_kruskal_test()`](https://delde001.github.io/rfriend/reference/f_kruskal_test.md)
+  and
+  [`f_friedman()`](https://delde001.github.io/rfriend/reference/f_friedman.md)
+  were missing a bracket and a space (“(alpha = 0.050.Groups …”).
+
+- The help page of
+  [`f_lmer()`](https://delde001.github.io/rfriend/reference/f_lmer.md)
+  said the post hoc only runs when a term is significant. In fact every
+  factor is shown, with `ns` when it is not significant; the help page
+  now says so.
+
+- `f_summary(..., digits = NULL)` did not switch rounding off, although
+  the help page says it does: it printed 2 decimals, the same as the
+  default. It now prints the unrounded values. Likewise,
+  `allow_integer_decimal_mix = TRUE` given to
+  [`f_summary()`](https://delde001.github.io/rfriend/reference/f_summary.md)
+  had no effect on the printed table (only on the Excel export); it now
+  does. The default `digits` is now 2 in the function itself as well, as
+  the help page always said, so default output does not change. The
+  returned values were never rounded and still are not.
+
+- After a transformation was tried and not kept,
+  [`print()`](https://rdrr.io/r/base/print.html) of an
+  [`f_aov()`](https://delde001.github.io/rfriend/reference/f_aov.md)
+  result still advised “ENABLE the transformation option” under the
+  residual warnings, although the transformation was already on. It now
+  says the transformation was tried but not kept, as the report does,
+  and only suggests `transformation = TRUE` when you switched it off.
+
 ## rfriend 3.2.0 (2026-07-04)
 
 CRAN release: 2026-07-06

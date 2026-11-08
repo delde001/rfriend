@@ -18,8 +18,8 @@ generated output can be in various formats ('Word', 'pdf', 'Excel').
 f_aov(
   formula,
   data = NULL,
-  norm_plots = TRUE,
-  interaction_plots = TRUE,
+  diagnostic_plots = TRUE,
+  effect_plots = TRUE,
   contrast_plots = FALSE,
   ANCOVA = FALSE,
   transformation = TRUE,
@@ -27,6 +27,8 @@ f_aov(
   force_aov = FALSE,
   alpha = 0.05,
   adjust = "sidak",
+  post_hoc = NULL,
+  by = NULL,
   anova_type = 2,
   intro_text = TRUE,
   close_generated_files = FALSE,
@@ -34,6 +36,8 @@ f_aov(
   output_type = "default",
   save_as = NULL,
   save_in_wdir = FALSE,
+  norm_plots = lifecycle::deprecated(),
+  interaction_plots = lifecycle::deprecated(),
   ...
 )
 ```
@@ -52,12 +56,12 @@ f_aov(
 
   A data frame containing the variables in the model.
 
-- norm_plots:
+- diagnostic_plots:
 
   Logical. If `TRUE`, diagnostic residual plots are included in the
   output files. Default is `TRUE`.
 
-- interaction_plots:
+- effect_plots:
 
   Logical. If `TRUE`, estimated means / interaction plots are included
   in the output files after the post hoc table. Default is `TRUE`.
@@ -96,7 +100,13 @@ f_aov(
   applies
   [`f_bestNormalize()`](https://delde001.github.io/rfriend/reference/f_bestNormalize.md)
   transformation. If `FALSE` no transformation will be applied. Default
-  is `TRUE`.
+  is `TRUE`. A transformation is kept only when it improves the residual
+  check that triggered it: normality (Shapiro-Wilk, or Anderson-Darling
+  when Shapiro-Wilk is unavailable) or, when only the variance check
+  failed, equal variance (Levene's test). Otherwise the untransformed
+  analysis is reported, the report says so, and the attempt is recorded
+  in `transformation_rejected`. Responses named in
+  `force_transformation` are always transformed.
 
 - force_transformation:
 
@@ -106,12 +116,18 @@ f_aov(
 
 - force_aov:
 
-  Logical. If `TRUE`, runs the ANOVA even when at least one cell has \\n
-  = 1\\ (saturated model). By default (`FALSE`), such responses are
-  skipped with a warning because F-statistics and p-values are undefined
-  for saturated models. Set to `TRUE` only for diagnostic purposes –
-  results should **not** be reported or interpreted as valid. Default is
-  `FALSE`.
+  Logical. Default `FALSE`. A response is skipped (with a message) when
+  its model is saturated: zero residual degrees of freedom, e.g. a fully
+  crossed design with \\n = 1\\ in every cell, where no F-test exists.
+  Saturation is judged from the rank of the model matrix, so additive
+  designs with one observation per cell, such as a randomised complete
+  block design (`y ~ block + treatment`), are analysed normally. Since
+  rfriend 3.2.1, `force_aov = TRUE` on a saturated model stops with an
+  explanation instead of fitting it, because the F-tests cannot be
+  computed. (Before 3.2.1 the skip also fired for any cell with \\n =
+  1\\.) `Error()` terms are not supported; use
+  [`f_lmer`](https://delde001.github.io/rfriend/reference/f_lmer.md)
+  with random effects instead.
 
 - alpha:
 
@@ -148,6 +164,45 @@ f_aov(
       of false positives among significant results.
 
   Default is `"sidak"`.
+
+- post_hoc:
+
+  Which post hoc tables to build. `NULL` or `TRUE` (default): one table
+  per term, see Details, "Which post hoc tables you get". `FALSE`: no
+  post hoc. A character vector of model terms: only those tables, e.g.
+  `post_hoc = "treatment"` (the marginal means of one factor, averaged
+  over the others), `post_hoc = c("treatment", "week")`, or
+  `post_hoc = "treatment:week"` (the cell means of that interaction,
+  every combination compared). A requested term that is not significant
+  is still tabulated, with letters shown as `"ns"`. Misspelled or
+  unknown names stop with a "did you mean" error. The same syntax is
+  used by
+  [`f_lmer`](https://delde001.github.io/rfriend/reference/f_lmer.md).
+
+  **Leaving blocks out of the post hoc.** A block belongs in the model
+  because it removes known variation (soil, bench, day) from the error
+  term, which makes the treatment comparison more precise. Comparing the
+  blocks with each other, however, is not a research question, and block
+  letters invite over-interpretation. So keep the block in the formula
+  and name only the factors you study in `post_hoc`:
+  `f_aov(y ~ block + treatment, data, post_hoc = "treatment")`. The
+  ANOVA table still reports the block effect. With five or more blocks
+  that are a random sample of possible blocks, consider a mixed model
+  instead: `f_lmer(y ~ treatment + (1 | block))`.
+
+- by:
+
+  `NULL` (default) or the name of one categorical predictor, used
+  together with `post_hoc` to get simple effects:
+  `post_hoc = "treatment", by = "week"` answers "which treatments differ
+  within each week?" with `emmeans(model, ~ treatment | week)`. Letters
+  and the p-value adjustment are computed separately within each level
+  of `by`. This makes fewer comparisons than the full cell-means table
+  (for 4 treatments x 3 weeks: 3 x 6 = 18 instead of 66), so each
+  comparison has more power. The table is stored as
+  `out$y$post_hoc[["treatment | week"]]`. `by` requires `post_hoc`, must
+  not also be named in `post_hoc`, and cannot be combined with an
+  interaction term (`"a:b"`) in `post_hoc`.
 
 - anova_type:
 
@@ -237,6 +292,16 @@ f_aov(
   If `save_as` location is specified `save_in_wdir` is overwritten by
   `save_as`.
 
+- norm_plots:
+
+  **Deprecated** in 3.2.1. Use `diagnostic_plots` instead. If supplied,
+  its value is passed to `diagnostic_plots` with a warning.
+
+- interaction_plots:
+
+  **Deprecated** in 3.2.1. Use `effect_plots` instead. If supplied, its
+  value is passed to `effect_plots` with a warning.
+
 - ...:
 
   Additional arguments forwarded to
@@ -258,9 +323,26 @@ An object of class 'f_aov' containing the fitted model (`aov_test`), the
 **Type II** omnibus ANOVA table from
 [`Anova`](https://rdrr.io/pkg/car/man/Anova.html) (`aov_summary`),
 normality and homogeneity diagnostics, optional transformation results,
-and the `emmeans` post hoc tests. Using the option `output_type`, it can
-also generate output as R Markdown, 'Word', 'pdf', or 'Excel' files.
-Includes `print` and `plot` methods for 'f_aov' objects.
+and the `emmeans` post hoc tests, one table per term in `out$y$post_hoc`
+(see Details, "Which post hoc tables you get"). The elements
+`post_hoc_summary_table`, `summary_table` and `cld_text` are
+**deprecated** and will be removed in the next release: they now hold
+the cell-means table when a significant interaction is tabulated,
+otherwise the first table; use `post_hoc` instead.
+`Response_Transformed`: `TRUE` when the response was transformed
+(Box-Cox or bestNormalize) because the residuals were not normal (or,
+alone, had unequal variances) and the transformation was kept (see
+`transformation`). `aov_summary`: ANOVA table of the untransformed
+response. `transformed_aov_summary`: ANOVA table of the transformed
+response, or `NULL` when no transformation was applied. The printed and
+reported result is `transformed_aov_summary` when `Response_Transformed`
+is `TRUE`, otherwise `aov_summary`. To pick it in code:
+`tab <- if (out$y$Response_Transformed) out$y$transformed_aov_summary else out$y$aov_summary`.
+When a transformation was tried but not kept, `transformation_rejected`
+records the method, the reason and the p-values before and after. Using
+the option `output_type`, it can also generate output as R Markdown,
+'Word', 'pdf', or 'Excel' files. Includes `print` and `plot` methods for
+'f_aov' objects.
 
 ## Details
 
@@ -287,11 +369,34 @@ The function performs the following steps:
 - If residuals are not normal and `transformation = TRUE` apply a data
   transformation.
 
-- If significant differences are found in ANOVA, proceed with post hoc
-  tests using estimated marginal means from `emmeans()` and Sidak
-  adjustment (or another option of `adjust =`.
+- Post hoc tests with estimated marginal means from `emmeans()`, one
+  table per term, with Sidak adjustment (or another option of
+  `adjust =`) within each table.
 
-**Effect and interaction plots.** When `interaction_plots = TRUE`, an
+**Which post hoc tables you get.** With the default `post_hoc = NULL`,
+each term is handled on its own: every significant interaction of
+categorical factors gets one cell-means table (all combinations
+compared); every categorical main effect gets its own marginal-means
+table (`emmeans(model, ~ factor)`), with letters `"ns"` when the term is
+not significant and an "Interpret with caution" note when the factor
+takes part in a significant interaction; numeric covariates (ANCOVA) get
+no table, their slope is in the ANOVA table. The `adjust` method is
+applied within each table, and each table has its own footer with its
+own number of estimates and tests. Marginal means are equal-weighted
+estimated marginal means: every level of the other factors counts
+equally, so in unbalanced designs they can differ from the raw group
+means. All tables are stored in `out$y$post_hoc[[term]]` as a list with
+`emmeans`, `pairs`, `cld` (the letters), `cld_text` (the footer) and
+`caution`, the same structure as
+[`f_lmer`](https://delde001.github.io/rfriend/reference/f_lmer.md). When
+the response was transformed, estimates and CIs are back-transformed per
+table (medians on the original scale) and the pairwise contrasts stay on
+the transformed scale. Effect plots take their letters from the factor's
+own table; a plot that averages over a factor in a significant
+interaction shows no letters and says why. Use `post_hoc` and `by` to
+choose the tables yourself.
+
+**Effect and interaction plots.** When `effect_plots = TRUE`, an
 estimated marginal means plot (estimate \\\pm\\ 95% CI, with jittered
 raw data and compact-letter-display labels) is added after the post hoc
 table for each categorical predictor. For a significant categorical
@@ -333,8 +438,8 @@ emmeans values that correspond to the actual model. The \*"ns"\* labels
 signal that pairwise differences should not be interpreted.
 
 This function requires
-\[Pandoc\](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3
-or higher), a universal document converter.
+\[Pandoc\](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or
+higher), a universal document converter.
 
 - **Windows:** Install Pandoc and ensure the installation folder.  
   (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your
@@ -406,7 +511,7 @@ f_aov_out <- f_aov(Sepal.Width + Sepal.Length ~ Species,
                    # Do bestNormalize transformation for non-normal residual (Default is boxcox)
                    transformation = "bestnormalize"
                    )
-#> Saving output in: /tmp/RtmplsKqN3/iris_aov_output.docx
+#> Saving output in: /tmp/RtmplP7rcW/iris_aov_output.docx
 
 # Print output to the console.
 print(f_aov_out)
@@ -418,7 +523,7 @@ print(f_aov_out)
 #> 
 #>  aov call:  Sepal.Width ~ Species 
 #> 
-#> Type II ANOVA Table (car::Anova):
+#> Type II ANOVA on Sepal.Width (untransformed) (car::Anova):
 #> Anova Table (Type II tests)
 #> 
 #> Response: Sepal.Width
@@ -429,11 +534,19 @@ print(f_aov_out)
 #> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 #> 
 #> --- Post hoc Comparisons of: Sepal.Width ---
-#> _________________________________________
+#> 
+#> * Species (marginal means) *
+#> Letters are compared within this table only.
 #>     Species emmean..        SE lower.CL upper.CL Letter  n
 #>      setosa    3.428 0.0480391 3.333064 3.522936      a 50
 #>   virginica    2.974 0.0480391 2.879064 3.068936      b 50
 #>  versicolor    2.770 0.0480391 2.675064 2.864936      c 50
+#> Confidence level used: 0.95  
+#> Significance level used: α = 0.05  
+#> P-value and CI adjustment: sidak method for 3 estimates / 3 tests.  
+#> 
+#> *Note: Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different. Sharing a letter indicates insufficient evidence to claim a difference; it does not prove they are identical.*
+#> 
 #> 
 #>    
 #> ==========================================================
@@ -442,22 +555,30 @@ print(f_aov_out)
 #> 
 #>  aov call:  Sepal.Length ~ Species 
 #> 
-#> TRANSFORMED Type II ANOVA Table (car::Anova):
+#> Type II ANOVA on bestNormalize (Quantile Normalization (ORQ)) transformed Sepal.Length (car::Anova):
 #> Anova Table (Type II tests)
 #> 
 #> Response: Sepal.Length
 #>           Sum Sq  Df F value    Pr(>F)    
-#> Species   63.212   2  119.26 < 2.2e-16 ***
-#> Residuals 38.956 147                      
+#> Species   88.311   2  110.02 < 2.2e-16 ***
+#> Residuals 58.995 147                      
 #> ---
 #> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 #> 
 #> --- BACK TRANSFORMED Post hoc Comparisons of: Sepal.Length ---
+#> 
+#> * Species (marginal means) *
+#> Letters are compared within this table only.
 #>     Species median (BT) lower.CL upper.CL Letter  n
 #>   virginica    6.593552 6.422851 6.726200      a 50
 #>  versicolor    5.944039 5.752349 6.135501      b 50
 #>      setosa    4.961446 4.881046 5.040758      c 50
-#> ___________________________
+#> Confidence level used: 0.95  
+#> Significance level used: α = 0.05  
+#> P-value and CI adjustment: sidak method for 3 estimates / 3 tests.  
+#> 
+#> *Note: Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different. Sharing a letter indicates insufficient evidence to claim a difference; it does not prove they are identical.*
+#> 
 #> 
 #> Note: 'median (BT)' = back-transformed estimated marginal mean. Back-transforming a mean from a transformed scale returns the MEDIAN on the original scale, not the arithmetic mean. Report these as back-transformed medians. CIs are valid; SE is omitted (asymmetric on original scale).
 #> 
@@ -471,6 +592,107 @@ plot(f_aov_out)
 
 
 
+
+# Randomised complete block design: the block stays in the model, but
+# only the treatment is compared in the post hoc.
+wk6 <- subset(plant_trial, time_weeks == 6)
+f_aov(height_cm ~ block + treatment, data = wk6, post_hoc = "treatment")
+#> 
+#>    
+#> ===========================================================
+#>    ANOVA of response variable:  height_cm 
+#> ===========================================================
+#> 
+#>  aov call:  height_cm ~ block + treatment 
+#> 
+#> Type II ANOVA on height_cm (untransformed) (car::Anova):
+#> Anova Table (Type II tests)
+#> 
+#> Response: height_cm
+#>            Sum Sq Df F value    Pr(>F)    
+#> block      152.88  4  3.2856   0.04889 *  
+#> treatment 1556.87  3 44.6136 8.774e-07 ***
+#> Residuals  139.59 12                      
+#> ---
+#> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+#> Note: Box-Cox did not improve the normality of the residuals (Shapiro-Wilk p = 0.0375 before, 0.0252 after). The untransformed analysis is reported.
+#> 
+#> --- Post hoc Comparisons of: height_cm ---
+#> 
+#> * treatment (marginal means) *
+#> Letters are compared within this table only.
+#>  treatment emmean..      SE lower.CL upper.CL Letter n
+#>     high_N    54.56 1.52527 51.23672 57.88328      a 5
+#>      low_N    47.06 1.52527 43.73672 50.38328      b 5
+#>    control    43.04 1.52527 39.71672 46.36328      b 5
+#>    drought    30.22 1.52527 26.89672 33.54328      c 5
+#> Confidence level used: 0.95  
+#> Significance level used: α = 0.05  
+#> P-value and CI adjustment: sidak method for 4 estimates / 6 tests.  
+#> 
+#> *Note: Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different. Sharing a letter indicates insufficient evidence to claim a difference; it does not prove they are identical.*
+#> 
+#> Warning: 
+#> Note: Minimum cell size = 1. Levene's Test has very low power with such small groups; interpret its result with caution.  
+#> Warning:   
+#> Based on the Shapiro-Wilk Test (0.0375 ≤ 0.05)
+#>  the residuals are **NOT** normally distributed. 
+#> ANOVA results can be misleading. 
+#> A transformation was tried but not kept (see above); resort to other statistical tests.  
+#> 
+#>    
+
+# Simple effects: which treatments differ within each week?
+# illustration only: plants are measured repeatedly, see f_lmer()
+pt <- plant_trial
+pt$week <- factor(pt$time_weeks)
+f_aov(height_cm ~ treatment * week, data = pt,
+      post_hoc = "treatment", by = "week")
+#> 
+#>    
+#> ===========================================================
+#>    ANOVA of response variable:  height_cm 
+#> ===========================================================
+#> 
+#>  aov call:  height_cm ~ treatment * week 
+#> 
+#> Type II ANOVA on height_cm (untransformed) (car::Anova):
+#> Anova Table (Type II tests)
+#> 
+#> Response: height_cm
+#>                 Sum Sq Df F value    Pr(>F)    
+#> treatment      2965.34  3 65.6474 < 2.2e-16 ***
+#> week           2215.89  2 73.5838 2.399e-15 ***
+#> treatment:week  169.52  6  1.8764    0.1043    
+#> Residuals       722.73 48                      
+#> ---
+#> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+#> 
+#> --- Post hoc Comparisons of: height_cm ---
+#> 
+#> * treatment | week (simple effects) *
+#> Letters are compared within this table only, separately for each level of week.
+#>  week treatment emmean..       SE lower.CL upper.CL Letter n
+#>     2    high_N    36.96 1.735334 33.47088 40.44912      a 5
+#>     2     low_N    32.36 1.735334 28.87088 35.84912      a 5
+#>     2   control    24.36 1.735334 20.87088 27.84912      b 5
+#>     2   drought    21.72 1.735334 18.23088 25.20912      b 5
+#>     4    high_N    45.48 1.735334 41.99088 48.96912      a 5
+#>     4     low_N    39.22 1.735334 35.73088 42.70912     ab 5
+#>     4   control    35.10 1.735334 31.61088 38.58912      b 5
+#>     4   drought    27.72 1.735334 24.23088 31.20912      c 5
+#>     6    high_N    54.56 1.735334 51.07088 58.04912      a 5
+#>     6     low_N    47.06 1.735334 43.57088 50.54912      b 5
+#>     6   control    43.04 1.735334 39.55088 46.52912      b 5
+#>     6   drought    30.22 1.735334 26.73088 33.70912      c 5
+#> Confidence level used: 0.95  
+#> Significance level used: α = 0.05  
+#> P-value and CI adjustment: sidak method for 4 estimates / 6 tests per level of week.  
+#> 
+#> *Note: Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different. Sharing a letter indicates insufficient evidence to claim a difference; it does not prove they are identical.*
+#> 
+#> 
+#>    
 # }
 
 #To print rmd output set chunck option to results = 'asis' and use cat().
@@ -519,7 +741,7 @@ cat(f_aov_rmd_out$rmd)
 #>           for the model residuals; check Q-Q plot.  
 #>   
 #> Check the plots in the figure below to assess normality.  
-#> ![](/tmp/RtmplsKqN3/file1da23aef658e.png)    
+#> ![](/tmp/RtmplP7rcW/file1c2a167d8d1a.png)    
 #>   
 #> 
 #> ## Observed Descriptives Table of:  Sepal.Width ~ Species   
@@ -542,7 +764,7 @@ cat(f_aov_rmd_out$rmd)
 #> main findings in the *Results* section, you **must** use the Emmeans table below.
 #> 
 #>    
-#> ## ANOVA Summary of  Sepal.Width   
+#> ## ANOVA on Sepal.Width (untransformed)  
 #> &nbsp;
 #>   
 #> 
@@ -562,33 +784,17 @@ cat(f_aov_rmd_out$rmd)
 #> &nbsp;
 #>   
 #>   
-#> ## Post Hoc Test on Estimated Marginal Means of Sepal.Width  
+#> ## Post Hoc Tests of Sepal.Width  
 #> 
-#>         
-#> Estimated Marginal Means (emmeans) are model-based mean values of Sepal.Width for each level of the significant predictor(s), averaged over all other
-#>           factors in the model. Unlike raw data averages (see: Observed Descriptives Table),
-#>           emmeans correct for unbalanced designs and reflect the statistical
-#>           model used for pairwise comparisons (significance testing **letters**). SE values are identical for groups with equal
-#>           sample sizes and differ only to reflect variation in group size ($n$). The $n$ column corresponds to the raw observed data of Sepal.Width. If $n$ is blank, there is no observed data and
-#>           emmeans estimates marginal means from the model.
-#>         
-#>   
-#> &nbsp;
-#>   
+#> Estimated marginal means (emmeans) are model-based means of Sepal.Width. Each table below answers one question and has its own letters, adjustment and footer: a **cell-means** table compares every combination of an interaction, a **marginal-means** table compares the levels of one factor averaged over the others, and a **simple-effects** table compares one factor within each level of another. Marginal means are equal-weighted emmeans: every level of the other factors counts equally, so in unbalanced designs they can differ from the raw group means in the Observed Descriptives Table. The $n$ column is the raw observed count.  
 #> 
-#>         
-#> *Reporting Tips:* For main results showing significant differences, prioritize
-#>           the Emmeans table (preferably with 95% CIs).
-#>           Figures should include all individual raw data points to show the
-#>           Model Fit (Emmeans) relative to the Observed Spread (Raw Data).
-#>           
-#>    
-#> &nbsp;   
-#>    
-#> &nbsp;  
-#>    
+#> *Reporting Tips:* Report the table that matches your question. When an interaction is significant, report its cell means (with 95% CIs) and describe how the pattern changes; main-effect letters average over that pattern.  
 #> 
-#> **Post Hoc Marginal Means Table** of aov call: Sepal.Width ~ Species  
+#> 
+#> ### Post hoc: Species (marginal means)  
+#> 
+#> *Letters are compared within this table only.*  
+#> 
 #> 
 #> -----------------------------------------------------------------
 #> Species      emmean     SE      lower     upper     Letter   n   
@@ -601,14 +807,15 @@ cat(f_aov_rmd_out$rmd)
 #> versicolor   2.770      0.048   2.675     2.865     c        50  
 #> -----------------------------------------------------------------
 #> 
-#> Degrees of freedom: 147  
 #> Confidence level used: 0.95  
+#> Significance level used: α = 0.05  
+#> P-value and CI adjustment: sidak method for 3 estimates / 3 tests.  
 #> 
-#> **Note:** Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different. Sharing a letter indicates insufficient evidence to claim a difference; it does not prove the groups are identical.
-#>         
+#> *Note: Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different. Sharing a letter indicates insufficient evidence to claim a difference; it does not prove they are identical.*
+#> 
 #> 
 #> ## Estimated Means Plot of: Sepal.Width  (Species)  
-#> ![](/tmp/RtmplsKqN3/file1da23041b948.png)    
+#> ![](/tmp/RtmplP7rcW/file1c2a3fce38a7.png)    
 #>   
 #> *Points are (jittered) raw data; estimates are model estimated marginal means with 95% CI. Groups sharing a letter are not significantly different (α = 0.05); groups with different letters are significantly different. Sharing a letter indicates insufficient evidence of a difference, not proof that the groups are identical.*   
 #>   

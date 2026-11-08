@@ -13,19 +13,22 @@ can be in various formats ('Word', 'pdf', 'Excel').
 f_lm(
   formula,
   data = NULL,
-  norm_plots = TRUE,
+  diagnostic_plots = TRUE,
   effect_plots = TRUE,
   contrast_plots = FALSE,
   transformation = TRUE,
   force_transformation = NULL,
   alpha = 0.05,
   adjust = "sidak",
+  post_hoc = NULL,
+  by = NULL,
   intro_text = TRUE,
   close_generated_files = FALSE,
   open_generated_files = interactive(),
   output_type = "default",
   save_as = NULL,
   save_in_wdir = FALSE,
+  norm_plots = lifecycle::deprecated(),
   ...
 )
 ```
@@ -43,7 +46,7 @@ f_lm(
 
   A data frame containing the variables in the model.
 
-- norm_plots:
+- diagnostic_plots:
 
   Logical. If `TRUE`, diagnostic residual plots are included in the
   output files. Default is `TRUE`.
@@ -76,7 +79,13 @@ f_lm(
   applies
   [`f_bestNormalize()`](https://delde001.github.io/rfriend/reference/f_bestNormalize.md)
   transformation. If `FALSE` no transformation will be applied. Default
-  is `TRUE`.
+  is `TRUE`. A transformation is kept only when it improves the residual
+  check that triggered it: normality (Shapiro-Wilk, or Anderson-Darling
+  when Shapiro-Wilk is unavailable) or, when only the variance check
+  failed, equal variance (Breusch-Pagan test). Otherwise the
+  untransformed analysis is reported, the report says so, and the
+  attempt is recorded in `transformation_rejected`. Responses named in
+  `force_transformation` are always transformed.
 
 - force_transformation:
 
@@ -115,6 +124,30 @@ f_lm(
   :   False Discovery Rate adjustment.
 
   Default is `"sidak"`.
+
+- post_hoc:
+
+  Which post hoc tables to build; the same syntax and rules as
+  [`f_aov`](https://delde001.github.io/rfriend/reference/f_aov.md).
+  `NULL` or `TRUE` (default): a cell-means table for each significant
+  interaction of categorical predictors and a marginal-means table for
+  each categorical main effect (letters `"ns"` when the term is not
+  significant, an "Interpret with caution" note when the factor takes
+  part in a significant interaction); numeric predictors get no table,
+  their slope is in the coefficient table. `FALSE`: no post hoc. A
+  character vector of terms: only those tables, e.g.
+  `post_hoc = "treatment"` (leave blocks out of the comparisons) or
+  `post_hoc = "treatment:week"`. Unknown names stop with a "did you
+  mean" error. Letters and the `adjust` method apply within each table,
+  and each table has its own footer.
+
+- by:
+
+  `NULL` (default) or one categorical predictor, used with `post_hoc`
+  for simple effects: `post_hoc = "treatment", by = "week"` compares the
+  treatments within each week (`emmeans(model, ~ treatment | week)`),
+  stored as `out$y$post_hoc[["treatment | week"]]`. The rules are those
+  of [`f_aov`](https://delde001.github.io/rfriend/reference/f_aov.md).
 
 - intro_text:
 
@@ -166,6 +199,11 @@ f_lm(
   is `FALSE`. If `save_as` location is specified `save_in_wdir` is
   overwritten by `save_as`.
 
+- norm_plots:
+
+  **Deprecated** in 3.2.1. Use `diagnostic_plots` instead. If supplied,
+  its value is passed to `diagnostic_plots` with a warning.
+
 - ...:
 
   Additional arguments forwarded to
@@ -184,7 +222,31 @@ An object of class 'f_lm' containing results from
 transformations, coefficient tables, Type II ANOVA, and post hoc tests.
 Using the option "output_type", it can also generate output in the form
 of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and
-plot methods for 'f_lm' objects.
+plot methods for 'f_lm' objects. Post hoc tables:
+`out$y$post_hoc[[term]]`, each a list with `emmeans`, `pairs`, `cld`
+(the letters), `cld_text` (the footer) and `caution`, the same structure
+as [`f_aov`](https://delde001.github.io/rfriend/reference/f_aov.md) and
+[`f_lmer`](https://delde001.github.io/rfriend/reference/f_lmer.md). The
+elements `post_hoc_summary_table`, `emmeans_table` and `cld_text` are
+**deprecated** and will be removed in the next release: they hold the
+cell-means table when a significant interaction is tabulated, otherwise
+the first table. (Before 3.2.1 this single table compared every
+combination of all categorical predictors, also in additive models.)
+`Response_Transformed`: `TRUE` when the response was transformed
+(Box-Cox or bestNormalize) because the residuals were not normal (or,
+alone, had unequal variances) and the transformation was kept (see
+`transformation`). `anova`: Type II ANOVA table of the untransformed
+response. `transformed_anova`: Type II ANOVA table of the transformed
+response, or `NULL` when no transformation was applied. The printed and
+reported result is `transformed_anova` when `Response_Transformed` is
+`TRUE`, otherwise `anova`. To pick it in code:
+`tab <- if (out$y$Response_Transformed) out$y$transformed_anova else out$y$anova`.
+When a transformation was tried but not kept, `transformation_rejected`
+records the method, the reason and the p-values before and after. The
+same convention holds for `summary` / `transformed_summary` and
+`coefficients` / `transformed_coefficients`. Since rfriend 3.2.1 the
+plain names always hold the untransformed fit (in 3.2.0 they held the
+transformed fit when a transformation was applied).
 
 ## Details
 
@@ -282,8 +344,8 @@ Outputs can be generated in multiple formats ("pdf", "word", "excel" and
 it is advised to use it in a chunk with {r, echo=FALSE, results='asis'}.
 
 This function requires
-\[Pandoc\](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3
-or higher), a universal document converter.
+\[Pandoc\](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or
+higher), a universal document converter.
 
 ## Multiple Testing Across Response Variables
 
@@ -315,14 +377,14 @@ print(f_lm_out)
 #> 
 #>  lm call:  Sepal.Length ~ Petal.Length 
 #> 
-#> Coefficients:
+#> Coefficients of the linear regression on Sepal.Length (untransformed):
 #>               Estimate Std. Error  t value      Pr(>|t|)
 #> (Intercept)  4.3066034 0.07838896 54.93890 2.426713e-100
 #> Petal.Length 0.4089223 0.01889134 21.64602  1.038667e-47
 #> 
 #> Model fit: R-squared = 0.76  Adjusted R-squared = 0.7583 
 #> 
-#> --- Type II Analysis of Variance ---
+#> --- Analysis of Variance on Sepal.Length (untransformed) ---
 #>                Sum Sq  Df  F value       Pr(>F)
 #> Petal.Length 77.64330   1 468.5502 1.038667e-47
 #> Residuals    24.52503 148       NA           NA
@@ -336,12 +398,12 @@ plot(f_lm_out)
 # Mixed continuous + categorical predictors (ANCOVA-style multiple regression).
 iris$Species <- factor(iris$Species)
 f_lm(Sepal.Length ~ Petal.Length + Species, data = iris, output_type = "word")
-#> Saving output in: /tmp/RtmplsKqN3/iris_lm_output.docx
+#> Saving output in: /tmp/RtmplP7rcW/iris_lm_output.docx
 
 # Two responses analysed in sequence, captured in one output file.
 f_lm(Sepal.Width + Sepal.Length ~ Petal.Length * Species,
            effect_plots = FALSE,
-           norm_plots = FALSE,
+           diagnostic_plots = FALSE,
            data = iris)
 #> 
 #>    
@@ -351,7 +413,7 @@ f_lm(Sepal.Width + Sepal.Length ~ Petal.Length * Species,
 #> 
 #>  lm call:  Sepal.Width ~ Petal.Length * Species 
 #> 
-#> Coefficients:
+#> Coefficients of the linear regression on Box-Cox transformed Sepal.Width (lambda = 0.281):
 #>                                   Estimate Std. Error    t value     Pr(>|t|)
 #> (Intercept)                     1.21787651  0.1710640  7.1194206 4.743766e-11
 #> Petal.Length                    0.16966508  0.1162062  1.4600351 1.464587e-01
@@ -362,7 +424,7 @@ f_lm(Sepal.Width + Sepal.Length ~ Petal.Length * Species,
 #> 
 #> Model fit: R-squared = 0.4929  Adjusted R-squared = 0.4753 
 #> 
-#> --- Type II Analysis of Variance ---
+#> --- Type II Analysis of Variance on Box-Cox transformed Sepal.Width (lambda = 0.281) ---
 #>                          Sum Sq  Df   F value       Pr(>F)
 #> Petal.Length         0.53026979   1 26.571920 8.234640e-07
 #> Species              1.78931406   2 44.831433 7.305351e-16
@@ -370,16 +432,19 @@ f_lm(Sepal.Width + Sepal.Length ~ Petal.Length * Species,
 #> Residuals            2.87366706 144        NA           NA
 #> 
 #> --- Post hoc Comparisons of: Sepal.Width ---
-#> _________________________________________
+#> 
+#> * Species (marginal means) *
+#> Letters are compared within this table only.
 #>     Species median (BT) lower.CL upper.CL Letter  n
 #>      setosa    4.451867 3.088072 6.202695      a 50
 #>   virginica    2.571626 2.314153 2.849079      b 50
 #>  versicolor    2.570753 2.458030 2.687146      b 50
+#> Confidence level used: 0.95  
+#> Significance level used: α = 0.05  
+#> P-value and CI adjustment: sidak method for 3 estimates / 3 tests.  
 #> 
-#>  Confidence level used: 0.95  
+#> *Note: Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different. Sharing a letter indicates insufficient evidence to claim a difference; it does not prove they are identical.*
 #> 
-#> **Note:** Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different.
-#>  
 #> Note: post hoc 'median (BT)' values are back-transformed estimated marginal means (medians on the original scale). Report them as back-transformed medians; rely on the CIs.
 #> Warning:    
 #> Based on the Breusch-Pagan Test (0.0032 ≤ 0.05) the residuals do 
@@ -392,7 +457,7 @@ f_lm(Sepal.Width + Sepal.Length ~ Petal.Length * Species,
 #> 
 #>  lm call:  Sepal.Length ~ Petal.Length * Species 
 #> 
-#> Coefficients:
+#> Coefficients of the linear regression on Sepal.Length (untransformed):
 #>                                  Estimate Std. Error   t value     Pr(>|t|)
 #> (Intercept)                     4.2131682  0.4074209 10.341071 4.331619e-19
 #> Petal.Length                    0.5422926  0.2767667  1.959385 5.199902e-02
@@ -403,7 +468,7 @@ f_lm(Sepal.Width + Sepal.Length ~ Petal.Length * Species,
 #> 
 #> Model fit: R-squared = 0.8405  Adjusted R-squared = 0.8349 
 #> 
-#> --- Type II Analysis of Variance ---
+#> --- Type II Analysis of Variance on Sepal.Length (untransformed) ---
 #>                          Sum Sq  Df    F value       Pr(>F)
 #> Petal.Length         22.2745412   1 196.772993 1.008582e-28
 #> Species               7.8433750   2  34.644134 5.205685e-13
@@ -411,16 +476,19 @@ f_lm(Sepal.Width + Sepal.Length ~ Petal.Length * Species,
 #> Residuals            16.3006817 144         NA           NA
 #> 
 #> --- Post hoc Comparisons of: Sepal.Length ---
-#> _________________________________________
+#> 
+#> * Species (marginal means) *
+#> Letters are compared within this table only.
 #>     Species emmean..         SE lower.CL upper.CL Letter  n
 #>      setosa 6.251104 0.63723520 4.991561 7.510647     ab 50
 #>  versicolor 5.520203 0.07000327 5.381836 5.658570      b 50
 #>   virginica 4.801645 0.16332376 4.478823 5.124467      a 50
+#> Confidence level used: 0.95  
+#> Significance level used: α = 0.05  
+#> P-value and CI adjustment: sidak method for 3 estimates / 3 tests.  
 #> 
-#>  Confidence level used: 0.95  
+#> *Note: Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different. Sharing a letter indicates insufficient evidence to claim a difference; it does not prove they are identical.*
 #> 
-#> **Note:** Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different.
-#>  
 
 # To print rmd output set chunk option to results = 'asis' and use cat().
 f_lm_rmd_out <- f_lm(Sepal.Length ~ Petal.Length, data = iris, output_type = "rmd")
@@ -460,8 +528,8 @@ cat(f_lm_rmd_out$rmd)
 #>           for the model residuals; check Q-Q plot.  
 #>   
 #> Check the plots in the figure below to assess normality and homoscedasticity.  
-#> ![](/tmp/RtmplsKqN3/file1da264c3fbf2.png)    
-#> ## Regression Summary of  Sepal.Length   
+#> ![](/tmp/RtmplP7rcW/file1c2a78451e60.png)    
+#> ## Linear regression on Sepal.Length (untransformed)  
 #> &nbsp;
 #>   
 #> 
@@ -486,12 +554,12 @@ cat(f_lm_rmd_out$rmd)
 #> 
 #> 
 #> ### Coefficient forest plot
-#> ![](/tmp/RtmplsKqN3/file1da248d14f80.png)    
+#> ![](/tmp/RtmplP7rcW/file1c2a9b3f5a1.png)    
 #>   
 #> *Each row is a coefficient (the intercept is omitted) with its 95% confidence interval. The dashed line marks zero: a coefficient at zero has no effect relative to its reference. Points to the right increase the response, points to the left decrease it. A CI that touches or crosses zero means the term is not distinguishable from its reference at α = 0.05; a CI clear of zero is a significant effect.*  
 #>   
 #> *Continuous term (Petal.Length) has no reference level; the estimate is the change per one-unit increase (on the scale stated above), so zero means no association.* 
-#> ## Analysis of Variance of: Sepal.Length  
+#> ## Analysis of Variance on Sepal.Length (untransformed)  
 #> 
 #> The table below tests the significance of the predictor term via an F-test.  With a single predictor this is equivalent to the coefficient t-test above  ($F = t^2$).  
 #> 
@@ -512,13 +580,13 @@ cat(f_lm_rmd_out$rmd)
 #>    
 #> 
 #> ## Regression Plot of: Sepal.Length  (Petal.Length)  
-#> ![](/tmp/RtmplsKqN3/file1da26f3717a4.png)    
+#> ![](/tmp/RtmplP7rcW/file1c2a28d6660b.png)    
 #>   
 #> *Points are (jittered) raw data; estimates and fitted lines are model estimates with 95% CI.*   
 #>   
 #> 
 #> ## Observed vs Fitted Plot of: Sepal.Length  
-#> ![](/tmp/RtmplsKqN3/file1da2572c04a1.png)    
+#> ![](/tmp/RtmplP7rcW/file1c2a325f9a0a.png)    
 #>   
 #> *Points on the dashed 1:1 line are perfectly predicted; scatter around it reflects residual error.*   
 #>   

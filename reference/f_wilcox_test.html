@@ -13,7 +13,7 @@ Additionally, a vector interface similar to stats::wilcox.test() is supported.">
 
     <a class="navbar-brand me-2" href="../index.html">rfriend</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -58,14 +58,16 @@ Additionally, a vector interface similar to stats::wilcox.test() is supported.</
 <span>  conf.level <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  mu <span class="op">=</span> <span class="fl">0</span>,</span>
 <span>  alternative <span class="op">=</span> <span class="st">"two.sided"</span>,</span>
-<span>  norm_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  diagnostic_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  effect_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  alpha <span class="op">=</span> <span class="fl">0.05</span>,</span>
 <span>  intro_text <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  close_generated_files <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  open_generated_files <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  open_generated_files <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/interactive.html" class="external-link">interactive</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  output_type <span class="op">=</span> <span class="st">"default"</span>,</span>
 <span>  save_as <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  save_in_wdir <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  norm_plots <span class="op">=</span> <span class="fu">lifecycle</span><span class="fu">::</span><span class="fu"><a href="https://lifecycle.r-lib.org/reference/deprecated.html" class="external-link">deprecated</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span>
 <span></span>
@@ -77,14 +79,16 @@ Additionally, a vector interface similar to stats::wilcox.test() is supported.</
 <span>  conf.level <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  mu <span class="op">=</span> <span class="fl">0</span>,</span>
 <span>  alternative <span class="op">=</span> <span class="st">"two.sided"</span>,</span>
-<span>  norm_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  diagnostic_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  effect_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  alpha <span class="op">=</span> <span class="fl">0.05</span>,</span>
 <span>  intro_text <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  close_generated_files <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  open_generated_files <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  open_generated_files <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/interactive.html" class="external-link">interactive</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  output_type <span class="op">=</span> <span class="st">"default"</span>,</span>
 <span>  save_as <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  save_in_wdir <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  norm_plots <span class="op">=</span> <span class="fu">lifecycle</span><span class="fu">::</span><span class="fu"><a href="https://lifecycle.r-lib.org/reference/deprecated.html" class="external-link">deprecated</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -108,14 +112,22 @@ expression is evaluated in the data's column scope (e.g.
 <code>subset = cyl == 6</code> works). All responses in a multi-response
 call (<code>y1 + y2 ~ group</code>) are then tested on the identical row
 set. For the default (vector) method, <code>...</code> is currently
-unused.</p></dd>
+unused.
+<code>subset</code> can also pick two groups of a factor with more
+levels (e.g. <code>subset = treatment %in% c("control", "high_N")</code>);
+the check for exactly two groups runs after the subset.</p></dd>
 
 
 <dt id="arg-formula">formula<a class="anchor" aria-label="anchor" href="#arg-formula"></a></dt>
 <dd><p>A formula specifying the model (alternative to using x/y).</p><ul><li><p><strong>Two-sample (Independent/Paired):</strong> <code>response ~ group</code>
         (where group has exactly 2 levels).</p></li>
 <li><p><strong>One-sample:</strong> <code>response ~ 1</code> or <code>response ~ NULL</code>.</p></li>
-</ul><p>More response variables can be added using <code>+</code> (e.g., <code>y1 + y2 ~ group</code>).</p></dd>
+</ul><p>More response variables can be added using <code>+</code> (e.g., <code>y1 + y2 ~ group</code>).
+The response must be numeric or an ordered factor (an ordinal score,
+e.g. <code>factor(score, ordered = TRUE)</code>). An ordered factor is tested
+on the rank codes of its levels (1 = lowest level), which is exact for a
+rank test; a message shows the coding. Other non-numeric responses stop
+with an error.</p></dd>
 
 
 <dt id="arg-data">data<a class="anchor" aria-label="anchor" href="#arg-data"></a></dt>
@@ -157,9 +169,15 @@ location shift (paired/two-sample) under H0. Default is 0.</p></dd>
 <code>"greater"</code>, or <code>"less"</code>.</p></dd>
 
 
-<dt id="arg-norm-plots">norm_plots<a class="anchor" aria-label="anchor" href="#arg-norm-plots"></a></dt>
+<dt id="arg-diagnostic-plots">diagnostic_plots<a class="anchor" aria-label="anchor" href="#arg-diagnostic-plots"></a></dt>
 <dd><p>Logical. If <code>TRUE</code>, descriptive diagnostic plots are
 included in the output. Default is <code>TRUE</code>.</p></dd>
+
+
+<dt id="arg-effect-plots">effect_plots<a class="anchor" aria-label="anchor" href="#arg-effect-plots"></a></dt>
+<dd><p>Logical. If <code>TRUE</code> (default), the main effect
+plot (<code>main_effect_plot</code>) is built, stored and included in the
+output files. With <code>FALSE</code> it is not built.</p></dd>
 
 
 <dt id="arg-alpha">alpha<a class="anchor" aria-label="anchor" href="#arg-alpha"></a></dt>
@@ -206,6 +224,11 @@ Set to <code>TRUE</code> or <code>FALSE</code> to override this behaviour explic
 
 <dt id="arg-save-in-wdir">save_in_wdir<a class="anchor" aria-label="anchor" href="#arg-save-in-wdir"></a></dt>
 <dd><p>Logical. Save in working directory.</p></dd>
+
+
+<dt id="arg-norm-plots">norm_plots<a class="anchor" aria-label="anchor" href="#arg-norm-plots"></a></dt>
+<dd><p><strong>Deprecated</strong> in 3.2.1. Use <code>diagnostic_plots</code> instead. If
+supplied, its value is passed to <code>diagnostic_plots</code> with a warning.</p></dd>
 
 
 <dt id="arg-y">y<a class="anchor" aria-label="anchor" href="#arg-y"></a></dt>

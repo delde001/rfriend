@@ -241,8 +241,8 @@ Note that there is an optional `jitter` option to plot all individual
 data points over the boxplots.
 
 This function requires
-\[Pandoc\](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3
-or higher), a universal document converter.
+\[Pandoc\](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or
+higher), a universal document converter.
 
 **Windows:** Install Pandoc and ensure the installation folder  
 (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your
@@ -282,7 +282,7 @@ f_boxplot(iris,
            fancy_names = new_names,
            output_type = "word"
            )
-#> Saving output in: /tmp/RtmplsKqN3/data_BoxPlot.docx
+#> Saving output in: /tmp/RtmplP7rcW/data_BoxPlot.docx
 
 # Use a formula to plot several response parameters (response 1 + response 2 etc)
 # and generate a rmd output without boxplot_explanation.
@@ -292,21 +292,21 @@ f_boxplot(hp + disp ~ gear*cyl,
            boxplot_explanation = FALSE,
            output_type = "word"
            )
-#> Saving output in: /tmp/RtmplsKqN3/mtcars_BoxPlot.docx
+#> Saving output in: /tmp/RtmplP7rcW/mtcars_BoxPlot.docx
 
 # Pass a bare numeric vector. Its name is used as the y-axis label
 # and as the data_name in the output filename.
 set.seed(1)
 my_vec <- rnorm(50, mean = 10)
 f_boxplot(my_vec, output_type = "png")
-#> PNG files saved in: /tmp/RtmplsKqN3
+#> PNG files saved in: /tmp/RtmplP7rcW
 #>    
 
 # Formula with bare vectors (no data.frame): group hp by cyl.
 hp1  <- mtcars$hp
 cyl1 <- mtcars$cyl
 f_boxplot(hp1 ~ cyl1, output_type = "png")
-#> PNG files saved in: /tmp/RtmplsKqN3
+#> PNG files saved in: /tmp/RtmplP7rcW
 #>    
 
 # Multiple unnamed numeric vectors, base R's boxplot() convention:
@@ -314,7 +314,7 @@ f_boxplot(hp1 ~ cyl1, output_type = "png")
 # original variable name. Use the formula syntax above when you
 # instead want to group one response by a factor.
 f_boxplot(hp1, cyl1, output_type = "png")
-#> PNG files saved in: /tmp/RtmplsKqN3
+#> PNG files saved in: /tmp/RtmplP7rcW
 #>    
 
 # Capture the R Markdown output as a string and render it inline.
@@ -333,28 +333,28 @@ cat(rmd)
 #> #  Boxplots of:  Sepal.Length   
 #> ##  Boxplot of:  Sepal.Length  as function of  Species   
 #>    
-#> ![](/tmp/RtmplsKqN3/file1da250f693ba.png)    
+#> ![](/tmp/RtmplP7rcW/file1c2a62ddf11f.png)    
 #>   
 #>   
 #>   
 #> #  Boxplots of:  Sepal.Width   
 #> ##  Boxplot of:  Sepal.Width  as function of  Species   
 #>    
-#> ![](/tmp/RtmplsKqN3/file1da2422f4da9.png)    
+#> ![](/tmp/RtmplP7rcW/file1c2a6bf10f6a.png)    
 #>   
 #>   
 #>   
 #> #  Boxplots of:  Petal.Length   
 #> ##  Boxplot of:  Petal.Length  as function of  Species   
 #>    
-#> ![](/tmp/RtmplsKqN3/file1da269d7793.png)    
+#> ![](/tmp/RtmplP7rcW/file1c2a5724d498.png)    
 #>   
 #>   
 #>   
 #> #  Boxplots of:  Petal.Width   
 #> ##  Boxplot of:  Petal.Width  as function of  Species   
 #>    
-#> ![](/tmp/RtmplsKqN3/file1da2738e7838.png)    
+#> ![](/tmp/RtmplP7rcW/file1c2a32845ba9.png)    
 #>   
 
 # ...or splice it into a knitr child chunk with results = "asis":

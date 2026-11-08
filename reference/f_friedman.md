@@ -16,7 +16,8 @@ customizable output options.
 f_friedman(
   formula,
   data = NULL,
-  plot = TRUE,
+  diagnostic_plots = TRUE,
+  effect_plots = TRUE,
   alpha = 0.05,
   output_type = "default",
   save_as = NULL,
@@ -25,6 +26,7 @@ f_friedman(
   adjust = "bonferroni",
   close_generated_files = FALSE,
   open_generated_files = interactive(),
+  plot = lifecycle::deprecated(),
   ...
 )
 ```
@@ -41,17 +43,25 @@ f_friedman(
   be tested in sequence using `+` on the left-hand side (e.g.
   `response1 + response2 ~ group | block`). The function iterates
   through the responses, because the Friedman test itself only allows
-  one response at a time.
+  one response at a time. The response must be numeric or an ordered
+  factor (an ordinal score, e.g. `factor(score, ordered = TRUE)`). An
+  ordered factor is tested on the rank codes of its levels (1 = lowest
+  level), which is exact for a rank test; a message shows the coding.
+  Other non-numeric responses stop with an error.
 
 - data:
 
   A `data.frame` containing the variables referenced in the formula.
 
-- plot:
+- diagnostic_plots:
 
-  Logical. If `TRUE`, generates two plots (a within-block trace plot
-  with median trend line, and a boxplot with compact letter display) in
-  the output files. Default is `TRUE`.
+  Logical. If `TRUE` (default), the within-block trace plot with median
+  trend line is included in the output files.
+
+- effect_plots:
+
+  Logical. If `TRUE` (default), the boxplot with the compact letter
+  display of the post hoc test is included in the output files.
 
 - alpha:
 
@@ -122,6 +132,12 @@ f_friedman(
   (e.g. in scripts or automated pipelines). Set to `TRUE` or `FALSE` to
   override this behaviour explicitly.
 
+- plot:
+
+  **Deprecated** in 3.2.1. Use `diagnostic_plots` and `effect_plots`
+  instead. If supplied, its value is passed to `diagnostic_plots` and
+  `effect_plots` with a warning.
+
 - ...:
 
   Additional arguments forwarded to
@@ -163,12 +179,12 @@ containing:
 
   ggplot within-block trace plot with grey spaghetti lines, raw
   group-coloured points, and a black median trend line on top (if
-  `plot = TRUE`).
+  `diagnostic_plots = TRUE`).
 
 - Boxplot:
 
   ggplot boxplot with jittered raw points and compact-letter-display
-  letters from the post hoc test (if `plot = TRUE`).
+  letters from the post hoc test (if `effect_plots = TRUE`).
 
 Using the option `output_type`, it can also generate output in the form
 of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and
@@ -205,8 +221,8 @@ and saved to the working directory, options are `"pdf", "word"` or
 chunk with {r, echo=FALSE, results='asis'}
 
 This function requires
-\[Pandoc\](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3
-or higher), a universal document converter.
+\[Pandoc\](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or
+higher), a universal document converter.
 
 - **Windows:** Install Pandoc and ensure the installation folder  
   (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your
@@ -258,9 +274,10 @@ df_rm <- data.frame(
 output <- f_friedman(
                score ~ condition | subject,
                data = df_rm,
-               plot = FALSE,
+               diagnostic_plots = FALSE,
+               effect_plots = FALSE,
                output_type = "word",
                adjust = "holm"
                )
-#> Saving output in: /tmp/RtmplsKqN3/df_rm_Friedman_output.docx
+#> Saving output in: /tmp/RtmplP7rcW/df_rm_Friedman_output.docx
 ```

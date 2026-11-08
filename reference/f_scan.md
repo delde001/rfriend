@@ -35,6 +35,8 @@ f_scan(
   save_as = NULL,
   save_in_wdir = FALSE,
   digits = NULL,
+  check = TRUE,
+  id_col = NULL,
   ...
 )
 ```
@@ -161,12 +163,40 @@ f_scan(
   Integer. Decimal places for printed tables in 'pdf' and 'Word' output
   files. Default `3`.
 
+- check:
+
+  Logical. If `TRUE` (default), runs a data check before the plots and
+  tables: every value of each text column with its count, with flags for
+  leading or trailing spaces, labels that differ only in case, spaces or
+  underscores, labels written differently from the others, and numbers
+  stored as text; the number of missing values per numeric column;
+  column names with dots from
+  [`read.csv()`](https://rdrr.io/r/utils/read.table.html); and, with
+  `id_col`, the number of rows per ID. A bare data frame call checks
+  every column; a formula call (or `columns =`) checks only the columns
+  it names. The check only reports and never changes the data. It is
+  stored as `attr(result, "data_check")` and printed first: a list of
+  possible problems, then tables of the text and numeric columns, with
+  the four lowest and highest values per numeric column. The flag for
+  labels written differently is a rule of thumb and cannot know which
+  labels your design intended: check those with
+  `f_factors(..., levels = )`.
+
+- id_col:
+
+  Character string or `NULL`. Column that identifies the experimental
+  unit (for example a plant ID). The data check then reports the number
+  of rows per ID and lists IDs with an unusual number of rows. Default
+  `NULL`.
+
 ## Value
 
 A list of class `f_scan` containing plots, the summary table, and the
-outlier table. Using the option "output_type", it can also generate
-output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files.
-Includes print, summary and plot methods for 'f_scan' objects.
+outlier table. With `check = TRUE` the data check is attached as
+`attr(result, "data_check")` (class `f_data_check`). Using the option
+"output_type", it can also generate output in the form of: R Markdown
+code, 'Word', 'pdf', or 'Excel' files. Includes print, summary and plot
+methods for 'f_scan' objects.
 
 ## Details
 
@@ -182,8 +212,8 @@ grouping variables provided:
 - **3 groups:** Adds Facet Grid (Row vs Column).
 
 This function requires
-\[Pandoc\](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3
-or higher), a universal document converter.
+\[Pandoc\](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or
+higher), a universal document converter.
 
 - **Windows:** Install Pandoc and ensure the installation folder.  
   (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your
@@ -205,6 +235,18 @@ or higher), a universal document converter.
 # 1. Non-formula | No groups | Default output (default)
 result <- f_scan(iris, columns = "Sepal.Length")
 print(result)
+#> 
+#> --- Data check ---
+#> This check only reports potential issues;
+#> it does not change the data.
+#> 150 rows; 1 of 5 columns were checked.
+#> 
+#> No problems found.
+#> 
+#> Numeric columns:
+#>   Column        Missing  Lowest 4            Highest 4
+#>   Sepal.Length        0  4.3, 4.4, 4.4, 4.4  7.9, 7.7, 7.7, 7.7
+#> 
 #> 
 #> --- Summary Statistics ---
 #> 
@@ -231,6 +273,19 @@ result <- f_scan(
   group_vars = "cyl",
   output_type = "console"
 )
+#> 
+#> --- Data check ---
+#> This check only reports potential issues;
+#> it does not change the data.
+#> 32 rows; 2 of 11 columns were checked.
+#> 
+#> No problems found.
+#> 
+#> Numeric columns:
+#>   Column  Missing  Lowest 4                Highest 4
+#>   mpg           0  10.4, 10.4, 13.3, 14.3  33.9, 32.4, 30.4, 30.4
+#>   cyl           0  4, 4, 4, 4              8, 8, 8, 8
+#> 
 #> 
 #> --- Summary Statistics ---
 #> 
@@ -277,7 +332,7 @@ result <- f_scan(
    output_type = "excel",
    save_as    = "mtcars_scan"
  )
-#> Saving output in: /tmp/RtmplsKqN3/mtcars_scan.xlsx
+#> Saving output in: /tmp/RtmplP7rcW/mtcars_scan.xlsx
 
 # 4. Formula | 1 group | Strict outlier detection | Word output
 result <- f_scan(
@@ -288,7 +343,7 @@ result <- f_scan(
   output_type = "word",
   save_as     = "iris_scan"
  )
-#> Saving output in: /tmp/RtmplsKqN3/iris_scan.docx
+#> Saving output in: /tmp/RtmplP7rcW/iris_scan.docx
 
 # 5. Formula | 2 groups | Multiple columns | Fancy names
 result <- f_scan(
@@ -300,6 +355,22 @@ result <- f_scan(
  summary     = TRUE
 )
 print(result)
+#> 
+#> --- Data check ---
+#> This check only reports potential issues;
+#> it does not change the data.
+#> 32 rows; 5 of 11 columns were checked.
+#> 
+#> No problems found.
+#> 
+#> Numeric columns:
+#>   Column  Missing  Lowest 4                    Highest 4
+#>   mpg           0  10.4, 10.4, 13.3, 14.3      33.9, 32.4, 30.4, 30.4
+#>   hp            0  52, 62, 65, 66              335, 264, 245, 245
+#>   wt            0  1.513, 1.615, 1.835, 1.935  5.424, 5.345, 5.25, 4.07
+#>   vs            0  0, 0, 0, 0                  1, 1, 1, 1
+#>   am            0  0, 0, 0, 0                  1, 1, 1, 1
+#> 
 #> 
 #>  Variable: Fuel Efficiency
 #> --- Summary Statistics ---
@@ -417,8 +488,27 @@ result <- f_scan(
   digits       = 2,
   output_type  = "word"
 )
-#> Saving output in: /tmp/RtmplsKqN3/plant_data_fscan_output.docx
+#> Saving output in: /tmp/RtmplP7rcW/plant_data_fscan_output.docx
 print(result)
+#> 
+#> --- Data check ---
+#> This check only reports potential issues;
+#> it does not change the data.
+#> 120 rows; 4 of 4 columns were checked.
+#> 
+#> No problems found.
+#> 
+#> Text columns:
+#>   Column     Values (rows)
+#>   species    "A" (60), "B" (60)
+#>   treatment  "control" (60), "treated" (60)
+#>   batch      "1" (40), "2" (40), "3" (40)
+#> 
+#> Numeric columns:
+#>   Column  Missing  Lowest 4                            Highest 4
+#>   weight        0  4.01382, 4.68709, 5.11907, 5.17158  19.4038, 17.697,
+#>                                                        17.0254, 16.7995
+#> 
 #> 
 #> --- Summary Statistics ---
 #> 
@@ -479,6 +569,18 @@ disp1 <- mtcars$disp
 result <- f_scan(disp1)
 print(result)
 #> 
+#> --- Data check ---
+#> This check only reports potential issues;
+#> it does not change the data.
+#> 32 rows; 1 of 1 columns were checked.
+#> 
+#> No problems found.
+#> 
+#> Numeric columns:
+#>   Column  Missing  Lowest 4              Highest 4
+#>   disp1         0  71.1, 75.7, 78.7, 79  472, 460, 440, 400
+#> 
+#> 
 #> --- Summary Statistics ---
 #> 
 #> ----------------------------------------------------------
@@ -508,6 +610,23 @@ hp1   <- mtcars$hp
 cyl1  <- factor(mtcars$cyl)
 result <- f_scan(disp1 + hp1 ~ cyl1)
 print(result)
+#> 
+#> --- Data check ---
+#> This check only reports potential issues;
+#> it does not change the data.
+#> 32 rows; 3 of 3 columns were checked.
+#> 
+#> No problems found.
+#> 
+#> Text columns:
+#>   Column  Values (rows)
+#>   cyl1    "4" (11), "6" (7), "8" (14)
+#> 
+#> Numeric columns:
+#>   Column  Missing  Lowest 4              Highest 4
+#>   disp1         0  71.1, 75.7, 78.7, 79  472, 460, 440, 400
+#>   hp1           0  52, 62, 65, 66        335, 264, 245, 245
+#> 
 #> 
 #>  Variable: disp1
 #> --- Summary Statistics ---
@@ -576,6 +695,22 @@ print(result)
 disp1 <- mtcars$disp
 cyl1  <- factor(mtcars$cyl)
 f_scan(disp1, cyl1)
+#> 
+#> --- Data check ---
+#> This check only reports potential issues;
+#> it does not change the data.
+#> 32 rows; 2 of 2 columns were checked.
+#> 
+#> No problems found.
+#> 
+#> Text columns:
+#>   Column  Values (rows)
+#>   cyl1    "4" (11), "6" (7), "8" (14)
+#> 
+#> Numeric columns:
+#>   Column  Missing  Lowest 4              Highest 4
+#>   disp1         0  71.1, 75.7, 78.7, 79  472, 460, 440, 400
+#> 
 #> 
 #> --- Summary Statistics ---
 #> 

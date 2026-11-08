@@ -131,8 +131,8 @@ doesn't matter as `loo = TRUE`. If 100 \<= n \< 200, `loo = FALSE`,
 user options.
 
 This function requires
-\[Pandoc\](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3
-or higher), a universal document converter.
+\[Pandoc\](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or
+higher), a universal document converter.
 
 - **Windows:** Install Pandoc and ensure the installation folder  
   (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your
@@ -264,10 +264,10 @@ f_bestNormalize(skewed_data,
                 output_type          = "pdf",
                 save_as              = "my_report"
                 )
-#> Saving output in: /tmp/RtmplsKqN3/my_report.pdf
+#> Saving output in: /tmp/RtmplP7rcW/my_report.pdf
 #> Warning: error in running command
 #> ! sh: 1: pdflatex: not found
-#> Error: LaTeX failed to compile /tmp/RtmplsKqN3/my_report.tex. See https://yihui.org/tinytex/r/#debugging for debugging tips. See my_report.log for more info.
+#> Error: LaTeX failed to compile my_report.tex. See https://yihui.org/tinytex/r/#debugging for debugging tips. See my_report.log for more info.
 
 # Generate R Markdown output for use inside a .Rmd chunk
 # (set chunk option results = 'asis').

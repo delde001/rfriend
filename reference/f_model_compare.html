@@ -9,7 +9,7 @@ and others. Supports comparison of nested models using ANOVA tests."></head><bod
 
     <a class="navbar-brand me-2" href="../index.html">rfriend</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -57,11 +57,11 @@ and others. Supports comparison of nested models using ANOVA tests.</p>
 
 
 <dl><dt id="arg-model-">model1<a class="anchor" aria-label="anchor" href="#arg-model-"></a></dt>
-<dd><p>The first model object. Supported classes include: <code>"lm", "glm", "aov", "lmerMod", "glmerMod", and "nls"</code>.</p></dd>
+<dd><p>The first model object. Supported classes include: <code>"lm", "glm", "aov", "lmerMod", "glmerMod", and "nls"</code>. The result of <code><a href="f_lm.html">f_lm()</a></code>, <code><a href="f_aov.html">f_aov()</a></code>, <code><a href="f_glm.html">f_glm()</a></code> or <code><a href="f_lmer.html">f_lmer()</a></code> (for one response) is also accepted; the fitted model stored in it is used.</p></dd>
 
 
 <dt id="arg-model-">model2<a class="anchor" aria-label="anchor" href="#arg-model-"></a></dt>
-<dd><p>The second model object. Supported classes include: <code>"lm", "glm", "aov", "lmerMod", "glmerMod", and "nls"</code>.</p></dd>
+<dd><p>The second model object. Supported classes include: <code>"lm", "glm", "aov", "lmerMod", "glmerMod", and "nls"</code>. The result of <code><a href="f_lm.html">f_lm()</a></code>, <code><a href="f_aov.html">f_aov()</a></code>, <code><a href="f_glm.html">f_glm()</a></code> or <code><a href="f_lmer.html">f_lmer()</a></code> (for one response) is also accepted; the fitted model stored in it is used.</p></dd>
 
 
 <dt id="arg-nested">nested<a class="anchor" aria-label="anchor" href="#arg-nested"></a></dt>
@@ -131,7 +131,16 @@ the function uses <code>deparse(substitute(model2))</code>.</p></dd>
 model (fewer parameters). If the user passes the complex model first, the function
 automatically swaps them and issues a message.</p>
 <p>If the models are nested, an ANOVA test is performed to compare them, and a p-value
-is provided to assess whether the more complex model significantly improves fit.</p>
+is provided to assess whether the more complex model significantly improves fit.
+For linear models this is an F test. For GLMs with a fixed dispersion
+(binomial, poisson, negative binomial) it is a likelihood-ratio
+(chi-square) test; for GLMs with an estimated dispersion (gaussian, Gamma,
+quasi families) it is an F test. Mixed models are compared with a
+likelihood-ratio test.</p>
+<p>Linear mixed models fitted with REML (the <code><a href="https://rdrr.io/pkg/lme4/man/lmer.html" class="external-link">lme4::lmer()</a></code> default, and
+the models stored by <code><a href="f_lmer.html">f_lmer()</a></code>) are refitted with maximum likelihood
+before the comparison, with a message: AIC, BIC and the log-likelihood of
+REML fits are not comparable between models with different fixed effects.</p>
     </div>
     <div class="section level2">
     <h2 id="note">Note<a class="anchor" aria-label="anchor" href="#note"></a></h2>
@@ -155,7 +164,13 @@ is provided to assess whether the more complex model significantly improves fit.
 <li><p>Generalized linear mixed models ("glmerMod")</p></li>
 <li><p>Nonlinear least squares models ("nls")</p></li>
 </ul><p>Note: Multi-stratum AOV models (fitted with <code>Error()</code>) are not supported
-and will produce a warning.</p>
+and stop with an error that suggests the equivalent mixed model.</p>
+<p>Results of rfriend test functions are accepted as well: for a result of
+<code><a href="f_lm.html">f_lm()</a></code>, <code><a href="f_aov.html">f_aov()</a></code>, <code><a href="f_glm.html">f_glm()</a></code> or <code><a href="f_lmer.html">f_lmer()</a></code> the
+fitted model stored in it is compared. A result with more than one response,
+or with a response that the function transformed (Box-Cox or
+bestNormalize), stops with a message, because models on different scales
+cannot be compared on AIC, BIC or likelihood.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">rfriend</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -78,7 +78,12 @@
 <li><p>Graph Clearing: Closes all open graphics devices.</p></li>
 <li><p>Environment Clearing: Removes all objects from the global environment.</p></li>
 <li><p>Session Restart: Restarts the R session (only available in 'RStudio').</p></li>
-</ul></div>
+</ul><p>Removing objects does not detach packages. Without <code>restart = TRUE</code>,
+<code>f_clear()</code> lists the packages that are still attached, apart from
+the packages R attaches at start-up and 'rfriend' itself. A script that
+runs after <code>f_clear()</code> may still depend on one of them; only a
+restart shows a missing <code><a href="https://rdrr.io/r/base/library.html" class="external-link">library()</a></code> call.</p>
+    </div>
     <div class="section level2">
     <h2 id="note">Note<a class="anchor" aria-label="anchor" href="#note"></a></h2>
     <p>The <code>restart</code> parameter requires 'RStudio' and its API package ('rstudioapi') to be installed and available.</p>

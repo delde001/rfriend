@@ -27,7 +27,7 @@ analysed in sequence and the generated output can be in various formats
 
     <a class="navbar-brand me-2" href="../index.html">rfriend</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -72,8 +72,8 @@ analysed in sequence and the generated output can be in various formats
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">f_aov</span><span class="op">(</span></span>
 <span>  <span class="va">formula</span>,</span>
 <span>  data <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  norm_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  interaction_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  diagnostic_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  effect_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  contrast_plots <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  ANCOVA <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  transformation <span class="op">=</span> <span class="cn">TRUE</span>,</span>
@@ -81,6 +81,8 @@ analysed in sequence and the generated output can be in various formats
 <span>  force_aov <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  alpha <span class="op">=</span> <span class="fl">0.05</span>,</span>
 <span>  adjust <span class="op">=</span> <span class="st">"sidak"</span>,</span>
+<span>  post_hoc <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  by <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  anova_type <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>  intro_text <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  close_generated_files <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -88,6 +90,8 @@ analysed in sequence and the generated output can be in various formats
 <span>  output_type <span class="op">=</span> <span class="st">"default"</span>,</span>
 <span>  save_as <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  save_in_wdir <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  norm_plots <span class="op">=</span> <span class="fu">lifecycle</span><span class="fu">::</span><span class="fu"><a href="https://lifecycle.r-lib.org/reference/deprecated.html" class="external-link">deprecated</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  interaction_plots <span class="op">=</span> <span class="fu">lifecycle</span><span class="fu">::</span><span class="fu"><a href="https://lifecycle.r-lib.org/reference/deprecated.html" class="external-link">deprecated</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -104,11 +108,11 @@ analysed in sequence and the generated output can be in various formats
 <dd><p>A data frame containing the variables in the model.</p></dd>
 
 
-<dt id="arg-norm-plots">norm_plots<a class="anchor" aria-label="anchor" href="#arg-norm-plots"></a></dt>
+<dt id="arg-diagnostic-plots">diagnostic_plots<a class="anchor" aria-label="anchor" href="#arg-diagnostic-plots"></a></dt>
 <dd><p>Logical. If <code>TRUE</code>, diagnostic residual plots are included in the output files. Default is <code>TRUE</code>.</p></dd>
 
 
-<dt id="arg-interaction-plots">interaction_plots<a class="anchor" aria-label="anchor" href="#arg-interaction-plots"></a></dt>
+<dt id="arg-effect-plots">effect_plots<a class="anchor" aria-label="anchor" href="#arg-effect-plots"></a></dt>
 <dd><p>Logical. If <code>TRUE</code>, estimated means / interaction plots are included in the output files after the post hoc table. Default is <code>TRUE</code>.</p></dd>
 
 
@@ -137,7 +141,13 @@ while interaction cell-contrast plots are stored as
 
 
 <dt id="arg-transformation">transformation<a class="anchor" aria-label="anchor" href="#arg-transformation"></a></dt>
-<dd><p>Logical or character string. If <code>TRUE</code>, or if <code>"boxcox"</code> applies a <code><a href="f_boxcox.html">f_boxcox()</a></code> transformation if residuals are not normal. If <code>"bestnormalize"</code>, applies <code><a href="f_bestNormalize.html">f_bestNormalize()</a></code> transformation. If <code>FALSE</code> no transformation will be applied. Default is <code>TRUE</code>.</p></dd>
+<dd><p>Logical or character string. If <code>TRUE</code>, or if <code>"boxcox"</code> applies a <code><a href="f_boxcox.html">f_boxcox()</a></code> transformation if residuals are not normal. If <code>"bestnormalize"</code>, applies <code><a href="f_bestNormalize.html">f_bestNormalize()</a></code> transformation. If <code>FALSE</code> no transformation will be applied. Default is <code>TRUE</code>.
+A transformation is kept only when it improves the residual check
+that triggered it: normality (Shapiro-Wilk, or Anderson-Darling when
+Shapiro-Wilk is unavailable) or, when only the variance check failed, equal
+variance (Levene's test). Otherwise the untransformed analysis is reported, the
+report says so, and the attempt is recorded in <code>transformation_rejected</code>.
+Responses named in <code>force_transformation</code> are always transformed.</p></dd>
 
 
 <dt id="arg-force-transformation">force_transformation<a class="anchor" aria-label="anchor" href="#arg-force-transformation"></a></dt>
@@ -145,12 +155,17 @@ while interaction cell-contrast plots are stored as
 
 
 <dt id="arg-force-aov">force_aov<a class="anchor" aria-label="anchor" href="#arg-force-aov"></a></dt>
-<dd><p>Logical. If <code>TRUE</code>, runs the ANOVA even when at least
-one cell has \(n = 1\) (saturated model). By default (<code>FALSE</code>),
-such responses are skipped with a warning because F-statistics and
-p-values are undefined for saturated models. Set to <code>TRUE</code> only for
-diagnostic purposes – results should <strong>not</strong> be reported or
-interpreted as valid. Default is <code>FALSE</code>.</p></dd>
+<dd><p>Logical. Default <code>FALSE</code>. A response is skipped (with a
+message) when its model is saturated: zero residual degrees of freedom, e.g.
+a fully crossed design with \(n = 1\) in every cell, where no F-test
+exists. Saturation is judged from the rank of the model matrix, so additive
+designs with one observation per cell, such as a randomised complete block
+design (<code>y ~ block + treatment</code>), are analysed normally. Since rfriend
+3.2.1, <code>force_aov = TRUE</code> on a saturated model stops with an
+explanation instead of fitting it, because the F-tests cannot be computed.
+(Before 3.2.1 the skip also fired for any cell with \(n = 1\).)
+<code>Error()</code> terms are not supported; use <code><a href="f_lmer.html">f_lmer</a></code> with
+random effects instead.</p></dd>
 
 
 <dt id="arg-alpha">alpha<a class="anchor" aria-label="anchor" href="#arg-alpha"></a></dt>
@@ -180,6 +195,43 @@ for multiple comparisons. Available methods include:</p><dl><dt>"tukey"</dt>
 
 
 </dl><p>Default is <code>"sidak"</code>.</p></dd>
+
+
+<dt id="arg-post-hoc">post_hoc<a class="anchor" aria-label="anchor" href="#arg-post-hoc"></a></dt>
+<dd><p>Which post hoc tables to build. <code>NULL</code> or <code>TRUE</code>
+  (default): one table per term, see Details, "Which post hoc tables you
+  get". <code>FALSE</code>: no post hoc. A character vector of model terms: only
+  those tables, e.g. <code>post_hoc = "treatment"</code> (the marginal means of one
+  factor, averaged over the others), <code>post_hoc = c("treatment",
+  "week")</code>, or <code>post_hoc = "treatment:week"</code> (the cell means of that
+  interaction, every combination compared). A requested term that is not
+  significant is still tabulated, with letters shown as <code>"ns"</code>.
+  Misspelled or unknown names stop with a "did you mean" error. The same
+  syntax is used by <code><a href="f_lmer.html">f_lmer</a></code>.</p>
+<p><strong>Leaving blocks out of the post hoc.</strong> A block belongs in the model
+  because it removes known variation (soil, bench, day) from the error term,
+  which makes the treatment comparison more precise. Comparing the blocks with
+  each other, however, is not a research question, and block letters invite
+  over-interpretation. So keep the block in the formula and name only the
+  factors you study in <code>post_hoc</code>:
+  <code>f_aov(y ~ block + treatment, data, post_hoc = "treatment")</code>. The ANOVA
+  table still reports the block effect. With five or more blocks that are a
+  random sample of possible blocks, consider a mixed model instead:
+  <code>f_lmer(y ~ treatment + (1 | block))</code>.</p></dd>
+
+
+<dt id="arg-by">by<a class="anchor" aria-label="anchor" href="#arg-by"></a></dt>
+<dd><p><code>NULL</code> (default) or the name of one categorical predictor,
+used together with <code>post_hoc</code> to get simple effects:
+<code>post_hoc = "treatment", by = "week"</code> answers "which treatments differ
+within each week?" with <code>emmeans(model, ~ treatment | week)</code>. Letters
+and the p-value adjustment are computed separately within each level of
+<code>by</code>. This makes fewer comparisons than the full cell-means table (for
+4 treatments x 3 weeks: 3 x 6 = 18 instead of 66), so each comparison has
+more power. The table is stored as
+<code>out$y$post_hoc[["treatment | week"]]</code>. <code>by</code> requires
+<code>post_hoc</code>, must not also be named in <code>post_hoc</code>, and cannot be
+combined with an interaction term (<code>"a:b"</code>) in <code>post_hoc</code>.</p></dd>
 
 
 <dt id="arg-anova-type">anova_type<a class="anchor" aria-label="anchor" href="#arg-anova-type"></a></dt>
@@ -258,6 +310,16 @@ Defaults to <code>file.path(tempdir(), "dataname_summary.pdf")</code>.</p></dd>
 <dd><p>Logical. If <code>TRUE</code>, saves the file in the working directory. Default is <code>FALSE</code>, this avoid unintended changes to the global environment. If <code>save_as</code> location is specified <code>save_in_wdir</code> is overwritten by <code>save_as</code>.</p></dd>
 
 
+<dt id="arg-norm-plots">norm_plots<a class="anchor" aria-label="anchor" href="#arg-norm-plots"></a></dt>
+<dd><p><strong>Deprecated</strong> in 3.2.1. Use <code>diagnostic_plots</code> instead. If
+supplied, its value is passed to <code>diagnostic_plots</code> with a warning.</p></dd>
+
+
+<dt id="arg-interaction-plots">interaction_plots<a class="anchor" aria-label="anchor" href="#arg-interaction-plots"></a></dt>
+<dd><p><strong>Deprecated</strong> in 3.2.1. Use <code>effect_plots</code> instead. If
+supplied, its value is passed to <code>effect_plots</code> with a warning.</p></dd>
+
+
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
 <dd><p>Additional arguments forwarded to <code><a href="https://rdrr.io/r/stats/aov.html" class="external-link">aov</a></code>.
 The arguments <code>subset</code>, <code>na.action</code>, and <code>weights</code> are
@@ -276,7 +338,24 @@ arguments (e.g. <code>contrasts</code>, <code>projections</code>,
   (<code>aov_test</code>), the <strong>Type II</strong> omnibus ANOVA table from
   <code><a href="https://rdrr.io/pkg/car/man/Anova.html" class="external-link">Anova</a></code> (<code>aov_summary</code>), normality and homogeneity
   diagnostics, optional transformation results, and the <code>emmeans</code>
-  post hoc tests. Using the option <code>output_type</code>, it can also
+  post hoc tests, one table per term in <code>out$y$post_hoc</code> (see
+  Details, "Which post hoc tables you get"). The elements
+  <code>post_hoc_summary_table</code>, <code>summary_table</code> and <code>cld_text</code> are
+  <strong>deprecated</strong> and will be removed in the next release: they now hold
+  the cell-means table when a significant interaction is tabulated, otherwise
+  the first table; use <code>post_hoc</code> instead.
+  <code>Response_Transformed</code>: <code>TRUE</code> when the response was
+  transformed (Box-Cox or bestNormalize) because the residuals were not normal (or, alone, had unequal variances) and
+  the transformation was kept (see <code>transformation</code>).
+  <code>aov_summary</code>: ANOVA table of the untransformed response.
+  <code>transformed_aov_summary</code>: ANOVA table of the transformed response, or
+  <code>NULL</code> when no transformation was applied. The printed and reported
+  result is <code>transformed_aov_summary</code> when <code>Response_Transformed</code> is
+  <code>TRUE</code>, otherwise <code>aov_summary</code>. To pick it in code:
+  <code>tab &lt;- if (out$y$Response_Transformed) out$y$transformed_aov_summary else out$y$aov_summary</code>.
+  When a transformation was tried but not kept, <code>transformation_rejected</code>
+  records the method, the reason and the p-values before and after.
+  Using the option <code>output_type</code>, it can also
   generate output as R Markdown, 'Word', 'pdf', or 'Excel' files.
   Includes <code>print</code> and <code>plot</code> methods for 'f_aov' objects.</p>
     </div>
@@ -297,8 +376,29 @@ arguments (e.g. <code>contrasts</code>, <code>projections</code>,
       sum / effect contrasts to be interpretable for main effects).</p></li>
 <li><p>Check normality of residuals using the Shapiro-Wilk test.</p></li>
 <li><p>If residuals are not normal and <code>transformation = TRUE</code> apply a data transformation.</p></li>
-<li><p>If significant differences are found in ANOVA, proceed with post hoc tests using estimated marginal means from <code>emmeans()</code> and Sidak adjustment (or another option of <code>adjust =</code>.</p></li>
-</ul><p><strong>Effect and interaction plots.</strong> When <code>interaction_plots = TRUE</code>,
+<li><p>Post hoc tests with estimated marginal means from <code>emmeans()</code>, one table per term, with Sidak adjustment (or another option of <code>adjust =</code>) within each table.</p></li>
+</ul><p><strong>Which post hoc tables you get.</strong> With the default
+<code>post_hoc = NULL</code>, each term is handled on its own: every significant
+interaction of categorical factors gets one cell-means table (all
+combinations compared); every categorical main effect gets its own
+marginal-means table (<code>emmeans(model, ~ factor)</code>), with letters
+<code>"ns"</code> when the term is not significant and an "Interpret with caution"
+note when the factor takes part in a significant interaction; numeric
+covariates (ANCOVA) get no table, their slope is in the ANOVA table. The
+<code>adjust</code> method is applied within each table, and each table has its
+own footer with its own number of estimates and tests. Marginal means are
+equal-weighted estimated marginal means: every level of the other factors
+counts equally, so in unbalanced designs they can differ from the raw group
+means. All tables are stored in <code>out$y$post_hoc[[term]]</code> as a list
+with <code>emmeans</code>, <code>pairs</code>, <code>cld</code> (the letters), <code>cld_text</code>
+(the footer) and <code>caution</code>, the same structure as <code><a href="f_lmer.html">f_lmer</a></code>.
+When the response was transformed, estimates and CIs are back-transformed
+per table (medians on the original scale) and the pairwise contrasts stay on
+the transformed scale. Effect plots take their letters from the factor's own
+table; a plot that averages over a factor in a significant interaction shows
+no letters and says why. Use <code>post_hoc</code> and <code>by</code> to choose the
+tables yourself.</p>
+<p><strong>Effect and interaction plots.</strong> When <code>effect_plots = TRUE</code>,
 an estimated marginal means plot (estimate \(\pm\) 95% CI, with jittered
 raw data and compact-letter-display labels) is added after the post hoc
 table for each categorical predictor. For a significant categorical
@@ -319,7 +419,7 @@ afterwards. Matches <code><a href="f_glm.html">f_glm</a></code>.</p>
 <p>More response variables can be added using <code>-</code> or <code>+</code> (e.g., <code>response1 + response2 ~ predictor</code>) to do a sequential <code><a href="https://rdrr.io/r/stats/aov.html" class="external-link">aov()</a></code> for each response parameter captured in one output file.</p>
 <p>Outputs can be generated in multiple formats ("pdf", "word", "excel" and "rmd") as specified by <code>output_type</code>. The function also closes any open 'Word' files to avoid conflicts when generating 'Word' documents. If <code>output_type = "rmd"</code> is used it is adviced to use it in a chunk with {r, echo=FALSE, results='asis'}</p>
 <p>*Non-significant ANOVA results*: When the overall F-test is not significant, f_aov still reports the estimated marginal means table, but with all pairwise comparison letters replaced by *"ns"*. The numeric estimates (and their confidence intervals) are provided because they are often needed for manuscript tables, especially when the response was back-transformed from a Box-Cox or bestNormalize scale - the raw descriptive means and the emmeans values can differ, and it is the emmeans values that correspond to the actual model. The *"ns"* labels signal that pairwise differences should not be interpreted.</p>
-<p>This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.</p><ul><li><p><b>Windows:</b> Install Pandoc and ensure the installation folder.
+<p>This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or higher), a universal document converter.</p><ul><li><p><b>Windows:</b> Install Pandoc and ensure the installation folder.
 <br> (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.</p></li>
 <li><p><b>macOS:</b> If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.</p></li>
 <li><p><b>Linux:</b> Install Pandoc through your distribution's package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.</p></li>
@@ -376,7 +476,7 @@ biological rationale.</p>
 <span class="r-in"><span>                   <span class="co"># Do bestNormalize transformation for non-normal residual (Default is boxcox)</span></span></span>
 <span class="r-in"><span>                   transformation <span class="op">=</span> <span class="st">"bestnormalize"</span></span></span>
 <span class="r-in"><span>                   <span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Saving output in: /tmp/RtmplsKqN3/iris_aov_output.docx</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Saving output in: /tmp/RtmplP7rcW/iris_aov_output.docx</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Print output to the console.</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">f_aov_out</span><span class="op">)</span></span></span>
@@ -388,7 +488,7 @@ biological rationale.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  aov call:  Sepal.Width ~ Species </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Type II ANOVA Table (car::Anova):</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Type II ANOVA on Sepal.Width (untransformed) (car::Anova):</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Anova Table (Type II tests)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Response: Sepal.Width</span>
@@ -399,11 +499,19 @@ biological rationale.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> --- Post hoc Comparisons of: Sepal.Width ---</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> _________________________________________</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> * Species (marginal means) *</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Letters are compared within this table only.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     Species emmean..        SE lower.CL upper.CL Letter  n</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>      setosa    3.428 0.0480391 3.333064 3.522936      a 50</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   virginica    2.974 0.0480391 2.879064 3.068936      b 50</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  versicolor    2.770 0.0480391 2.675064 2.864936      c 50</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Confidence level used: 0.95  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Significance level used: α = 0.05  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> P-value and CI adjustment: sidak method for 3 estimates / 3 tests.  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> *Note: Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different. Sharing a letter indicates insufficient evidence to claim a difference; it does not prove they are identical.*</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
@@ -412,22 +520,30 @@ biological rationale.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  aov call:  Sepal.Length ~ Species </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> TRANSFORMED Type II ANOVA Table (car::Anova):</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Type II ANOVA on bestNormalize (Quantile Normalization (ORQ)) transformed Sepal.Length (car::Anova):</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Anova Table (Type II tests)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Response: Sepal.Length</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           Sum Sq  Df F value    Pr(&gt;F)    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Species   63.212   2  119.26 &lt; 2.2e-16 ***</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Residuals 38.956 147                      </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Species   88.311   2  110.02 &lt; 2.2e-16 ***</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Residuals 58.995 147                      </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> --- BACK TRANSFORMED Post hoc Comparisons of: Sepal.Length ---</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> * Species (marginal means) *</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Letters are compared within this table only.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     Species median (BT) lower.CL upper.CL Letter  n</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   virginica    6.593552 6.422851 6.726200      a 50</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  versicolor    5.944039 5.752349 6.135501      b 50</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>      setosa    4.961446 4.881046 5.040758      c 50</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ___________________________</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Confidence level used: 0.95  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Significance level used: α = 0.05  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> P-value and CI adjustment: sidak method for 3 estimates / 3 tests.  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> *Note: Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different. Sharing a letter indicates insufficient evidence to claim a difference; it does not prove they are identical.*</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Note: 'median (BT)' = back-transformed estimated marginal mean. Back-transforming a mean from a transformed scale returns the MEDIAN on the original scale, not the arithmetic mean. Report these as back-transformed medians. CIs are valid; SE is omitted (asymmetric on original scale).</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
@@ -441,6 +557,107 @@ biological rationale.</p>
 <span class="r-plt img"><img src="f_aov-4.png" alt="" width="700" height="433"></span>
 <span class="r-plt img"><img src="f_aov-5.png" alt="" width="700" height="433"></span>
 <span class="r-plt img"><img src="f_aov-6.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Randomised complete block design: the block stays in the model, but</span></span></span>
+<span class="r-in"><span><span class="co"># only the treatment is compared in the post hoc.</span></span></span>
+<span class="r-in"><span><span class="va">wk6</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/subset.html" class="external-link">subset</a></span><span class="op">(</span><span class="va">plant_trial</span>, <span class="va">time_weeks</span> <span class="op">==</span> <span class="fl">6</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">f_aov</span><span class="op">(</span><span class="va">height_cm</span> <span class="op">~</span> <span class="va">block</span> <span class="op">+</span> <span class="va">treatment</span>, data <span class="op">=</span> <span class="va">wk6</span>, post_hoc <span class="op">=</span> <span class="st">"treatment"</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ===========================================================</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    ANOVA of response variable:  height_cm </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ===========================================================</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  aov call:  height_cm ~ block + treatment </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Type II ANOVA on height_cm (untransformed) (car::Anova):</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Anova Table (Type II tests)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Response: height_cm</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>            Sum Sq Df F value    Pr(&gt;F)    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> block      152.88  4  3.2856   0.04889 *  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> treatment 1556.87  3 44.6136 8.774e-07 ***</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Residuals  139.59 12                      </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ---</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Note: Box-Cox did not improve the normality of the residuals (Shapiro-Wilk p = 0.0375 before, 0.0252 after). The untransformed analysis is reported.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> --- Post hoc Comparisons of: height_cm ---</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> * treatment (marginal means) *</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Letters are compared within this table only.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  treatment emmean..      SE lower.CL upper.CL Letter n</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     high_N    54.56 1.52527 51.23672 57.88328      a 5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>      low_N    47.06 1.52527 43.73672 50.38328      b 5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    control    43.04 1.52527 39.71672 46.36328      b 5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    drought    30.22 1.52527 26.89672 33.54328      c 5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Confidence level used: 0.95  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Significance level used: α = 0.05  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> P-value and CI adjustment: sidak method for 4 estimates / 6 tests.  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> *Note: Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different. Sharing a letter indicates insufficient evidence to claim a difference; it does not prove they are identical.*</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span></span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> Note: Minimum cell size = 1. Levene's Test has very low power with such small groups; interpret its result with caution.  </span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>  </span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> Based on the Shapiro-Wilk Test (0.0375 ≤ 0.05)</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span>  the residuals are **NOT** normally distributed. </span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> ANOVA results can be misleading. </span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> A transformation was tried but not kept (see above); resort to other statistical tests.  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    </span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Simple effects: which treatments differ within each week?</span></span></span>
+<span class="r-in"><span><span class="co"># illustration only: plants are measured repeatedly, see f_lmer()</span></span></span>
+<span class="r-in"><span><span class="va">pt</span> <span class="op">&lt;-</span> <span class="va">plant_trial</span></span></span>
+<span class="r-in"><span><span class="va">pt</span><span class="op">$</span><span class="va">week</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">pt</span><span class="op">$</span><span class="va">time_weeks</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">f_aov</span><span class="op">(</span><span class="va">height_cm</span> <span class="op">~</span> <span class="va">treatment</span> <span class="op">*</span> <span class="va">week</span>, data <span class="op">=</span> <span class="va">pt</span>,</span></span>
+<span class="r-in"><span>      post_hoc <span class="op">=</span> <span class="st">"treatment"</span>, by <span class="op">=</span> <span class="st">"week"</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ===========================================================</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    ANOVA of response variable:  height_cm </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ===========================================================</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  aov call:  height_cm ~ treatment * week </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Type II ANOVA on height_cm (untransformed) (car::Anova):</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Anova Table (Type II tests)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Response: height_cm</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                 Sum Sq Df F value    Pr(&gt;F)    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> treatment      2965.34  3 65.6474 &lt; 2.2e-16 ***</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> week           2215.89  2 73.5838 2.399e-15 ***</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> treatment:week  169.52  6  1.8764    0.1043    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Residuals       722.73 48                      </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ---</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> --- Post hoc Comparisons of: height_cm ---</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> * treatment | week (simple effects) *</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Letters are compared within this table only, separately for each level of week.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  week treatment emmean..       SE lower.CL upper.CL Letter n</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     2    high_N    36.96 1.735334 33.47088 40.44912      a 5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     2     low_N    32.36 1.735334 28.87088 35.84912      a 5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     2   control    24.36 1.735334 20.87088 27.84912      b 5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     2   drought    21.72 1.735334 18.23088 25.20912      b 5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     4    high_N    45.48 1.735334 41.99088 48.96912      a 5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     4     low_N    39.22 1.735334 35.73088 42.70912     ab 5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     4   control    35.10 1.735334 31.61088 38.58912      b 5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     4   drought    27.72 1.735334 24.23088 31.20912      c 5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     6    high_N    54.56 1.735334 51.07088 58.04912      a 5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     6     low_N    47.06 1.735334 43.57088 50.54912      b 5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     6   control    43.04 1.735334 39.55088 46.52912      b 5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     6   drought    30.22 1.735334 26.73088 33.70912      c 5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Confidence level used: 0.95  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Significance level used: α = 0.05  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> P-value and CI adjustment: sidak method for 4 estimates / 6 tests per level of week.  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> *Note: Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different. Sharing a letter indicates insufficient evidence to claim a difference; it does not prove they are identical.*</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    </span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co">#To print rmd output set chunck option to results = 'asis' and use cat().</span></span></span>
@@ -489,7 +706,7 @@ biological rationale.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           for the model residuals; check Q-Q plot.  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Check the plots in the figure below to assess normality.  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplsKqN3/file1da23aef658e.png)    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplP7rcW/file1c2a167d8d1a.png)    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ## Observed Descriptives Table of:  Sepal.Width ~ Species   </span>
@@ -512,7 +729,7 @@ biological rationale.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> main findings in the *Results* section, you **must** use the Emmeans table below.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ## ANOVA Summary of  Sepal.Width   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ## ANOVA on Sepal.Width (untransformed)  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> &amp;nbsp;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
@@ -532,33 +749,17 @@ biological rationale.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> &amp;nbsp;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ## Post Hoc Test on Estimated Marginal Means of Sepal.Width  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ## Post Hoc Tests of Sepal.Width  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>         </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Estimated Marginal Means (emmeans) are model-based mean values of Sepal.Width for each level of the significant predictor(s), averaged over all other</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>           factors in the model. Unlike raw data averages (see: Observed Descriptives Table),</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>           emmeans correct for unbalanced designs and reflect the statistical</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>           model used for pairwise comparisons (significance testing **letters**). SE values are identical for groups with equal</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>           sample sizes and differ only to reflect variation in group size ($n$). The $n$ column corresponds to the raw observed data of Sepal.Width. If $n$ is blank, there is no observed data and</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>           emmeans estimates marginal means from the model.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>         </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &amp;nbsp;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Estimated marginal means (emmeans) are model-based means of Sepal.Width. Each table below answers one question and has its own letters, adjustment and footer: a **cell-means** table compares every combination of an interaction, a **marginal-means** table compares the levels of one factor averaged over the others, and a **simple-effects** table compares one factor within each level of another. Marginal means are equal-weighted emmeans: every level of the other factors counts equally, so in unbalanced designs they can differ from the raw group means in the Observed Descriptives Table. The $n$ column is the raw observed count.  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>         </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> *Reporting Tips:* For main results showing significant differences, prioritize</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>           the Emmeans table (preferably with 95% CIs).</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>           Figures should include all individual raw data points to show the</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>           Model Fit (Emmeans) relative to the Observed Spread (Raw Data).</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>           </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &amp;nbsp;   </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &amp;nbsp;  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> *Reporting Tips:* Report the table that matches your question. When an interaction is significant, report its cell means (with 95% CIs) and describe how the pattern changes; main-effect letters average over that pattern.  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> **Post Hoc Marginal Means Table** of aov call: Sepal.Width ~ Species  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ### Post hoc: Species (marginal means)  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> *Letters are compared within this table only.*  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> -----------------------------------------------------------------</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Species      emmean     SE      lower     upper     Letter   n   </span>
@@ -571,14 +772,15 @@ biological rationale.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> versicolor   2.770      0.048   2.675     2.865     c        50  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> -----------------------------------------------------------------</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Degrees of freedom: 147  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Confidence level used: 0.95  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Significance level used: α = 0.05  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> P-value and CI adjustment: sidak method for 3 estimates / 3 tests.  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> **Note:** Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different. Sharing a letter indicates insufficient evidence to claim a difference; it does not prove the groups are identical.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>         </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> *Note: Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different. Sharing a letter indicates insufficient evidence to claim a difference; it does not prove they are identical.*</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ## Estimated Means Plot of: Sepal.Width  (Species)  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplsKqN3/file1da23041b948.png)    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplP7rcW/file1c2a3fce38a7.png)    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> *Points are (jittered) raw data; estimates are model estimated marginal means with 95% CI. Groups sharing a letter are not significantly different (α = 0.05); groups with different letters are significantly different. Sharing a letter indicates insufficient evidence of a difference, not proof that the groups are identical.*   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>

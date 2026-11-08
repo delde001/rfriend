@@ -15,7 +15,7 @@ is supported."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">rfriend</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -63,7 +63,8 @@ is supported.</p>
 <span>  conf.level <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  mu <span class="op">=</span> <span class="fl">0</span>,</span>
 <span>  alternative <span class="op">=</span> <span class="st">"two.sided"</span>,</span>
-<span>  norm_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  diagnostic_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  effect_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  transformation <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  force_transformation <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  alpha <span class="op">=</span> <span class="fl">0.05</span>,</span>
@@ -73,6 +74,7 @@ is supported.</p>
 <span>  output_type <span class="op">=</span> <span class="st">"default"</span>,</span>
 <span>  save_as <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  save_in_wdir <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  norm_plots <span class="op">=</span> <span class="fu">lifecycle</span><span class="fu">::</span><span class="fu"><a href="https://lifecycle.r-lib.org/reference/deprecated.html" class="external-link">deprecated</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span>
 <span></span>
@@ -85,7 +87,8 @@ is supported.</p>
 <span>  conf.level <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  mu <span class="op">=</span> <span class="fl">0</span>,</span>
 <span>  alternative <span class="op">=</span> <span class="st">"two.sided"</span>,</span>
-<span>  norm_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  diagnostic_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  effect_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  transformation <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  force_transformation <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  alpha <span class="op">=</span> <span class="fl">0.05</span>,</span>
@@ -95,6 +98,7 @@ is supported.</p>
 <span>  output_type <span class="op">=</span> <span class="st">"default"</span>,</span>
 <span>  save_as <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  save_in_wdir <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  norm_plots <span class="op">=</span> <span class="fu">lifecycle</span><span class="fu">::</span><span class="fu"><a href="https://lifecycle.r-lib.org/reference/deprecated.html" class="external-link">deprecated</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -118,7 +122,10 @@ expression is evaluated in the data's column scope (e.g.
 <code>subset = cyl == 6</code> works). All responses in a
 multi-response call (<code>y1 + y2 ~ group</code>) are then tested on
 the identical row set. For the default (vector) method, <code>...</code>
-is currently unused.</p></dd>
+is currently unused.
+<code>subset</code> can also pick two groups of a factor with more
+levels (e.g. <code>subset = treatment %in% c("control", "high_N")</code>);
+the check for exactly two groups runs after the subset.</p></dd>
 
 
 <dt id="arg-formula">formula<a class="anchor" aria-label="anchor" href="#arg-formula"></a></dt>
@@ -186,9 +193,15 @@ paired tests. For two-sample tests with <code>mu != 0</code> a warning is issued
 <code>"greater"</code>, or <code>"less"</code>.</p></dd>
 
 
-<dt id="arg-norm-plots">norm_plots<a class="anchor" aria-label="anchor" href="#arg-norm-plots"></a></dt>
+<dt id="arg-diagnostic-plots">diagnostic_plots<a class="anchor" aria-label="anchor" href="#arg-diagnostic-plots"></a></dt>
 <dd><p>Logical. If <code>TRUE</code>, diagnostic plots are included in the
 output. Default is <code>TRUE</code>.</p></dd>
+
+
+<dt id="arg-effect-plots">effect_plots<a class="anchor" aria-label="anchor" href="#arg-effect-plots"></a></dt>
+<dd><p>Logical. If <code>TRUE</code> (default), the main effect
+plot (<code>main_effect_plot</code>) is built, stored and included in the
+output files. With <code>FALSE</code> it is not built.</p></dd>
 
 
 <dt id="arg-transformation">transformation<a class="anchor" aria-label="anchor" href="#arg-transformation"></a></dt>
@@ -198,7 +211,12 @@ non-normality. If <code>"bestnormalize"</code>, applies <code><a href="f_bestNor
 If <code>FALSE</code> or <code>"none"</code>, no transformation is applied.
 <strong>Note:</strong> For paired tests, <code>bestNormalize</code> (Yeo-Johnson) is always
 used on the differences, since Box-Cox requires strictly positive values.
-Default is <code>TRUE</code>.</p></dd>
+Default is <code>TRUE</code>.
+A transformation is kept only when it improves the normality of the
+residuals (Shapiro-Wilk, or Anderson-Darling when Shapiro-Wilk is
+unavailable). Otherwise the untransformed test is reported, the report says
+so, and the attempt is recorded in <code>transformation_rejected</code>. Responses
+named in <code>force_transformation</code> are always transformed.</p></dd>
 
 
 <dt id="arg-force-transformation">force_transformation<a class="anchor" aria-label="anchor" href="#arg-force-transformation"></a></dt>
@@ -251,6 +269,11 @@ Set to <code>TRUE</code> or <code>FALSE</code> to override this behaviour explic
 <dd><p>Logical. Save in working directory. Default <code>FALSE</code>.</p></dd>
 
 
+<dt id="arg-norm-plots">norm_plots<a class="anchor" aria-label="anchor" href="#arg-norm-plots"></a></dt>
+<dd><p><strong>Deprecated</strong> in 3.2.1. Use <code>diagnostic_plots</code> instead. If
+supplied, its value is passed to <code>diagnostic_plots</code> with a warning.</p></dd>
+
+
 <dt id="arg-y">y<a class="anchor" aria-label="anchor" href="#arg-y"></a></dt>
 <dd><p>Optional numeric vector (second group) for two-sample tests if using
 the vector interface. Ignored when a formula is supplied.</p></dd>
@@ -269,7 +292,20 @@ the vector interface. Ignored when a formula is supplied.</p></dd>
   <code>mu</code> (one-sample), or the mean of the per-pair differences with a
   reference line at <code>mu</code> (paired). When the response was transformed the
   estimate and interval are back-transformed to the original scale and
-  labelled as a median.</p>
+  labelled as a median.
+  <code>Response_Transformed</code>: <code>TRUE</code> when the response was
+  transformed (Box-Cox or bestNormalize) because the residuals were not normal and
+  the transformation was kept (see <code>transformation</code>).
+  <code>t_test</code>: <code>htest</code> result of the untransformed response.
+  <code>transformed_t_test</code>: <code>htest</code> result of the transformed response, or
+  <code>NULL</code> when no transformation was applied. The printed and reported
+  result is <code>transformed_t_test</code> when <code>Response_Transformed</code> is
+  <code>TRUE</code>, otherwise <code>t_test</code>. To pick it in code:
+  <code>tab &lt;- if (out$y$Response_Transformed) out$y$transformed_t_test else out$y$t_test</code>.
+  When a transformation was tried but not kept, <code>transformation_rejected</code>
+  records the method, the reason and the p-values before and after.
+  <code>t_test_transformed</code> is a <strong>deprecated</strong> alias of
+  <code>transformed_t_test</code> and will be removed in the next release.</p>
     </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
@@ -287,10 +323,10 @@ use Welch's t-test instead of Student's t-test.
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
 <span class="r-in"><span><span class="co"># 1. Two-sample independent Welch's t-test (default)</span></span></span>
-<span class="r-in"><span><span class="fu">f_t_test</span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">am</span>, data <span class="op">=</span> <span class="va">mtcars</span>, output_type <span class="op">=</span> <span class="st">"console"</span>, norm_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">f_t_test</span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">am</span>, data <span class="op">=</span> <span class="va">mtcars</span>, output_type <span class="op">=</span> <span class="st">"console"</span>, diagnostic_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Welch Two Sample t-test (two.sided) of: mpg</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Welch Two Sample t-test (two.sided) on mpg (untransformed)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> SAMPLE STATISTICS:</span>
@@ -312,10 +348,10 @@ use Welch's t-test instead of Student's t-test.
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># 2. Multiple response variables in one call</span></span></span>
-<span class="r-in"><span><span class="fu">f_t_test</span><span class="op">(</span><span class="va">mpg</span> <span class="op">+</span> <span class="va">hp</span> <span class="op">~</span> <span class="va">am</span>, data <span class="op">=</span> <span class="va">mtcars</span>, output_type <span class="op">=</span> <span class="st">"console"</span>, norm_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">f_t_test</span><span class="op">(</span><span class="va">mpg</span> <span class="op">+</span> <span class="va">hp</span> <span class="op">~</span> <span class="va">am</span>, data <span class="op">=</span> <span class="va">mtcars</span>, output_type <span class="op">=</span> <span class="st">"console"</span>, diagnostic_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Welch Two Sample t-test (two.sided) of: mpg</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Welch Two Sample t-test (two.sided) on mpg (untransformed)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> SAMPLE STATISTICS:</span>
@@ -335,7 +371,7 @@ use Welch's t-test instead of Student's t-test.
 <span class="r-out co"><span class="r-pr">#&gt;</span>   95% CI for the difference in population means (μ1 - μ2) : [ -11.28, -3.21 ]</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Welch Two Sample t-test (Box-Cox transformed) of: hp</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Welch Two Sample t-test (two.sided) on Box-Cox transformed hp (lambda = 0.094)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> SAMPLE STATISTICS:</span>
@@ -367,10 +403,10 @@ use Welch's t-test instead of Student's t-test.
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># 3. One-sample t-test: test if mean mpg equals 20</span></span></span>
 <span class="r-in"><span><span class="fu">f_t_test</span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="fl">1</span>, data <span class="op">=</span> <span class="va">mtcars</span>, mu <span class="op">=</span> <span class="fl">20</span>,</span></span>
-<span class="r-in"><span>         output_type <span class="op">=</span> <span class="st">"console"</span>, norm_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span>         output_type <span class="op">=</span> <span class="st">"console"</span>, diagnostic_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> One Sample t-test (two.sided) of: mpg</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> One Sample t-test (two.sided) on mpg (untransformed)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> SAMPLE STATISTICS:</span>
@@ -391,10 +427,10 @@ use Welch's t-test instead of Student's t-test.
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># 4. Paired t-test with explicit subject id (recommended)</span></span></span>
 <span class="r-in"><span><span class="fu">f_t_test</span><span class="op">(</span><span class="va">extra</span> <span class="op">~</span> <span class="va">group</span>, data <span class="op">=</span> <span class="va">sleep</span>, paired <span class="op">=</span> <span class="cn">TRUE</span>, paired_by <span class="op">=</span> <span class="st">"ID"</span>,</span></span>
-<span class="r-in"><span>         output_type <span class="op">=</span> <span class="st">"console"</span>, norm_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span>         output_type <span class="op">=</span> <span class="st">"console"</span>, diagnostic_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> One Sample t-test (arcsinh(x) transformed) of: extra</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> One Sample t-test (two.sided) on bestNormalize (arcsinh(x)) transformed extra</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> SAMPLE STATISTICS:</span>
@@ -423,10 +459,10 @@ use Welch's t-test instead of Student's t-test.
 <span class="r-in"><span><span class="co"># 4b. Paired t-test without paired_by (warns; pairing is positional and</span></span></span>
 <span class="r-in"><span><span class="co"># only safe when data is in AABB order with matching within-group order)</span></span></span>
 <span class="r-in"><span><span class="fu">f_t_test</span><span class="op">(</span><span class="va">extra</span> <span class="op">~</span> <span class="va">group</span>, data <span class="op">=</span> <span class="va">sleep</span>, paired <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
-<span class="r-in"><span>         output_type <span class="op">=</span> <span class="st">"console"</span>, norm_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span>         output_type <span class="op">=</span> <span class="st">"console"</span>, diagnostic_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> One Sample t-test (arcsinh(x) transformed) of: extra</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> One Sample t-test (two.sided) on bestNormalize (arcsinh(x)) transformed extra</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> SAMPLE STATISTICS:</span>
@@ -455,10 +491,10 @@ use Welch's t-test instead of Student's t-test.
 <span class="r-in"><span><span class="co"># 5. Vector interface: two-sample independent</span></span></span>
 <span class="r-in"><span><span class="va">group_auto</span>   <span class="op">&lt;-</span> <span class="va">mtcars</span><span class="op">$</span><span class="va">mpg</span><span class="op">[</span><span class="va">mtcars</span><span class="op">$</span><span class="va">am</span> <span class="op">==</span> <span class="fl">0</span><span class="op">]</span></span></span>
 <span class="r-in"><span><span class="va">group_manual</span> <span class="op">&lt;-</span> <span class="va">mtcars</span><span class="op">$</span><span class="va">mpg</span><span class="op">[</span><span class="va">mtcars</span><span class="op">$</span><span class="va">am</span> <span class="op">==</span> <span class="fl">1</span><span class="op">]</span></span></span>
-<span class="r-in"><span><span class="fu">f_t_test</span><span class="op">(</span><span class="va">group_auto</span>, <span class="va">group_manual</span>, output_type <span class="op">=</span> <span class="st">"console"</span>, norm_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">f_t_test</span><span class="op">(</span><span class="va">group_auto</span>, <span class="va">group_manual</span>, output_type <span class="op">=</span> <span class="st">"console"</span>, diagnostic_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Welch Two Sample t-test (two.sided) of: y</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Welch Two Sample t-test (two.sided) on y (untransformed)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> SAMPLE STATISTICS:</span>
@@ -480,7 +516,7 @@ use Welch's t-test instead of Student's t-test.
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Welch Two Sample t-test (two.sided) of: group_auto_vs_group_manual</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Welch Two Sample t-test (two.sided) on group_auto_vs_group_manual (untransformed)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> SAMPLE STATISTICS:</span>
@@ -502,10 +538,10 @@ use Welch's t-test instead of Student's t-test.
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># 6. Vector interface: one-sample</span></span></span>
-<span class="r-in"><span><span class="fu">f_t_test</span><span class="op">(</span><span class="va">mtcars</span><span class="op">$</span><span class="va">mpg</span>, mu <span class="op">=</span> <span class="fl">20</span>, output_type <span class="op">=</span> <span class="st">"console"</span>, norm_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">f_t_test</span><span class="op">(</span><span class="va">mtcars</span><span class="op">$</span><span class="va">mpg</span>, mu <span class="op">=</span> <span class="fl">20</span>, output_type <span class="op">=</span> <span class="st">"console"</span>, diagnostic_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> One Sample t-test (two.sided) of: mpg</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> One Sample t-test (two.sided) on mpg (untransformed)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> SAMPLE STATISTICS:</span>
@@ -525,7 +561,7 @@ use Welch's t-test instead of Student's t-test.
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> One Sample t-test (two.sided) of: mpg</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> One Sample t-test (two.sided) on mpg (untransformed)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> SAMPLE STATISTICS:</span>
@@ -546,10 +582,10 @@ use Welch's t-test instead of Student's t-test.
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># 7. Force Student's t-test (equal variances assumed)</span></span></span>
 <span class="r-in"><span><span class="fu">f_t_test</span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">am</span>, data <span class="op">=</span> <span class="va">mtcars</span>, var.equal <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
-<span class="r-in"><span>         output_type <span class="op">=</span> <span class="st">"console"</span>, norm_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span>         output_type <span class="op">=</span> <span class="st">"console"</span>, diagnostic_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  Two Sample t-test (two.sided) of: mpg</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  Two Sample t-test (two.sided) on mpg (untransformed)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> SAMPLE STATISTICS:</span>
@@ -572,10 +608,10 @@ use Welch's t-test instead of Student's t-test.
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># 8. One-sided test</span></span></span>
 <span class="r-in"><span><span class="fu">f_t_test</span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">am</span>, data <span class="op">=</span> <span class="va">mtcars</span>, alternative <span class="op">=</span> <span class="st">"greater"</span>,</span></span>
-<span class="r-in"><span>         output_type <span class="op">=</span> <span class="st">"console"</span>, norm_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span>         output_type <span class="op">=</span> <span class="st">"console"</span>, diagnostic_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Welch Two Sample t-test (greater) of: mpg</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Welch Two Sample t-test (greater) on mpg (untransformed)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> SAMPLE STATISTICS:</span>
@@ -598,10 +634,10 @@ use Welch's t-test instead of Student's t-test.
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># 9. Custom significance level (alpha = 0.01 is equivalent to conf.level = 0.99)</span></span></span>
 <span class="r-in"><span><span class="fu">f_t_test</span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">am</span>, data <span class="op">=</span> <span class="va">mtcars</span>, alpha <span class="op">=</span> <span class="fl">0.01</span>,</span></span>
-<span class="r-in"><span>         output_type <span class="op">=</span> <span class="st">"console"</span>, norm_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span>         output_type <span class="op">=</span> <span class="st">"console"</span>, diagnostic_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Welch Two Sample t-test (two.sided) of: mpg</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Welch Two Sample t-test (two.sided) on mpg (untransformed)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> SAMPLE STATISTICS:</span>
@@ -625,10 +661,10 @@ use Welch's t-test instead of Student's t-test.
 <span class="r-in"><span><span class="co"># 10. Box-Cox transformation with back-transformed CI</span></span></span>
 <span class="r-in"><span><span class="co"># The back-transformed CI estimates the MEDIAN, not the arithmetic mean.</span></span></span>
 <span class="r-in"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu">f_t_test</span><span class="op">(</span><span class="va">hp</span> <span class="op">~</span> <span class="va">am</span>, data <span class="op">=</span> <span class="va">mtcars</span>, transformation <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
-<span class="r-in"><span>                   output_type <span class="op">=</span> <span class="st">"console"</span>, norm_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span>                   output_type <span class="op">=</span> <span class="st">"console"</span>, diagnostic_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Welch Two Sample t-test (Box-Cox transformed) of: hp</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Welch Two Sample t-test (two.sided) on Box-Cox transformed hp (lambda = 0.094)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> SAMPLE STATISTICS:</span>
@@ -664,10 +700,10 @@ use Welch's t-test instead of Student's t-test.
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># 11. One-sample with non-zero mu and back-transformation</span></span></span>
 <span class="r-in"><span><span class="fu">f_t_test</span><span class="op">(</span><span class="va">hp</span> <span class="op">~</span> <span class="fl">1</span>, data <span class="op">=</span> <span class="va">mtcars</span>, mu <span class="op">=</span> <span class="fl">100</span>, transformation <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
-<span class="r-in"><span>         output_type <span class="op">=</span> <span class="st">"console"</span>, norm_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span>         output_type <span class="op">=</span> <span class="st">"console"</span>, diagnostic_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> One Sample t-test (Box-Cox transformed) of: hp</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> One Sample t-test (two.sided) on Box-Cox transformed hp (lambda = 0.094)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> SAMPLE STATISTICS:</span>
@@ -697,10 +733,10 @@ use Welch's t-test instead of Student's t-test.
 <span class="r-in"><span><span class="co"># 12. BestNormalize transformation (set seed for reproducibility)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu">f_t_test</span><span class="op">(</span><span class="va">hp</span> <span class="op">~</span> <span class="va">am</span>, data <span class="op">=</span> <span class="va">mtcars</span>, transformation <span class="op">=</span> <span class="st">"bestnormalize"</span>,</span></span>
-<span class="r-in"><span>         output_type <span class="op">=</span> <span class="st">"console"</span>, norm_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span>         output_type <span class="op">=</span> <span class="st">"console"</span>, diagnostic_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Welch Two Sample t-test (sqrt(x + a) transformed) of: hp</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Welch Two Sample t-test (two.sided) on bestNormalize (sqrt(x + a)) transformed hp</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> SAMPLE STATISTICS:</span>
@@ -732,10 +768,10 @@ use Welch's t-test instead of Student's t-test.
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># 13. Force transformation regardless of normality</span></span></span>
 <span class="r-in"><span><span class="fu">f_t_test</span><span class="op">(</span><span class="va">mpg</span> <span class="op">+</span> <span class="va">hp</span> <span class="op">~</span> <span class="va">am</span>, data <span class="op">=</span> <span class="va">mtcars</span>, force_transformation <span class="op">=</span> <span class="st">"mpg"</span>,</span></span>
-<span class="r-in"><span>         output_type <span class="op">=</span> <span class="st">"console"</span>, norm_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span>         output_type <span class="op">=</span> <span class="st">"console"</span>, diagnostic_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Welch Two Sample t-test (Box-Cox transformed) of: mpg</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Welch Two Sample t-test (two.sided) on Box-Cox transformed mpg (lambda = 0.019)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> SAMPLE STATISTICS:</span>
@@ -764,7 +800,7 @@ use Welch's t-test instead of Student's t-test.
 <span class="r-out co"><span class="r-pr">#&gt;</span> The t-test was conducted on the Box-Cox-transformed scale. The back-transformed mean and the sample median of the raw data will differ when the transformation is not perfectly normalizing. For non-normal data consider f_wilcox_test() which tests the median directly without transformation assumptions.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Welch Two Sample t-test (Box-Cox transformed) of: hp</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Welch Two Sample t-test (two.sided) on Box-Cox transformed hp (lambda = 0.094)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> SAMPLE STATISTICS:</span>
@@ -796,10 +832,10 @@ use Welch's t-test instead of Student's t-test.
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># 14. Suppress transformation (diagnostic mode)</span></span></span>
 <span class="r-in"><span><span class="fu">f_t_test</span><span class="op">(</span><span class="va">hp</span> <span class="op">~</span> <span class="va">am</span>, data <span class="op">=</span> <span class="va">mtcars</span>, transformation <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
-<span class="r-in"><span>         output_type <span class="op">=</span> <span class="st">"console"</span>, norm_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span>         output_type <span class="op">=</span> <span class="st">"console"</span>, diagnostic_plots <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Welch Two Sample t-test (two.sided) of: hp</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Welch Two Sample t-test (two.sided) on hp (untransformed)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ==========================================================</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> SAMPLE STATISTICS:</span>
@@ -822,7 +858,7 @@ use Welch's t-test instead of Student's t-test.
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># 15. Access return object fields directly</span></span></span>
 <span class="r-in"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu">f_t_test</span><span class="op">(</span><span class="va">mpg</span> <span class="op">+</span> <span class="va">hp</span> <span class="op">~</span> <span class="va">am</span>, data <span class="op">=</span> <span class="va">mtcars</span>,</span></span>
-<span class="r-in"><span>                   output_type <span class="op">=</span> <span class="st">"default"</span>, norm_plots <span class="op">=</span> <span class="cn">FALSE</span>, intro_text <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span>                   output_type <span class="op">=</span> <span class="st">"default"</span>, diagnostic_plots <span class="op">=</span> <span class="cn">FALSE</span>, intro_text <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">result</span><span class="op">[[</span><span class="st">"mpg"</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">t_test</span>          <span class="co"># standard htest object</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 	Welch Two Sample t-test</span>

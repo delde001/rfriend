@@ -15,7 +15,7 @@ be in various formats ('Word', 'pdf', 'Excel')."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">rfriend</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -54,19 +54,22 @@ be in various formats ('Word', 'pdf', 'Excel').</p>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">f_lm</span><span class="op">(</span></span>
 <span>  <span class="va">formula</span>,</span>
 <span>  data <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  norm_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  diagnostic_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  effect_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  contrast_plots <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  transformation <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  force_transformation <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  alpha <span class="op">=</span> <span class="fl">0.05</span>,</span>
 <span>  adjust <span class="op">=</span> <span class="st">"sidak"</span>,</span>
+<span>  post_hoc <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  by <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  intro_text <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  close_generated_files <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  open_generated_files <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/interactive.html" class="external-link">interactive</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  output_type <span class="op">=</span> <span class="st">"default"</span>,</span>
 <span>  save_as <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  save_in_wdir <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  norm_plots <span class="op">=</span> <span class="fu">lifecycle</span><span class="fu">::</span><span class="fu"><a href="https://lifecycle.r-lib.org/reference/deprecated.html" class="external-link">deprecated</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -83,7 +86,7 @@ be in various formats ('Word', 'pdf', 'Excel').</p>
 <dd><p>A data frame containing the variables in the model.</p></dd>
 
 
-<dt id="arg-norm-plots">norm_plots<a class="anchor" aria-label="anchor" href="#arg-norm-plots"></a></dt>
+<dt id="arg-diagnostic-plots">diagnostic_plots<a class="anchor" aria-label="anchor" href="#arg-diagnostic-plots"></a></dt>
 <dd><p>Logical. If <code>TRUE</code>, diagnostic residual plots are included in the output files. Default is <code>TRUE</code>.</p></dd>
 
 
@@ -107,7 +110,13 @@ contrasts). Main-effect contrast plots are stored as
 
 
 <dt id="arg-transformation">transformation<a class="anchor" aria-label="anchor" href="#arg-transformation"></a></dt>
-<dd><p>Logical or character string. If <code>TRUE</code>, or if <code>"boxcox"</code> applies an <code><a href="f_boxcox.html">f_boxcox()</a></code> transformation if residuals are not normal. If <code>"bestnormalize"</code>, applies <code><a href="f_bestNormalize.html">f_bestNormalize()</a></code> transformation. If <code>FALSE</code> no transformation will be applied. Default is <code>TRUE</code>.</p></dd>
+<dd><p>Logical or character string. If <code>TRUE</code>, or if <code>"boxcox"</code> applies an <code><a href="f_boxcox.html">f_boxcox()</a></code> transformation if residuals are not normal. If <code>"bestnormalize"</code>, applies <code><a href="f_bestNormalize.html">f_bestNormalize()</a></code> transformation. If <code>FALSE</code> no transformation will be applied. Default is <code>TRUE</code>.
+A transformation is kept only when it improves the residual check
+that triggered it: normality (Shapiro-Wilk, or Anderson-Darling when
+Shapiro-Wilk is unavailable) or, when only the variance check failed, equal
+variance (Breusch-Pagan test). Otherwise the untransformed analysis is reported, the
+report says so, and the attempt is recorded in <code>transformation_rejected</code>.
+Responses named in <code>force_transformation</code> are always transformed.</p></dd>
 
 
 <dt id="arg-force-transformation">force_transformation<a class="anchor" aria-label="anchor" href="#arg-force-transformation"></a></dt>
@@ -137,6 +146,30 @@ for multiple comparisons. Available methods include:</p><dl><dt>"tukey"</dt>
 
 
 </dl><p>Default is <code>"sidak"</code>.</p></dd>
+
+
+<dt id="arg-post-hoc">post_hoc<a class="anchor" aria-label="anchor" href="#arg-post-hoc"></a></dt>
+<dd><p>Which post hoc tables to build; the same syntax and rules as
+<code><a href="f_aov.html">f_aov</a></code>. <code>NULL</code> or <code>TRUE</code> (default): a cell-means
+table for each significant interaction of categorical predictors and a
+marginal-means table for each categorical main effect (letters <code>"ns"</code>
+when the term is not significant, an "Interpret with caution" note when the
+factor takes part in a significant interaction); numeric predictors get no
+table, their slope is in the coefficient table. <code>FALSE</code>: no post hoc.
+A character vector of terms: only those tables, e.g.
+<code>post_hoc = "treatment"</code> (leave blocks out of the comparisons) or
+<code>post_hoc = "treatment:week"</code>. Unknown names stop with a "did you mean"
+error. Letters and the <code>adjust</code> method apply within each table, and
+each table has its own footer.</p></dd>
+
+
+<dt id="arg-by">by<a class="anchor" aria-label="anchor" href="#arg-by"></a></dt>
+<dd><p><code>NULL</code> (default) or one categorical predictor, used with
+<code>post_hoc</code> for simple effects: <code>post_hoc = "treatment",
+by = "week"</code> compares the treatments within each week
+(<code>emmeans(model, ~ treatment | week)</code>), stored as
+<code>out$y$post_hoc[["treatment | week"]]</code>. The rules are those of
+<code><a href="f_aov.html">f_aov</a></code>.</p></dd>
 
 
 <dt id="arg-intro-text">intro_text<a class="anchor" aria-label="anchor" href="#arg-intro-text"></a></dt>
@@ -176,6 +209,11 @@ the file is named "dataname_lm_output" in that directory. If an extension is pro
 <dd><p>Logical. If <code>TRUE</code>, saves the file in the working directory. Default is <code>FALSE</code>. If <code>save_as</code> location is specified <code>save_in_wdir</code> is overwritten by <code>save_as</code>.</p></dd>
 
 
+<dt id="arg-norm-plots">norm_plots<a class="anchor" aria-label="anchor" href="#arg-norm-plots"></a></dt>
+<dd><p><strong>Deprecated</strong> in 3.2.1. Use <code>diagnostic_plots</code> instead. If
+supplied, its value is passed to <code>diagnostic_plots</code> with a warning.</p></dd>
+
+
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
 <dd><p>Additional arguments forwarded to <code><a href="https://rdrr.io/r/stats/lm.html" class="external-link">lm</a></code>.
 The arguments <code>subset</code> and <code>weights</code> are handled specially: when
@@ -187,7 +225,31 @@ same row set as <code><a href="https://rdrr.io/r/stats/lm.html" class="external-
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>An object of class 'f_lm' containing results from <code><a href="https://rdrr.io/r/stats/lm.html" class="external-link">lm()</a></code>, normality tests, transformations, coefficient tables, Type II ANOVA, and post hoc tests. Using the option "output_type", it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and plot methods for 'f_lm' objects.</p>
+    <p>An object of class 'f_lm' containing results from <code><a href="https://rdrr.io/r/stats/lm.html" class="external-link">lm()</a></code>, normality tests, transformations, coefficient tables, Type II ANOVA, and post hoc tests. Using the option "output_type", it can also generate output in the form of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and plot methods for 'f_lm' objects.
+  Post hoc tables: <code>out$y$post_hoc[[term]]</code>, each a list with
+  <code>emmeans</code>, <code>pairs</code>, <code>cld</code> (the letters), <code>cld_text</code>
+  (the footer) and <code>caution</code>, the same structure as <code><a href="f_aov.html">f_aov</a></code>
+  and <code><a href="f_lmer.html">f_lmer</a></code>. The elements <code>post_hoc_summary_table</code>,
+  <code>emmeans_table</code> and <code>cld_text</code> are <strong>deprecated</strong> and will
+  be removed in the next release: they hold the cell-means table when a
+  significant interaction is tabulated, otherwise the first table. (Before
+  3.2.1 this single table compared every combination of all categorical
+  predictors, also in additive models.)
+  <code>Response_Transformed</code>: <code>TRUE</code> when the response was
+  transformed (Box-Cox or bestNormalize) because the residuals were not normal (or, alone, had unequal variances) and
+  the transformation was kept (see <code>transformation</code>).
+  <code>anova</code>: Type II ANOVA table of the untransformed response.
+  <code>transformed_anova</code>: Type II ANOVA table of the transformed response, or
+  <code>NULL</code> when no transformation was applied. The printed and reported
+  result is <code>transformed_anova</code> when <code>Response_Transformed</code> is
+  <code>TRUE</code>, otherwise <code>anova</code>. To pick it in code:
+  <code>tab &lt;- if (out$y$Response_Transformed) out$y$transformed_anova else out$y$anova</code>.
+  When a transformation was tried but not kept, <code>transformation_rejected</code>
+  records the method, the reason and the p-values before and after.
+  The same convention holds for <code>summary</code> / <code>transformed_summary</code>
+  and <code>coefficients</code> / <code>transformed_coefficients</code>. Since rfriend
+  3.2.1 the plain names always hold the untransformed fit (in 3.2.0 they held
+  the transformed fit when a transformation was applied).</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -256,7 +318,7 @@ interactive output matches the report output.</p>
 estimates are back-transformed to the original scale (medians), exactly as in
 <code><a href="f_aov.html">f_aov</a></code>.</p>
 <p>Outputs can be generated in multiple formats ("pdf", "word", "excel" and "rmd") as specified by <code>output_type</code>. If <code>output_type = "rmd"</code> is used it is advised to use it in a chunk with {r, echo=FALSE, results='asis'}.</p>
-<p>This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.</p>
+<p>This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or higher), a universal document converter.</p>
     </div>
     <div class="section level2">
     <h2 id="multiple-testing-across-response-variables">Multiple Testing Across Response Variables<a class="anchor" aria-label="anchor" href="#multiple-testing-across-response-variables"></a></h2>
@@ -290,14 +352,14 @@ FDR correction across responses, or pre-registration of primary outcomes.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  lm call:  Sepal.Length ~ Petal.Length </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Coefficients:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Coefficients of the linear regression on Sepal.Length (untransformed):</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>               Estimate Std. Error  t value      Pr(&gt;|t|)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)  4.3066034 0.07838896 54.93890 2.426713e-100</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Petal.Length 0.4089223 0.01889134 21.64602  1.038667e-47</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Model fit: R-squared = 0.76  Adjusted R-squared = 0.7583 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> --- Type II Analysis of Variance ---</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> --- Analysis of Variance on Sepal.Length (untransformed) ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                Sum Sq  Df  F value       Pr(&gt;F)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Petal.Length 77.64330   1 468.5502 1.038667e-47</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Residuals    24.52503 148       NA           NA</span>
@@ -311,12 +373,12 @@ FDR correction across responses, or pre-registration of primary outcomes.</p>
 <span class="r-in"><span><span class="co"># Mixed continuous + categorical predictors (ANCOVA-style multiple regression).</span></span></span>
 <span class="r-in"><span><span class="va">iris</span><span class="op">$</span><span class="va">Species</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">iris</span><span class="op">$</span><span class="va">Species</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu">f_lm</span><span class="op">(</span><span class="va">Sepal.Length</span> <span class="op">~</span> <span class="va">Petal.Length</span> <span class="op">+</span> <span class="va">Species</span>, data <span class="op">=</span> <span class="va">iris</span>, output_type <span class="op">=</span> <span class="st">"word"</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Saving output in: /tmp/RtmplsKqN3/iris_lm_output.docx</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Saving output in: /tmp/RtmplP7rcW/iris_lm_output.docx</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Two responses analysed in sequence, captured in one output file.</span></span></span>
 <span class="r-in"><span><span class="fu">f_lm</span><span class="op">(</span><span class="va">Sepal.Width</span> <span class="op">+</span> <span class="va">Sepal.Length</span> <span class="op">~</span> <span class="va">Petal.Length</span> <span class="op">*</span> <span class="va">Species</span>,</span></span>
 <span class="r-in"><span>           effect_plots <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
-<span class="r-in"><span>           norm_plots <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
+<span class="r-in"><span>           diagnostic_plots <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
 <span class="r-in"><span>           data <span class="op">=</span> <span class="va">iris</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    </span>
@@ -326,7 +388,7 @@ FDR correction across responses, or pre-registration of primary outcomes.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  lm call:  Sepal.Width ~ Petal.Length * Species </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Coefficients:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Coefficients of the linear regression on Box-Cox transformed Sepal.Width (lambda = 0.281):</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                                   Estimate Std. Error    t value     Pr(&gt;|t|)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)                     1.21787651  0.1710640  7.1194206 4.743766e-11</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Petal.Length                    0.16966508  0.1162062  1.4600351 1.464587e-01</span>
@@ -337,7 +399,7 @@ FDR correction across responses, or pre-registration of primary outcomes.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Model fit: R-squared = 0.4929  Adjusted R-squared = 0.4753 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> --- Type II Analysis of Variance ---</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> --- Type II Analysis of Variance on Box-Cox transformed Sepal.Width (lambda = 0.281) ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                          Sum Sq  Df   F value       Pr(&gt;F)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Petal.Length         0.53026979   1 26.571920 8.234640e-07</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Species              1.78931406   2 44.831433 7.305351e-16</span>
@@ -345,16 +407,19 @@ FDR correction across responses, or pre-registration of primary outcomes.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Residuals            2.87366706 144        NA           NA</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> --- Post hoc Comparisons of: Sepal.Width ---</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> _________________________________________</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> * Species (marginal means) *</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Letters are compared within this table only.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     Species median (BT) lower.CL upper.CL Letter  n</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>      setosa    4.451867 3.088072 6.202695      a 50</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   virginica    2.571626 2.314153 2.849079      b 50</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  versicolor    2.570753 2.458030 2.687146      b 50</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Confidence level used: 0.95  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Significance level used: α = 0.05  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> P-value and CI adjustment: sidak method for 3 estimates / 3 tests.  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  Confidence level used: 0.95  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> *Note: Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different. Sharing a letter indicates insufficient evidence to claim a difference; it does not prove they are identical.*</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> **Note:** Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Note: post hoc 'median (BT)' values are back-transformed estimated marginal means (medians on the original scale). Report them as back-transformed medians; rely on the CIs.</span>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>   </span>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span> Based on the Breusch-Pagan Test (0.0032 ≤ 0.05) the residuals do </span>
@@ -367,7 +432,7 @@ FDR correction across responses, or pre-registration of primary outcomes.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  lm call:  Sepal.Length ~ Petal.Length * Species </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Coefficients:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Coefficients of the linear regression on Sepal.Length (untransformed):</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                                  Estimate Std. Error   t value     Pr(&gt;|t|)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)                     4.2131682  0.4074209 10.341071 4.331619e-19</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Petal.Length                    0.5422926  0.2767667  1.959385 5.199902e-02</span>
@@ -378,7 +443,7 @@ FDR correction across responses, or pre-registration of primary outcomes.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Model fit: R-squared = 0.8405  Adjusted R-squared = 0.8349 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> --- Type II Analysis of Variance ---</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> --- Type II Analysis of Variance on Sepal.Length (untransformed) ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                          Sum Sq  Df    F value       Pr(&gt;F)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Petal.Length         22.2745412   1 196.772993 1.008582e-28</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Species               7.8433750   2  34.644134 5.205685e-13</span>
@@ -386,16 +451,19 @@ FDR correction across responses, or pre-registration of primary outcomes.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Residuals            16.3006817 144         NA           NA</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> --- Post hoc Comparisons of: Sepal.Length ---</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> _________________________________________</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> * Species (marginal means) *</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Letters are compared within this table only.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     Species emmean..         SE lower.CL upper.CL Letter  n</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>      setosa 6.251104 0.63723520 4.991561 7.510647     ab 50</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  versicolor 5.520203 0.07000327 5.381836 5.658570      b 50</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   virginica 4.801645 0.16332376 4.478823 5.124467      a 50</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Confidence level used: 0.95  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Significance level used: α = 0.05  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> P-value and CI adjustment: sidak method for 3 estimates / 3 tests.  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  Confidence level used: 0.95  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> *Note: Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different. Sharing a letter indicates insufficient evidence to claim a difference; it does not prove they are identical.*</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> **Note:** Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># To print rmd output set chunk option to results = 'asis' and use cat().</span></span></span>
 <span class="r-in"><span><span class="va">f_lm_rmd_out</span> <span class="op">&lt;-</span> <span class="fu">f_lm</span><span class="op">(</span><span class="va">Sepal.Length</span> <span class="op">~</span> <span class="va">Petal.Length</span>, data <span class="op">=</span> <span class="va">iris</span>, output_type <span class="op">=</span> <span class="st">"rmd"</span><span class="op">)</span></span></span>
@@ -435,8 +503,8 @@ FDR correction across responses, or pre-registration of primary outcomes.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           for the model residuals; check Q-Q plot.  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Check the plots in the figure below to assess normality and homoscedasticity.  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplsKqN3/file1da264c3fbf2.png)    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ## Regression Summary of  Sepal.Length   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplP7rcW/file1c2a78451e60.png)    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ## Linear regression on Sepal.Length (untransformed)  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> &amp;nbsp;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
@@ -461,12 +529,12 @@ FDR correction across responses, or pre-registration of primary outcomes.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ### Coefficient forest plot</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplsKqN3/file1da248d14f80.png)    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplP7rcW/file1c2a9b3f5a1.png)    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> *Each row is a coefficient (the intercept is omitted) with its 95% confidence interval. The dashed line marks zero: a coefficient at zero has no effect relative to its reference. Points to the right increase the response, points to the left decrease it. A CI that touches or crosses zero means the term is not distinguishable from its reference at α = 0.05; a CI clear of zero is a significant effect.*  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> *Continuous term (Petal.Length) has no reference level; the estimate is the change per one-unit increase (on the scale stated above), so zero means no association.* </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ## Analysis of Variance of: Sepal.Length  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ## Analysis of Variance on Sepal.Length (untransformed)  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> The table below tests the significance of the predictor term via an F-test.  With a single predictor this is equivalent to the coefficient t-test above  ($F = t^2$).  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
@@ -487,13 +555,13 @@ FDR correction across responses, or pre-registration of primary outcomes.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ## Regression Plot of: Sepal.Length  (Petal.Length)  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplsKqN3/file1da26f3717a4.png)    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplP7rcW/file1c2a28d6660b.png)    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> *Points are (jittered) raw data; estimates and fitted lines are model estimates with 95% CI.*   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ## Observed vs Fitted Plot of: Sepal.Length  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplsKqN3/file1da2572c04a1.png)    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplP7rcW/file1c2a325f9a0a.png)    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> *Points on the dashed 1:1 line are perfectly predicted; scatter around it reflects residual error.*   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>

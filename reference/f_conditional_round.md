@@ -56,9 +56,9 @@ f_conditional_round(
   Character string used to replace `NA` values in the output when
   `replace_na = TRUE`. Use `"-"` (default) for a standard "not
   available" dash, `""` for empty cells, or any other string as needed.
-  Note that special characters such as the em dash (`"\u2014"`) may
-  require additional LaTeX declarations when rendering to PDF via
-  `pdflatex`. Default is `"-"`.
+  Note that non-ASCII characters (for example a long dash) may require
+  additional LaTeX declarations when rendering to PDF via `pdflatex`.
+  Default is `"-"`.
 
 - allow_integer_decimal_mix:
 
@@ -78,7 +78,11 @@ f_conditional_round(
 
 - If input is a data frame: A data frame with the same structure as the
   input, but with character columns formatted according to the specified
-  rules.
+  rules. Because the numbers become text, the result is a plain data
+  frame (or tibble): other classes, such as the `anova` class of an
+  ANOVA table, are dropped, so that
+  [`print()`](https://rdrr.io/r/base/print.html) shows the rounded
+  values.
 
 ## Details
 

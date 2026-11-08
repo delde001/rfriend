@@ -16,8 +16,11 @@ f_factors(
   properties = FALSE,
   force_factors = FALSE,
   ref = NULL,
-  unique_num_treshold = 8,
+  unique_num_threshold = 8,
   repeats_threshold = 2,
+  unique_num_treshold = NULL,
+  ordered = NULL,
+  levels = NULL,
   ...
 )
 ```
@@ -63,21 +66,54 @@ f_factors(
   A level that is not present in a given factor is skipped with a
   warning. Default `NULL` (leave the reference as the first level).
 
-- unique_num_treshold:
+- unique_num_threshold:
 
   Numeric. A threshold of the amount of unique numbers a numeric column
-  should have to keep it numeric, i.e. omit factor conversion. Default
-  `8`.
+  should have to keep it numeric, i.e. omit factor conversion. A numeric
+  column is a factor candidate only when it has fewer than
+  `unique_num_threshold` unique values. Default `8`.
 
 - repeats_threshold:
 
-  Numeric. A threshold of the minimal number of repeats a numeric column
-  should have to convert it to a factor. Default `2`.
+  Numeric. A numeric column is converted to a factor only when at least
+  one of its values occurs more than `repeats_threshold` times. Default
+  `2`, so a value has to occur at least three times.
+
+- unique_num_treshold:
+
+  Alternative spelling of `unique_num_threshold`, accepted so that
+  existing scripts keep working. Default `NULL` (not used). Supplying
+  both spellings with different values is an error.
+
+- ordered:
+
+  Which converted columns become ordered factors (for ordinal data such
+  as a damage score). Supply the column names, e.g. `ordered = "damage"`
+  or `ordered = c("damage", "stage")`; `TRUE` orders all converted
+  columns, `FALSE` makes all of them unordered. Default `NULL`:
+  [`factor()`](https://rdrr.io/r/base/factor.html)'s own default (a
+  column that is already ordered stays ordered). A named column must
+  exist and be among the converted columns, otherwise the function stops
+  with an error.
+
+- levels:
+
+  Optional named list with the level order per column, e.g.
+  `levels = list(damage = c("low", "medium", "high"))`. Without it,
+  [`factor()`](https://rdrr.io/r/base/factor.html) sorts the levels
+  (text alphabetically), which is rarely the right order for an ordered
+  factor. Every value in the column must be one of the given levels
+  (missing values excepted), otherwise the function stops: a value
+  outside the levels would silently become `NA`. Levels without
+  observations are allowed. A named column must exist and be among the
+  converted columns. Default `NULL`.
 
 - ...:
 
   Additional arguments passed to the
-  [`factor()`](https://rdrr.io/r/base/factor.html) function of baseR.
+  [`factor()`](https://rdrr.io/r/base/factor.html) function of base R,
+  such as `labels`. `ordered` and `levels` are arguments of
+  `f_factors()` itself (see above).
 
 ## Value
 
@@ -88,14 +124,20 @@ data frame's structure to the console (properties = TRUE).
 ## Details
 
 - If `select` is `NULL`, the function identifies columns with character
-  data or numeric data with fewer than 8 unique values as candidates for
-  conversion to factors.
+  data, and numeric columns with fewer than `unique_num_threshold`
+  (default 8) unique values of which at least one value occurs more than
+  `repeats_threshold` (default 2) times, as candidates for conversion to
+  factors.
 
 - The function checks if all specified columns exist in the data frame
   and stops execution if any are missing.
 
 - Converts specified columns into factors, applying any additional
   arguments provided.
+
+- `ordered` and `levels` make ordinal columns: name the columns and give
+  the level order. `ref` does not apply to an ordered factor (it uses
+  its level order, not a reference level) and stops with an error.
 
 - Outputs a summary data frame with details about each column, including
   its type, class, number of observations, missing values, factor
@@ -178,16 +220,28 @@ levels(df_ref$c)[1] # reference is now "kiwi"
 levels(df_ref$a)[1] # reference is now "yes" (was "no")
 #> [1] "yes"
 
-# In example above col b was converted to a factor as the number of repeats = 2
-# and the amount of unique numbers < 8. In order to keep b numeric we can also
-# adjust the unique_num_treshold and/or repeats_threshold:
-df5 <- f_factors(df, unique_num_treshold = 2)
+# In example above col b was converted to a factor as each value occurs 3 times
+# (more than repeats_threshold = 2) and there are fewer than 8 unique numbers.
+# In order to keep b numeric we can also adjust the unique_num_threshold
+# and/or repeats_threshold:
+df5 <- f_factors(df, unique_num_threshold = 2)
 str(df5)
 #> 'data.frame':    9 obs. of  4 variables:
 #>  $ a: Factor w/ 2 levels "no","yes": 2 1 2 2 1 2 2 1 2
 #>  $ b: num  1 2 3 1 2 3 1 2 3
 #>  $ c: Factor w/ 3 levels "apple","banana",..: 1 3 2 1 3 2 1 3 2
 #>  $ d: num  1.1 1.1 3.4 4.5 5.4 6.7 7.8 8.1 9.8
+
+# An ordinal column: name it in 'ordered' and give the level order in 'levels'
+# (without 'levels' the order would be alphabetical: high, low, medium).
+scores <- data.frame(damage = c("low", "high", "medium", "low", "high", "medium"),
+                     trt = c("a", "b", "a", "b", "a", "b"))
+scores_f <- f_factors(scores, select = c("damage", "trt"), ordered = "damage",
+                      levels = list(damage = c("low", "medium", "high")))
+str(scores_f)
+#> 'data.frame':    6 obs. of  2 variables:
+#>  $ damage: Ord.factor w/ 3 levels "low"<"medium"<..: 1 3 2 1 3 2
+#>  $ trt   : Factor w/ 2 levels "a","b": 1 2 1 2 1 2
 
 # Use `properties = TRUE` to view the data frame's structure.
 # This forces a printed output which is more insight than standard str() output.

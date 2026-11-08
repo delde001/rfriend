@@ -1,5 +1,12 @@
 # Statistical Test Wizard
 
+**\[experimental\]**
+
+**Beta.** `f_stat_wizard()` is under active development: its
+recommendations can be wrong and can change between versions. Use the
+recommendation as a proposal and verify it against your experimental
+design before you report it.
+
 Analyzes your data structure based on a formula and recommends the
 appropriate statistical test. Checks variable types, normality of
 residuals, homogeneity of variance, and checks if f_boxcox
@@ -11,6 +18,21 @@ interaction terms. Formulas with random effects (e.g. `(1|ID)`) are
 detected and handled separately. Multivariate responses (e.g.
 `cbind(y1, y2) ~ x`) and transformed responses (e.g. `log(y) ~ x`) are
 not supported.
+
+**Ordinal responses.** A response stored as an ordered factor
+(`factor(y, ordered = TRUE)`) with three or more levels is treated as
+ordinal: the wizard recommends rank-based tests
+([`f_wilcox_test()`](https://delde001.github.io/rfriend/reference/f_wilcox_test.md),
+[`f_kruskal_test()`](https://delde001.github.io/rfriend/reference/f_kruskal_test.md),
+[`f_friedman()`](https://delde001.github.io/rfriend/reference/f_friedman.md))
+or a Spearman correlation, applied to the rank codes of the levels
+([`as.integer()`](https://rdrr.io/r/base/integer.html)), because these
+tests use only the order of the values. With several predictors or
+random effects it points to ordinal (cumulative link) regression, which
+has no rfriend wrapper. A numeric response of whole numbers on a short
+scale (at most 10 distinct values, maximum at most 10) cannot be told
+apart from a count; it is analysed as count data, with a note to store
+it as an ordered factor if it is a score (for example 1 to 5).
 
 ## Usage
 
@@ -153,8 +175,8 @@ An object of class `"f_stat_wizard"`: a list containing:
 - y_type:
 
   Detected type of the response: `"binary"`, `"count"`, `"multinomial"`,
-  `"ratio_normal"`, `"ratio_non_normal"`, `"ratio_unknown"`, or
-  `"unsupported"`.
+  `"ordinal"`, `"ratio_normal"`, `"ratio_non_normal"`,
+  `"ratio_unknown"`, or `"unsupported"`.
 
 - x_vars:
 
@@ -245,7 +267,7 @@ f_stat_wizard(Sepal.Length ~ Species, data = iris)
 #> ---------------------------------------------------
 #>  
 #> RECOMMENDATION:
-#> Test: One-Way ANOVA (variances unequal — see note)
+#> Test: One-Way ANOVA (variances unequal, see note)
 #> Code: f_aov(Sepal.Length ~ Species, data=iris, output_type="word")
 #>    Note: Levene flagged unequal variances. f_aov() is reasonably robust
 #>    for balanced designs; for strict correctness use Welch's ANOVA:
@@ -257,15 +279,19 @@ f_stat_wizard(Sepal.Length ~ Species, data = iris)
 #> Disclaimer:
 #> - This wizard checks data properties, not experimental design.
 #> - Always verify if your data is Paired or Independent!
-#> - BETA: f_stat_wizard is new and under active development — verify recommendations.
+#> - BETA: f_stat_wizard is new and under active development: verify recommendations.
 #> - Other tests than the recommended one could be more suitable.
 #> The WIZARD recommends exclusively from these rfriend functions:
-#>    f_t_test, f_aov, f_glm, f_chisq_test,
-#>    f_kruskal_test, f_wilcox_test, f_corplot,
+#>    f_t_test, f_aov, f_lm, f_glm, f_chisq_test,
+#>    f_kruskal_test, f_wilcox_test, f_friedman, f_lmer, f_corplot,
 #>    f_boxcox (transformation), f_scan (diagnostics)
 #> And these external packages (when no rfriend wrapper exists):
 #>    oneway.test (Welch ANOVA), MASS::glm.nb (Neg. Binomial),
-#>    nnet::multinom (Multinomial), cor.test (correlation test).
+#>    nnet::multinom (Multinomial), cor.test (correlation test),
+#>    MASS::polr / ordinal::clmm (ordinal regression).
+#>  
+#> WARNING: Package(s) not installed: ordinal
+#>    Install with: install.packages(c('ordinal'))
 
 # Data-first interface (backward compatible)
 f_stat_wizard(iris, Sepal.Length ~ Species)
@@ -281,7 +307,7 @@ f_stat_wizard(iris, Sepal.Length ~ Species)
 #> ---------------------------------------------------
 #>  
 #> RECOMMENDATION:
-#> Test: One-Way ANOVA (variances unequal — see note)
+#> Test: One-Way ANOVA (variances unequal, see note)
 #> Code: f_aov(Sepal.Length ~ Species, data=iris, output_type="word")
 #>    Note: Levene flagged unequal variances. f_aov() is reasonably robust
 #>    for balanced designs; for strict correctness use Welch's ANOVA:
@@ -293,15 +319,19 @@ f_stat_wizard(iris, Sepal.Length ~ Species)
 #> Disclaimer:
 #> - This wizard checks data properties, not experimental design.
 #> - Always verify if your data is Paired or Independent!
-#> - BETA: f_stat_wizard is new and under active development — verify recommendations.
+#> - BETA: f_stat_wizard is new and under active development: verify recommendations.
 #> - Other tests than the recommended one could be more suitable.
 #> The WIZARD recommends exclusively from these rfriend functions:
-#>    f_t_test, f_aov, f_glm, f_chisq_test,
-#>    f_kruskal_test, f_wilcox_test, f_corplot,
+#>    f_t_test, f_aov, f_lm, f_glm, f_chisq_test,
+#>    f_kruskal_test, f_wilcox_test, f_friedman, f_lmer, f_corplot,
 #>    f_boxcox (transformation), f_scan (diagnostics)
 #> And these external packages (when no rfriend wrapper exists):
 #>    oneway.test (Welch ANOVA), MASS::glm.nb (Neg. Binomial),
-#>    nnet::multinom (Multinomial), cor.test (correlation test).
+#>    nnet::multinom (Multinomial), cor.test (correlation test),
+#>    MASS::polr / ordinal::clmm (ordinal regression).
+#>  
+#> WARNING: Package(s) not installed: ordinal
+#>    Install with: install.packages(c('ordinal'))
 
 # Paired design -- supply the id_col that identifies matched subjects
 f_stat_wizard(extra ~ group, data = sleep, id_col = "ID")
@@ -311,7 +341,7 @@ f_stat_wizard(extra ~ group, data = sleep, id_col = "ID")
 #> Model: extra ~ group
 #> Effective sample size: n = 20
 #> Design: PAIRED / Repeated Measures (id_col = 'ID')
-#>    OK: Pairing structure verified (10 subjects × 2 groups, one observation per cell).
+#>    OK: Pairing structure verified (10 subjects x 2 groups, one observation per cell).
 #> -> Explanatory: Single variable (nominal).
 #> -> Response: Numeric. Checking normality of residuals...
 #>    CAVEAT: For paired tests, normality should be checked on within-pair
@@ -330,15 +360,19 @@ f_stat_wizard(extra ~ group, data = sleep, id_col = "ID")
 #> Disclaimer:
 #> - This wizard checks data properties, not experimental design.
 #> - Always verify if your data is Paired or Independent!
-#> - BETA: f_stat_wizard is new and under active development — verify recommendations.
+#> - BETA: f_stat_wizard is new and under active development: verify recommendations.
 #> - Other tests than the recommended one could be more suitable.
 #> The WIZARD recommends exclusively from these rfriend functions:
-#>    f_t_test, f_aov, f_glm, f_chisq_test,
-#>    f_kruskal_test, f_wilcox_test, f_corplot,
+#>    f_t_test, f_aov, f_lm, f_glm, f_chisq_test,
+#>    f_kruskal_test, f_wilcox_test, f_friedman, f_lmer, f_corplot,
 #>    f_boxcox (transformation), f_scan (diagnostics)
 #> And these external packages (when no rfriend wrapper exists):
 #>    oneway.test (Welch ANOVA), MASS::glm.nb (Neg. Binomial),
-#>    nnet::multinom (Multinomial), cor.test (correlation test).
+#>    nnet::multinom (Multinomial), cor.test (correlation test),
+#>    MASS::polr / ordinal::clmm (ordinal regression).
+#>  
+#> WARNING: Package(s) not installed: ordinal
+#>    Install with: install.packages(c('ordinal'))
 
 # With diagnostic plots
 f_stat_wizard(Sepal.Length ~ Species, data = iris, plots = TRUE)
@@ -358,7 +392,7 @@ f_stat_wizard(Sepal.Length ~ Species, data = iris, plots = TRUE)
 #> ---------------------------------------------------
 #>  
 #> RECOMMENDATION:
-#> Test: One-Way ANOVA (variances unequal — see note)
+#> Test: One-Way ANOVA (variances unequal, see note)
 #> Code: f_aov(Sepal.Length ~ Species, data=iris, output_type="word")
 #>    Note: Levene flagged unequal variances. f_aov() is reasonably robust
 #>    for balanced designs; for strict correctness use Welch's ANOVA:
@@ -370,15 +404,19 @@ f_stat_wizard(Sepal.Length ~ Species, data = iris, plots = TRUE)
 #> Disclaimer:
 #> - This wizard checks data properties, not experimental design.
 #> - Always verify if your data is Paired or Independent!
-#> - BETA: f_stat_wizard is new and under active development — verify recommendations.
+#> - BETA: f_stat_wizard is new and under active development: verify recommendations.
 #> - Other tests than the recommended one could be more suitable.
 #> The WIZARD recommends exclusively from these rfriend functions:
-#>    f_t_test, f_aov, f_glm, f_chisq_test,
-#>    f_kruskal_test, f_wilcox_test, f_corplot,
+#>    f_t_test, f_aov, f_lm, f_glm, f_chisq_test,
+#>    f_kruskal_test, f_wilcox_test, f_friedman, f_lmer, f_corplot,
 #>    f_boxcox (transformation), f_scan (diagnostics)
 #> And these external packages (when no rfriend wrapper exists):
 #>    oneway.test (Welch ANOVA), MASS::glm.nb (Neg. Binomial),
-#>    nnet::multinom (Multinomial), cor.test (correlation test).
+#>    nnet::multinom (Multinomial), cor.test (correlation test),
+#>    MASS::polr / ordinal::clmm (ordinal regression).
+#>  
+#> WARNING: Package(s) not installed: ordinal
+#>    Install with: install.packages(c('ordinal'))
 
 # Run the recommended test directly
 result <- f_stat_wizard(Sepal.Length ~ Species, data = iris, run = TRUE)
@@ -391,22 +429,30 @@ result$run_result
 #> 
 #>  aov call:  Sepal.Length ~ Species 
 #> 
-#> TRANSFORMED Type II ANOVA Table (car::Anova):
+#> Type II ANOVA on Box-Cox transformed Sepal.Length (lambda = -0.145) (car::Anova):
 #> Anova Table (Type II tests)
 #> 
 #> Response: Sepal.Length
-#>           Sum Sq  Df F value    Pr(>F)    
-#> Species   63.212   2  119.26 < 2.2e-16 ***
-#> Residuals 38.956 147                      
+#>            Sum Sq  Df F value    Pr(>F)    
+#> Species   1.14005   2  130.03 < 2.2e-16 ***
+#> Residuals 0.64444 147                      
 #> ---
 #> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 #> 
 #> --- BACK TRANSFORMED Post hoc Comparisons of: Sepal.Length ---
+#> 
+#> * Species (marginal means) *
+#> Letters are compared within this table only.
 #>     Species median (BT) lower.CL upper.CL Letter  n
 #>   virginica    6.553397 6.396318 6.714908      a 50
 #>  versicolor    5.910783 5.771183 6.054264      b 50
 #>      setosa    4.992078 4.876990 5.110285      c 50
-#> ___________________________
+#> Confidence level used: 0.95  
+#> Significance level used: α = 0.05  
+#> P-value and CI adjustment: sidak method for 3 estimates / 3 tests.  
+#> 
+#> *Note: Groups in the "Letters" column sharing the same letter are **not** significantly different (α = 0.05). Groups with different letters are significantly different. Sharing a letter indicates insufficient evidence to claim a difference; it does not prove they are identical.*
+#> 
 #> 
 #> Note: 'median (BT)' = back-transformed estimated marginal mean. Back-transforming a mean from a transformed scale returns the MEDIAN on the original scale, not the arithmetic mean. Report these as back-transformed medians. CIs are valid; SE is omitted (asymmetric on original scale).
 #> 

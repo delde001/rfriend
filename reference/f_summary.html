@@ -15,7 +15,7 @@ the results directly to an 'Excel' file."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">rfriend</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -75,7 +75,7 @@ the results directly to an 'Excel' file.</p>
 <span>  show_Q3 <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  show_skew <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  show_kurtosis <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  digits <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  digits <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>  export_to_excel <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  close_generated_files <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  open_generated_files <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/interactive.html" class="external-link">interactive</a></span><span class="op">(</span><span class="op">)</span>,</span>
@@ -176,7 +176,8 @@ approximately normal or <code>n</code> is large; see Details.</p></dd>
 
 <dt id="arg-digits">digits<a class="anchor" aria-label="anchor" href="#arg-digits"></a></dt>
 <dd><p>Integer. Number of decimal places for the R console output.
-Default is <code>2</code>. If <code>NULL</code>, no rounding is applied.
+Default is <code>2</code>. If <code>NULL</code>, no rounding is applied. Rounding
+only affects the printed table; the returned values are never rounded.
 (Note: This does not affect the raw numbers exported to Excel).</p></dd>
 
 
@@ -348,7 +349,7 @@ When <code>export_to_excel = TRUE</code>, the file is automatically generated.</
 <span class="r-in"><span>                             show_Q1 <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
 <span class="r-in"><span>                             show_Q3 <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
 <span class="r-in"><span>                             export_to_excel <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Saved output in: /tmp/RtmplsKqN3/mtcars_summary.xlsx</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Saved output in: /tmp/RtmplP7rcW/mtcars_summary.xlsx</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">summary_formula</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  Variable: hp</span>
@@ -422,17 +423,17 @@ When <code>export_to_excel = TRUE</code>, the file is automatically generated.</
 <span class="r-out co"><span class="r-pr">#&gt;</span> Table continues below</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ---------------------------</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Sepal    Sepal    Sepal    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Length   Length   Length   </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> max      skew     kurt     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> -------- -------- ---------</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5.800    5.767    137.992  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> --------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Sepal    Sepal    Sepal   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Length   Length   Length  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> max      skew     kurt    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> -------- -------- --------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5.800    0.120    -0.253  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7.000    5.060    124.531  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7.000    0.105    -0.533  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7.900    5.667    151.706  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ---------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7.900    0.118    0.033   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> --------------------------</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  Variable: Petal.Length</span>
@@ -451,17 +452,17 @@ When <code>export_to_excel = TRUE</code>, the file is automatically generated.</
 <span class="r-out co"><span class="r-pr">#&gt;</span> Table continues below</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ----------------------------</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Petal    Petal     Petal    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Length   Length    Length   </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> max      skew      kurt     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> -------- --------- ---------</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1.900    5.109     199.182  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> --------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Petal    Petal    Petal   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Length   Length   Length  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> max      skew     kurt    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> -------- -------- --------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1.900    0.106    1.022   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5.100    -29.124   152.427  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5.100    -0.607   0.048   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6.900    26.384    142.742  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ----------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6.900    0.549    -0.154  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> --------------------------</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># --- Example 5: Custom Print Formatting ---</span></span></span>

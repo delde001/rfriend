@@ -32,8 +32,10 @@ print(
 
 - digits:
 
-  Integer. Number of decimal digits to use in formatting. Default is
-  `3`.
+  Integer. Number of decimal digits to use in formatting. By default the
+  `digits` given to
+  [`f_summary()`](https://delde001.github.io/rfriend/reference/f_summary.md)
+  (2 unless set); `NULL` prints unrounded values.
 
 - allow_integer_decimal_mix:
 

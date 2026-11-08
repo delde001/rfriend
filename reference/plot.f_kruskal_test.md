@@ -2,7 +2,8 @@
 
 Displays the density plot and/or boxplot stored in an `f_kruskal_test`
 object. Plots are only available when the original call used
-`plot = TRUE`.
+`diagnostic_plots = TRUE` (density plot) or `effect_plots = TRUE`
+(boxplot).
 
 ## Usage
 

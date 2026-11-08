@@ -1,15 +1,23 @@
 # Remove Outliers from Data
 
 \`f_remove_outliers()\` removes specific rows from a dataframe based on
-a list of identifiers. It is designed to work seamlessly with the output
-of
+a list of identifiers, or, with `set_na = TRUE`, keeps the rows and sets
+only the outlier values to `NA`. It is designed to work seamlessly with
+the output of
 [`f_outliers`](https://delde001.github.io/rfriend/reference/f_outliers.md),
 but can also accept a custom vector of IDs.
 
 ## Usage
 
 ``` r
-f_remove_outliers(data, outliers, by = "row_id", verbose = TRUE)
+f_remove_outliers(
+  data,
+  outliers,
+  by = "row_id",
+  verbose = TRUE,
+  set_na = FALSE,
+  columns = NULL
+)
 ```
 
 ## Arguments
@@ -27,6 +35,12 @@ f_remove_outliers(data, outliers, by = "row_id", verbose = TRUE)
 
   - A vector of IDs/row numbers to remove.
 
+  - `NULL`, which is what
+    [`f_outliers`](https://delde001.github.io/rfriend/reference/f_outliers.md)
+    returns when it finds no outliers. The data is then returned
+    unchanged (with a message when `verbose = TRUE`), so the
+    find-then-remove pair also runs on data without outliers.
+
 - by:
 
   A character string specifying the column to match on. Default is
@@ -36,8 +50,23 @@ f_remove_outliers(data, outliers, by = "row_id", verbose = TRUE)
 
 - verbose:
 
-  Logical. If `TRUE` (default), prints a summary of how many rows were
-  removed.
+  Logical. If `TRUE` (default), prints a summary of what was removed.
+
+- set_na:
+
+  Logical. If `FALSE` (default), whole rows are removed. If `TRUE`, the
+  rows are kept and only the values are set to `NA` (missing): with an
+  `f_outliers` result, exactly the flagged values in the column(s) where
+  they were flagged; with a vector of IDs or a data frame, the values in
+  `columns` of those rows.
+
+- columns:
+
+  Character vector of column names. Only used with `set_na = TRUE`. With
+  an `f_outliers` result it limits the change to these checked columns
+  (default: all checked columns). With a vector of IDs or a data frame
+  it is required: the values in these columns of the given rows are set
+  to `NA`.
 
 ## Value
 
@@ -85,7 +114,7 @@ df <- data.frame(
 # The most common use case: find then remove in two lines.
 bad_rows <- f_outliers(df, columns = "Salary")
 clean_df <- f_remove_outliers(df, bad_rows)
-#> rfriend: Removed 3 outliers.
+#> rfriend: Removed 3 outlier rows.
 #> rfriend: Rows: 40 -> 37
 nrow(df)       # 40
 #> [1] 40
@@ -96,7 +125,7 @@ nrow(clean_df) # 40 minus flagged rows
 # Identical result to Example 1 using the formula interface.
 bad_rows <- f_outliers(Salary ~ 1, data = df)
 clean_df <- f_remove_outliers(df, bad_rows)
-#> rfriend: Removed 3 outliers.
+#> rfriend: Removed 3 outlier rows.
 #> rfriend: Rows: 40 -> 37
 nrow(clean_df)
 #> [1] 37
@@ -107,13 +136,13 @@ nrow(clean_df)
 # data.frame notation:
 bad_rows <- f_outliers(df, columns = "Salary", group_vars = "Team")
 clean_df <- f_remove_outliers(df, bad_rows)
-#> rfriend: Removed 3 outliers.
+#> rfriend: Removed 3 outlier rows.
 #> rfriend: Rows: 40 -> 37
 
 # Formula notation (identical result):
 bad_rows <- f_outliers(Salary ~ Team, data = df)
 clean_df <- f_remove_outliers(df, bad_rows)
-#> rfriend: Removed 3 outliers.
+#> rfriend: Removed 3 outlier rows.
 #> rfriend: Rows: 40 -> 37
 nrow(clean_df)
 #> [1] 37
@@ -129,7 +158,7 @@ really_bad  <- all_flagged[all_flagged$Salary > 90000, ]
 
 # Step 3: Remove only those rows -- low outlier (row 40) is preserved
 clean_df <- f_remove_outliers(df, really_bad)
-#> rfriend: Removed 1 outliers.
+#> rfriend: Removed 1 outlier row.
 #> rfriend: Rows: 40 -> 39
 range(clean_df$Salary)  # low outlier still present, high one is gone
 #> [1]  1000 57000
@@ -141,13 +170,13 @@ range(clean_df$Salary)  # low outlier still present, high one is gone
 # Formula notation:
 bad_rows <- f_outliers(Salary + Age ~ Team, data = df)
 clean_df <- f_remove_outliers(df, bad_rows)
-#> rfriend: Removed 4 outliers.
+#> rfriend: Removed 4 outlier rows.
 #> rfriend: Rows: 40 -> 36
 
 # data.frame notation (identical result):
 bad_rows <- f_outliers(df, columns = c("Salary", "Age"), group_vars = "Team")
 clean_df <- f_remove_outliers(df, bad_rows)
-#> rfriend: Removed 4 outliers.
+#> rfriend: Removed 4 outlier rows.
 #> rfriend: Rows: 40 -> 36
 nrow(clean_df)  # rows flagged by Salary OR Age are removed
 #> [1] 36
@@ -166,11 +195,22 @@ bad_rows <- f_outliers(df, columns = "Salary", group_vars = "Team",
 
 # Remove by EmployeeID rather than row position
 clean_df <- f_remove_outliers(df, bad_rows$output_df, by = "EmployeeID")
-#> rfriend: Removed 3 outliers.
+#> rfriend: Removed 3 outlier rows.
 #> rfriend: Rows: 40 -> 37
 
 # Confirm the flagged employees are no longer in the clean data
 bad_ids  <- bad_rows$output_df$EmployeeID
 any(clean_df$EmployeeID %in% bad_ids)  # FALSE
 #> [1] FALSE
+
+# --- Keep the rows, set only the flagged values to NA ---
+bad_rows <- f_outliers(Salary ~ Team, data = df)
+df_na <- f_remove_outliers(df, bad_rows, set_na = TRUE)
+#> rfriend: Set 3 values to NA (Salary: row_id 20, 39, 40). Rows kept: 40.
+sum(is.na(df_na$Salary))   # the flagged salaries are now missing
+#> [1] 3
+
+# --- By hand: set the Age of rows 39 and 40 to NA ---
+df_na2 <- f_remove_outliers(df, c(39, 40), set_na = TRUE, columns = "Age")
+#> rfriend: Set 2 values to NA (Age: row_id 39, 40). Rows kept: 40.
 ```

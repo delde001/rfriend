@@ -13,7 +13,8 @@ or console only) with customizable output options.
 f_kruskal_test(
   formula,
   data = NULL,
-  plot = TRUE,
+  diagnostic_plots = TRUE,
+  effect_plots = TRUE,
   alpha = 0.05,
   output_type = "default",
   save_as = NULL,
@@ -22,6 +23,7 @@ f_kruskal_test(
   adjust = "bonferroni",
   close_generated_files = FALSE,
   open_generated_files = interactive(),
+  plot = lifecycle::deprecated(),
   ...
 )
 ```
@@ -36,16 +38,26 @@ f_kruskal_test(
   `response1 + response2 ~ predictor1 + predictor2)`. The function
   iterates through these combinations or response and predictors,
   because the Kruskal-Wallis test itself only allows one response and
-  one predictor combination to be tested simultaneously.
+  one predictor combination to be tested simultaneously. The response
+  must be numeric or an ordered factor (an ordinal score, e.g.
+  `factor(score, ordered = TRUE)`). An ordered factor is tested on the
+  rank codes of its levels (1 = lowest level), which is exact for a rank
+  test; a message shows the coding. Other non-numeric responses stop
+  with an error.
 
 - data:
 
   A `data.frame` containing the variables referenced in the formula.
 
-- plot:
+- diagnostic_plots:
 
-  Logical. If `TRUE`, generates plots (e.g., density plots and boxplots)
-  in the output files. Default is `TRUE`.
+  Logical. If `TRUE` (default), the density plot of the groups (visual
+  check on similarity of distributions) is included in the output files.
+
+- effect_plots:
+
+  Logical. If `TRUE` (default), the boxplot with the Dunn's test compact
+  letter display is included in the output files.
 
 - alpha:
 
@@ -116,6 +128,12 @@ f_kruskal_test(
   (e.g. in scripts or automated pipelines). Set to `TRUE` or `FALSE` to
   override this behaviour explicitly.
 
+- plot:
+
+  **Deprecated** in 3.2.1. Use `diagnostic_plots` and `effect_plots`
+  instead. If supplied, its value is passed to `diagnostic_plots` and
+  `effect_plots` with a warning.
+
 - ...:
 
   Additional arguments forwarded to
@@ -128,8 +146,10 @@ f_kruskal_test(
 
 ## Value
 
-An object of class 'f_kruskal_test' (a named list, one entry per
-response-predictor combination) containing:
+An object of class 'f_kruskal_test': a named list with one entry per
+response, and inside it one entry per predictor, so the results of
+`biomass_g ~ treatment` are in `out$biomass_g$treatment` (the same "per
+response" structure as the other test functions). Each entry contains:
 
 - kruskal.test:
 
@@ -155,11 +175,11 @@ response-predictor combination) containing:
 
 - distributions:
 
-  ggplot density plot (if `plot = TRUE`).
+  ggplot density plot (if `diagnostic_plots = TRUE`).
 
 - Boxplot:
 
-  ggplot boxplot with CLD letters (if `plot = TRUE`).
+  ggplot boxplot with CLD letters (if `effect_plots = TRUE`).
 
 Using the option `output_type`, it can also generate output in the form
 of: R Markdown code, 'Word', 'pdf', or 'Excel' files. Includes print and
@@ -187,8 +207,8 @@ and saved to the working directory, options are `"pdf", "word"` or
 chunk with {r, echo=FALSE, results='asis'}
 
 This function requires
-\[Pandoc\](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3
-or higher), a universal document converter.
+\[Pandoc\](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or
+higher), a universal document converter.
 
 - **Windows:** Install Pandoc and ensure the installation folder  
   (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your
@@ -233,19 +253,21 @@ data(iris)
 output <- f_kruskal_test(
                Sepal.Width + Sepal.Length ~ Species,
                data = iris,
-               plot = FALSE,
+               diagnostic_plots = FALSE,
+               effect_plots = FALSE,
                output_type = "word",
                adjust = "holm"
                )
-#> Saving output in: /tmp/RtmplsKqN3/iris_Kruskal_Wallis_output.docx
+#> Saving output in: /tmp/RtmplP7rcW/iris_Kruskal_Wallis_output.docx
 
 # Save Kruskal-Wallis test and posthoc to Excel sheets: Sepal.Width and Sepal.Length.
 f_kruskal_out <- f_kruskal_test(
                      Sepal.Width + Sepal.Length ~ Species,
                      data = iris,
-                     plot = FALSE,
+                     diagnostic_plots = FALSE,
+                     effect_plots = FALSE,
                      output_type = "excel",
                      adjust = "holm"
                      )
-#> Saving output in: /tmp/RtmplsKqN3/iris_Kruskal_Wallis_output.xlsx
+#> Saving output in: /tmp/RtmplP7rcW/iris_Kruskal_Wallis_output.xlsx
 ```

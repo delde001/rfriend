@@ -19,7 +19,7 @@ returned to the console or written to 'pdf', 'Word' or 'Excel'."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">rfriend</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -65,9 +65,10 @@ returned to the console or written to 'pdf', 'Word' or 'Excel'.</p>
 <span>  alpha <span class="op">=</span> <span class="fl">0.05</span>,</span>
 <span>  adjust <span class="op">=</span> <span class="st">"sidak"</span>,</span>
 <span>  diagnostic_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  effect_plot <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  effect_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  contrast_plots <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  post_hoc <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  by <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  intro_text <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  output_type <span class="op">=</span> <span class="st">"default"</span>,</span>
 <span>  save_as <span class="op">=</span> <span class="cn">NULL</span>,</span>
@@ -75,6 +76,7 @@ returned to the console or written to 'pdf', 'Word' or 'Excel'.</p>
 <span>  close_generated_files <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  open_generated_files <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/interactive.html" class="external-link">interactive</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  norm_plots <span class="op">=</span> <span class="fu">lifecycle</span><span class="fu">::</span><span class="fu"><a href="https://lifecycle.r-lib.org/reference/deprecated.html" class="external-link">deprecated</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  effect_plot <span class="op">=</span> <span class="fu">lifecycle</span><span class="fu">::</span><span class="fu"><a href="https://lifecycle.r-lib.org/reference/deprecated.html" class="external-link">deprecated</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -148,7 +150,7 @@ pairwise comparisons in the post hoc step (passed to
 BLUPs, scale-location) are included in the output.</p></dd>
 
 
-<dt id="arg-effect-plot">effect_plot<a class="anchor" aria-label="anchor" href="#arg-effect-plot"></a></dt>
+<dt id="arg-effect-plots">effect_plots<a class="anchor" aria-label="anchor" href="#arg-effect-plots"></a></dt>
 <dd><p>Logical. If <code>TRUE</code> (default), an estimated
 marginal means plot (estimate \(\pm\) 95% CI, with jittered raw
 data and compact-letter-display labels) is added after each
@@ -204,27 +206,40 @@ method as the post hoc p-values, so figure and table agree.</p></dd>
 
 
 <dt id="arg-post-hoc">post_hoc<a class="anchor" aria-label="anchor" href="#arg-post-hoc"></a></dt>
-<dd><p>Logical. If <code>TRUE</code> (default), runs
-<code><a href="https://rvlenth.github.io/emmeans/reference/emmeans.html" class="external-link">emmeans::emmeans()</a></code> pairwise comparisons <strong>only when</strong>
-the linear mixed model finds a significant fixed-effect term
-(ANOVA p-value below <code>alpha</code>). The post hoc is performed on
-each significant factor fixed-effect term separately. Numeric
-covariates are skipped because their slope is already reported in
-the fixed-effects coefficient table; pairwise contrasts are not
-meaningful for a continuous predictor. If no fixed-effect term is
-significant, no post hoc is run. When a significant interaction
-between categorical factors is present, an additional
-<strong>cell-means</strong> post hoc table is produced for that interaction
+<dd><p>Which post hoc tables to build; the same syntax as
+<code><a href="f_aov.html">f_aov</a></code>. <code>TRUE</code> (default) or <code>NULL</code>: every categorical
+fixed-effect main effect gets its own marginal-means table
+(<code><a href="https://rvlenth.github.io/emmeans/reference/emmeans.html" class="external-link">emmeans::emmeans()</a></code> pairwise comparisons with a compact letter
+display). A term that is not significant is still tabulated, with letters
+shown as <code>"ns"</code>, because the estimates and CIs are often needed for
+manuscript tables. Numeric covariates get no table: their slope is already
+reported in the fixed-effects coefficient table, and pairwise contrasts are
+not meaningful for a continuous predictor. Every significant interaction
+between categorical factors gets an additional <strong>cell-means</strong> table
 (estimated mean for every factor-level combination, compared
-simultaneously, with a compact letter display and pairwise
-contrasts), matching <code><a href="f_aov.html">f_aov</a></code>. It is stored alongside the
-main-effect results under the interaction term name, e.g.
-<code>out$y1$post_hoc[["a:b"]]</code>. In addition, when a main-effect term
-takes part in a significant interaction, a caution note is printed
-directly above that term's marginal-means table (and the term's
-heading is annotated), warning that the marginal means average over
-the interacting factor and can hide or reverse the real pattern; the
-interaction cell-means table and plot(s) should be read instead.</p></dd>
+simultaneously, with a compact letter display and pairwise contrasts),
+stored under the interaction term name, e.g.
+<code>out$y1$post_hoc[["a:b"]]</code>. When a main-effect term takes part in a
+significant interaction, a caution note is printed directly above that
+term's marginal-means table (and the heading is annotated), warning that the
+marginal means average over the interacting factor and can hide or reverse
+the real pattern; read the interaction cell-means table and plot(s)
+instead. <code>FALSE</code>: no post hoc. A character vector of terms: only those
+tables, e.g. <code>post_hoc = "treatment"</code> or
+<code>post_hoc = "treatment:week"</code> (tabulated with <code>"ns"</code> letters when
+not significant). Unknown or misspelled names stop with a "did you mean"
+error.</p></dd>
+
+
+<dt id="arg-by">by<a class="anchor" aria-label="anchor" href="#arg-by"></a></dt>
+<dd><p><code>NULL</code> (default) or one categorical fixed-effect predictor,
+used with <code>post_hoc</code> for simple effects:
+<code>post_hoc = "treatment", by = "week"</code> compares the treatments within
+each week (<code>emmeans(model, ~ treatment | week)</code>), with letters and the
+p-value adjustment computed per level of <code>by</code>, stored as
+<code>out$y1$post_hoc[["treatment | week"]]</code>. The rules are those of
+<code><a href="f_aov.html">f_aov</a></code>: <code>by</code> requires <code>post_hoc</code>, must not also be
+named in it, and cannot be combined with an interaction term there.</p></dd>
 
 
 <dt id="arg-intro-text">intro_text<a class="anchor" aria-label="anchor" href="#arg-intro-text"></a></dt>
@@ -269,9 +284,13 @@ Set to <code>TRUE</code> or <code>FALSE</code> to override this behaviour explic
 
 
 <dt id="arg-norm-plots">norm_plots<a class="anchor" aria-label="anchor" href="#arg-norm-plots"></a></dt>
-<dd><p>`r lifecycle::badge("deprecated")` Deprecated in
-version 4.0.0. Use <code>diagnostic_plots</code> instead. If supplied, its
-value is passed through to <code>diagnostic_plots</code> with a warning.</p></dd>
+<dd><p><strong>Deprecated</strong> in 3.2.0. Use <code>diagnostic_plots</code> instead. If
+supplied, its value is passed to <code>diagnostic_plots</code> with a warning.</p></dd>
+
+
+<dt id="arg-effect-plot">effect_plot<a class="anchor" aria-label="anchor" href="#arg-effect-plot"></a></dt>
+<dd><p><strong>Deprecated</strong> in 3.2.1. Use <code>effect_plots</code> instead. If
+supplied, its value is passed to <code>effect_plots</code> with a warning.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -298,6 +317,9 @@ fitted on the identical row set. Other <code>lmer()</code> arguments
   values, the
   observed descriptives table (raw-data n, mean, sd, se, min, Q1,
   median, Q3, max grouped by the categorical fixed-effect predictors),
+  the slopes of numeric predictors (<code>slopes</code>, with their standard error
+  and confidence interval; per factor level when the numeric predictor
+  interacts with a factor, from <code><a href="https://rvlenth.github.io/emmeans/reference/emtrends.html" class="external-link">emmeans::emtrends()</a></code>),
   post hoc results (if any; per main-effect terms plus, for a
   significant categorical interaction, a cell-means entry keyed by the
   interaction term name), diagnostic plots, and convergence
@@ -421,7 +443,7 @@ steps (generalised mixed model, transformation).</p>
 fit usually means the random-effects structure is too complex for the
 data (often a random slope with too few levels) - simplify the model
 before interpreting results.</p>
-<p>This function requires Pandoc (&gt;= 1.12.3) for <code>pdf</code>, <code>word</code>
+<p>This function requires Pandoc (&gt;= 3.1) for <code>pdf</code>, <code>word</code>
 and <code>rmd</code> output. See <code><a href="f_aov.html">f_aov</a></code> for installation notes.</p>
     </div>
     <div class="section level2">
@@ -497,6 +519,16 @@ rationale.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> -------------------------------------------------</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> --- Slopes of numeric predictors ---</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ---------------------------------------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Predictor   Level   Slope     SE       df         lower     upper    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                                   CL        CL       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ----------- ------- --------- -------- ---------- --------- ---------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Days        (all)   10.4673   0.8042   161.0000   8.8791    12.0555  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ---------------------------------------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> --- Random-effects variance components ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ----------------------------------------------</span>
@@ -546,7 +578,7 @@ rationale.</p>
 <span class="r-in"><span>       ddf  <span class="op">=</span> <span class="st">"Kenward-Roger"</span>,</span></span>
 <span class="r-in"><span>       output_type <span class="op">=</span> <span class="st">"word"</span></span></span>
 <span class="r-in"><span>       <span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Saving output in: /tmp/RtmplsKqN3/sleepstudy_lmer_output.docx</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Saving output in: /tmp/RtmplP7rcW/sleepstudy_lmer_output.docx</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># 3) A factor fixed effect triggers a post hoc test.</span></span></span>
 <span class="r-in"><span><span class="co">#    Bin Days into three sleep-deprivation phases so that the</span></span></span>
@@ -629,6 +661,7 @@ rationale.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> --- Post hoc comparisons ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> * Phase *</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Letters are compared within this table only.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Estimated marginal means with compact letter display:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> --------------------------------------------------------------------</span>
@@ -658,7 +691,7 @@ rationale.</p>
 <span class="r-in"><span>       diagnostic_plots <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
 <span class="r-in"><span>       output_type <span class="op">=</span> <span class="st">"word"</span></span></span>
 <span class="r-in"><span>       <span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Saving output in: /tmp/RtmplsKqN3/sleepstudy_lmer_output.docx</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Saving output in: /tmp/RtmplP7rcW/sleepstudy_lmer_output.docx</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># 5) Get the raw markdown back for embedding in an R Markdown</span></span></span>
 <span class="r-in"><span><span class="co">#    document. Use it inside a chunk with results = 'asis'.</span></span></span>
@@ -846,9 +879,9 @@ rationale.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ### Coefficient forest plot</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplsKqN3/file1da2501665af.png)    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplP7rcW/file1c2a1fe7d975.png)    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> *Each row is a fixed-effect coefficient (the intercept is omitted) with its 95% Wald CI. The dashed line marks zero: a coefficient at zero has no effect relative to its reference. Points to the right increase the response, points to the left decrease it. A CI that touches or crosses zero means the term is not distinguishable from its reference at α = 0.05; a CI clear of zero is a significant effect.*  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> *Each row is a fixed-effect coefficient (the intercept is omitted) with its 95% confidence interval (t, with the df of the coefficient table). The dashed line marks zero: a coefficient at zero has no effect relative to its reference. Points to the right increase the response, points to the left decrease it. A CI that touches or crosses zero means the term is not distinguishable from its reference at α = 0.05; a CI clear of zero is a significant effect.*  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> *Continuous term (Days) has no reference level; the estimate is the change per one-unit increase (on the scale stated above), so zero means no association.*  </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
@@ -903,7 +936,7 @@ rationale.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ## Diagnostic plots</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplsKqN3/file1da27f1fe415.png)   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplP7rcW/file1c2a16305ecf.png)   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> *Top-left:* residuals should scatter randomly around zero with no funnel shape. *Top-right:* level-1 residuals should fall on the line. *Bottom-left:* the random-effect BLUPs should also be approximately normal - this is the LMM-specific assumption most users forget. *Bottom-right:* the spread of residuals should be roughly constant across fitted values.</span>
@@ -921,7 +954,17 @@ rationale.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> *Note: Shapiro-Wilk on the level-1 residuals is significant (p = 0.0026), but the residual Q-Q plot is essentially straight apart from the tails (tail-trimmed quantile correlation = 0.997, skewness = 0.2577). This pattern reflects a few outliers or heavy but symmetric tails rather than systematic skew, and linear mixed models are robust to it. No transformation or change of family is recommended on this basis alone; inspect the Q-Q plot and any flagged outliers instead.*</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> **Note on numeric covariate(s):** Days. Their slopes are reported in the coefficient table above; no pairwise post hoc is performed.  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ### Slopes of numeric predictors</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ---------------------------------------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Predictor   Level   Slope     SE       df         lower     upper    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                                   CL        CL       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ----------- ------- --------- -------- ---------- --------- ---------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Days        (all)   10.4673   0.8042   161.0000   8.8791    12.0555  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ---------------------------------------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> **Note on numeric covariate(s):** Days. Their slopes are in the slopes table above; no pairwise post hoc is performed.  </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># 6) Two response variables analysed in one call. A separate model</span></span></span>
 <span class="r-in"><span><span class="co">#    is fit for each, sharing the same right-hand side. The results</span></span></span>
@@ -973,6 +1016,22 @@ rationale.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> treatment:time_weeks   3       36.0000   10.7393    &lt; 0.001   *    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> -------------------------------------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> --- Slopes of numeric predictors ---</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ----------------------------------------------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Predictor    Level     Slope    SE       df        lower     upper    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                                    CL        CL       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ------------ --------- -------- -------- --------- --------- ---------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> time_weeks   control   4.6700   0.3484   36.0000   3.9634    5.3766   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> time_weeks   drought   2.1250   0.3484   36.0000   1.4184    2.8316   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> time_weeks   high_N    4.4000   0.3484   36.0000   3.6934    5.1066   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> time_weeks   low_N     3.6750   0.3484   36.0000   2.9684    4.3816   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ----------------------------------------------------------------------</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> --- Observed descriptives (by fixed-effect factor levels) ---</span>
@@ -1051,6 +1110,16 @@ rationale.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> --- Post hoc comparisons ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> * treatment *</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Letters are compared within this table only.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> **[!] Interpret with caution:** `treatment` takes part in the significant</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> interaction(s) `treatment:time_weeks`. The estimated marginal means below</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> average over the other term(s) in that interaction, so they can hide or</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> even reverse the real pattern - the effect of `treatment` depends on the</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> level/value of the interacting term(s). For `treatment:time_weeks` see the</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> slope plot(s) below (model-fitted lines per `treatment` level): the</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> covariate slope differs across `treatment`, so a single averaged effect is</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> misleading.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Estimated marginal means with compact letter display:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ---------------------------------------------------------------------</span>
@@ -1082,7 +1151,7 @@ rationale.</p>
 <span class="r-in"><span>       contrast_plots <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
 <span class="r-in"><span>       output_type <span class="op">=</span> <span class="st">"word"</span></span></span>
 <span class="r-in"><span>       <span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Saving output in: /tmp/RtmplsKqN3/plant_trial_lmer_output.docx</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Saving output in: /tmp/RtmplP7rcW/plant_trial_lmer_output.docx</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> NOTE: Results may be misleading due to involvement in interactions</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>

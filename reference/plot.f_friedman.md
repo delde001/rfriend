@@ -2,7 +2,8 @@
 
 Displays the within-block trace plot and/or the boxplot stored in an
 `f_friedman` object. Plots are only available when the original call
-used `plot = TRUE`.
+used `diagnostic_plots = TRUE` (trace plot) or `effect_plots = TRUE`
+(boxplot).
 
 ## Usage
 

@@ -54,6 +54,12 @@ No return value, called for side effects, see details.
 
 - Session Restart: Restarts the R session (only available in 'RStudio').
 
+Removing objects does not detach packages. Without `restart = TRUE`,
+`f_clear()` lists the packages that are still attached, apart from the
+packages R attaches at start-up and 'rfriend' itself. A script that runs
+after `f_clear()` may still depend on one of them; only a restart shows
+a missing [`library()`](https://rdrr.io/r/base/library.html) call.
+
 ## Note
 
 The `restart` parameter requires 'RStudio' and its API package

@@ -18,7 +18,7 @@ f_corplot(
   factor_table = FALSE,
   factor_exclude = NULL,
   factor_select = NULL,
-  unique_num_treshold = 8,
+  unique_num_threshold = 8,
   repeats_threshold = 2,
   color_factor = "auto",
   shape_factor = "auto",
@@ -33,7 +33,8 @@ f_corplot(
   open_generated_files = interactive(),
   output_type = "word",
   save_as = NULL,
-  save_in_wdir = FALSE
+  save_in_wdir = FALSE,
+  unique_num_treshold = NULL
 )
 ```
 
@@ -66,16 +67,18 @@ f_corplot(
   should be factors based on their data type and unique value count.
   Default is `NULL`.
 
-- unique_num_treshold:
+- unique_num_threshold:
 
   Numeric. A threshold of the amount of unique numbers a numeric column
-  should have to keep it numeric, i.e. omit factor conversion. Default
-  `8`.
+  should have to keep it numeric, i.e. omit factor conversion. A numeric
+  column is a factor candidate only when it has fewer than
+  `unique_num_threshold` unique values. Default `8`.
 
 - repeats_threshold:
 
-  Numeric. A threshold of the minimal number of repeats a numeric column
-  should have to convert it to a factor. Default `2`.
+  Numeric. A numeric column is converted to a factor only when at least
+  one of its values occurs more than `repeats_threshold` times. Default
+  `2`, so a value has to occur at least three times.
 
 - color_factor:
 
@@ -152,6 +155,12 @@ f_corplot(
   Logical. If `TRUE`, saves to the working directory. Overridden by
   `save_as`. Default `FALSE`.
 
+- unique_num_treshold:
+
+  Alternative spelling of `unique_num_threshold`, accepted so that
+  existing scripts keep working. Default `NULL` (not used). Supplying
+  both spellings with different values is an error.
+
 ## Value
 
 No value is returned to the R environment. Output files are saved and
@@ -183,8 +192,8 @@ opened automatically.
   correlation panels.
 
 This function requires
-\[Pandoc\](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3
-or higher), a universal document converter.
+\[Pandoc\](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or
+higher), a universal document converter.
 
 - **Windows:** Install Pandoc and ensure the installation folder  
   (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your
@@ -217,7 +226,7 @@ f_corplot(mtcars_sub,
 #> 
 #> Variable 'gear' was converted to a factor.
 #> Variable 'cyl' was converted to a factor.
-#> Saving output in: /tmp/RtmplsKqN3/mtcars_sub_CorPlot.png and /tmp/RtmplsKqN3/mtcars_sub_Legend.png
+#> Saving output in: /tmp/RtmplP7rcW/mtcars_sub_CorPlot.png and /tmp/RtmplP7rcW/mtcars_sub_Legend.png
 
 # With ordinal variables
 data(iris)
@@ -228,5 +237,5 @@ f_corplot(iris,
           ordinal_vars = "Petal.Width",
           output_type  = "png",
           open_generated_files = FALSE)
-#> Saving output in: /tmp/RtmplsKqN3/iris_CorPlot.png and /tmp/RtmplsKqN3/iris_Legend.png
+#> Saving output in: /tmp/RtmplP7rcW/iris_CorPlot.png and /tmp/RtmplP7rcW/iris_Legend.png
 ```

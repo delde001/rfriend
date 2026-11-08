@@ -2,6 +2,9 @@
 
 ## All functions
 
+- [`` `$`( ``*`<f_outliers>`*`)`](https://delde001.github.io/rfriend/reference/cash-.f_outliers.md)
+  : Access parts of an f_outliers result with \$
+
 - [`df_to_table()`](https://delde001.github.io/rfriend/reference/df_to_table.md)
   : Convert a data frame to a contingency table
 
@@ -105,7 +108,7 @@
   : Set Working Directory Based on Current File or Specified Path
 
 - [`f_stat_wizard()`](https://delde001.github.io/rfriend/reference/f_stat_wizard.md)
-  : Statistical Test Wizard
+  **\[experimental\]** : Statistical Test Wizard
 
 - [`f_summary()`](https://delde001.github.io/rfriend/reference/f_summary.md)
   : Summarize a Data Frame with Grouping Variables
@@ -144,6 +147,9 @@
 
 - [`predict(`*`<f_boxcox>`*`)`](https://delde001.github.io/rfriend/reference/predict.f_boxcox.md)
   : Predict method for f_boxcox objects
+
+- [`print(`*`<f_data_check>`*`)`](https://delde001.github.io/rfriend/reference/print.f_data_check.md)
+  : Print the data check of f_scan()
 
 - [`print(`*`<f_outliers>`*`)`](https://delde001.github.io/rfriend/reference/print.f_outliers.md)
   : Print method for f_outliers objects

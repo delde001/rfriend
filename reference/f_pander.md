@@ -22,7 +22,9 @@ f_pander(
 
 - table:
 
-  A data frame, matrix, or other table-like structure to be rendered.
+  A data frame, matrix, or other table-like structure to be rendered. An
+  `f_summary` result is also accepted: each table it holds is rendered
+  in turn.
 
 - col_width:
 
@@ -86,8 +88,8 @@ include:
   characters.
 
 This function requires
-\[Pandoc\](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3
-or higher), a universal document converter.
+\[Pandoc\](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or
+higher), a universal document converter.
 
 - **Windows:** Install Pandoc and ensure the installation folder  
   (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your

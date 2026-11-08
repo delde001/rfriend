@@ -50,11 +50,13 @@ A data frame with 60 rows and 8 variables:
 
 - biomass_g:
 
-  Above-ground dry biomass in grams. Right-skewed, suited to
+  Above-ground biomass in grams, estimated non-destructively from plant
+  images, so each plant is measured every week. Right-skewed, suited to
   demonstrating
   [`f_bestNormalize`](https://delde001.github.io/rfriend/reference/f_bestNormalize.md)
   and
-  [`f_boxcox`](https://delde001.github.io/rfriend/reference/f_boxcox.md).
+  [`f_boxcox`](https://delde001.github.io/rfriend/reference/f_boxcox.md);
+  on the log scale it fits the same mixed model as `height_cm`.
 
 - chloroplast_count:
 
@@ -73,8 +75,8 @@ A data frame with 60 rows and 8 variables:
   (paired with
   [`df_to_table`](https://delde001.github.io/rfriend/reference/df_to_table.md));
   for a binomial
-  [`f_glm`](https://delde001.github.io/rfriend/reference/f_glm.md),
-  convert to 0/1 with `as.numeric(infected == "yes")`.
+  [`f_glm`](https://delde001.github.io/rfriend/reference/f_glm.md), name
+  the modelled outcome with `event = "yes"`.
 
 ## Source
 
@@ -89,8 +91,14 @@ with treatment and time as fixed effects and block and plant as nested
 random effects. Treatment, time, and their interaction all have genuine
 effects built in. A deliberately messy raw version (inconsistent column
 names, injected outliers, missing values, and a stray factor label) and
-a wide-format version are distributed alongside the course materials for
-the import and cleaning modules.
+a wide-format version ship with the package for the import and cleaning
+modules;
+[`f_example_data`](https://delde001.github.io/rfriend/reference/f_example_data.md)
+lists them and returns their paths. The Excel copy of the raw version,
+`"plant_trial_raw.xlsx"`, has a second sheet, `"meta_data"`, describing
+each column (meaning, unit and intended values), so
+[`readxl::excel_sheets()`](https://readxl.tidyverse.org/reference/excel_sheets.html)
+has more than one sheet to show.
 
 ## Examples
 
@@ -103,7 +111,7 @@ str(plant_trial)
 #>  $ treatment        : chr  "control" "control" "control" "control" ...
 #>  $ time_weeks       : num  2 4 6 2 4 6 2 4 6 2 ...
 #>  $ height_cm        : num  28.8 40.9 49.7 23.7 37 41 23.5 32.1 42.9 20 ...
-#>  $ biomass_g        : num  30.4 26.5 30.8 15.8 34.3 18.4 14.3 17.7 37.5 18 ...
+#>  $ biomass_g        : num  19.5 34.9 29.9 12.6 22.4 18.9 10.2 20.1 21.7 12.9 ...
 #>  $ chloroplast_count: int  31 41 35 30 35 25 28 21 47 22 ...
 #>  $ infected         : Factor w/ 2 levels "no","yes": 1 1 2 1 1 1 2 1 1 2 ...
 if (FALSE) { # \dontrun{

@@ -19,14 +19,16 @@ f_wilcox_test(
   conf.level = NULL,
   mu = 0,
   alternative = "two.sided",
-  norm_plots = TRUE,
+  diagnostic_plots = TRUE,
+  effect_plots = TRUE,
   alpha = 0.05,
   intro_text = TRUE,
   close_generated_files = FALSE,
-  open_generated_files = TRUE,
+  open_generated_files = interactive(),
   output_type = "default",
   save_as = NULL,
   save_in_wdir = FALSE,
+  norm_plots = lifecycle::deprecated(),
   ...
 )
 
@@ -38,14 +40,16 @@ f_wilcox_test(
   conf.level = NULL,
   mu = 0,
   alternative = "two.sided",
-  norm_plots = TRUE,
+  diagnostic_plots = TRUE,
+  effect_plots = TRUE,
   alpha = 0.05,
   intro_text = TRUE,
   close_generated_files = FALSE,
-  open_generated_files = TRUE,
+  open_generated_files = interactive(),
   output_type = "default",
   save_as = NULL,
   save_in_wdir = FALSE,
+  norm_plots = lifecycle::deprecated(),
   ...
 )
 ```
@@ -68,7 +72,10 @@ f_wilcox_test(
   evaluated in the data's column scope (e.g. `subset = cyl == 6` works).
   All responses in a multi-response call (`y1 + y2 ~ group`) are then
   tested on the identical row set. For the default (vector) method,
-  `...` is currently unused.
+  `...` is currently unused. `subset` can also pick two groups of a
+  factor with more levels (e.g.
+  `subset = treatment %in% c("control", "high_N")`); the check for
+  exactly two groups runs after the subset.
 
 - formula:
 
@@ -80,7 +87,11 @@ f_wilcox_test(
   - **One-sample:** `response ~ 1` or `response ~ NULL`.
 
   More response variables can be added using `+` (e.g.,
-  `y1 + y2 ~ group`).
+  `y1 + y2 ~ group`). The response must be numeric or an ordered factor
+  (an ordinal score, e.g. `factor(score, ordered = TRUE)`). An ordered
+  factor is tested on the rank codes of its levels (1 = lowest level),
+  which is exact for a rank test; a message shows the coding. Other
+  non-numeric responses stop with an error.
 
 - data:
 
@@ -125,10 +136,16 @@ f_wilcox_test(
 
   Character string. `"two.sided"` (default), `"greater"`, or `"less"`.
 
-- norm_plots:
+- diagnostic_plots:
 
   Logical. If `TRUE`, descriptive diagnostic plots are included in the
   output. Default is `TRUE`.
+
+- effect_plots:
+
+  Logical. If `TRUE` (default), the main effect plot
+  (`main_effect_plot`) is built, stored and included in the output
+  files. With `FALSE` it is not built.
 
 - alpha:
 
@@ -177,6 +194,11 @@ f_wilcox_test(
 - save_in_wdir:
 
   Logical. Save in working directory.
+
+- norm_plots:
+
+  **Deprecated** in 3.2.1. Use `diagnostic_plots` instead. If supplied,
+  its value is passed to `diagnostic_plots` with a warning.
 
 - y:
 

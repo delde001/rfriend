@@ -34,7 +34,7 @@ f_long(
 
   - Use column numbers: `2:5`
 
-  - Use helpers: `starts_with("Measure")`
+  - Use helpers: `starts_with("Measure")` (works without loading dplyr)
 
   If NULL (default), the function will pivot ALL columns except those in
   `keep_cols`.
@@ -44,8 +44,9 @@ f_long(
   (Optional) The columns that identify your samples (IDs). E.g.,
   "SampleID", "PatientID", "Treatment", "Student number". These are
   repeated for every measurement. \*If left empty, all non-measured
-  columns are kept.\* Important: If `measure_columns` is NULL, you MUST
-  specify `keep_cols`.
+  columns are kept.\* Accepts the same forms as `measure_columns`
+  (names, numbers, helpers). Important: If `measure_columns` is NULL,
+  you MUST specify `keep_cols`.
 
 - category_name:
 
@@ -143,6 +144,22 @@ iris_long <- f_long(
 
  # Plot the data using f_scan
  plot(iris_long)
+#> 
+#> --- Data check ---
+#> This check only reports potential issues;
+#> it does not change the data.
+#> 300 rows; 2 of 3 columns were checked.
+#> 
+#> No problems found.
+#> 
+#> Text columns:
+#>   Column           Values (rows)
+#>   Sepal_Dimension  "Length" (150), "Width" (150)
+#> 
+#> Numeric columns:
+#>   Column   Missing  Lowest 4          Highest 4
+#>   Size_cm        0  2, 2.2, 2.2, 2.2  7.9, 7.7, 7.7, 7.7
+#> 
 
 
 

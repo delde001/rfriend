@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">rfriend</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -199,7 +199,7 @@ Set to <code>TRUE</code> or <code>FALSE</code> to override this behaviour explic
 <p>If no factor variables are detected, the function stops with an error message since factors are required for creating boxplots.</p>
 <p>This function will plot all numeric and factor candidates, use the function <code><a href="https://rdrr.io/r/base/subset.html" class="external-link">subset()</a></code> to prepare a selection of columns before submitting to <code>f_boxplot()</code>.</p>
 <p>Note that there is an optional <code>jitter</code> option to plot all individual data points over the boxplots.</p>
-<p>This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 1.12.3 or higher), a universal document converter.</p>
+<p>This function requires [Pandoc](https://github.com/jgm/pandoc/releases/tag) (version 3.1 or higher), a universal document converter.</p>
 <p><b>Windows:</b> Install Pandoc and ensure the installation folder <br> (e.g., "C:/Users/your_username/AppData/Local/Pandoc") is added to your system PATH.</p>
 <p><b>macOS:</b> If using Homebrew, Pandoc is typically installed in "/usr/local/bin". Alternatively, download the .pkg installer and verify that the binary's location is in your PATH.</p>
 <p><b>Linux:</b> Install Pandoc through your distribution's package manager (commonly installed in "/usr/bin" or "/usr/local/bin") or manually, and ensure the directory containing Pandoc is in your PATH.</p>
@@ -229,7 +229,7 @@ Set to <code>TRUE</code> or <code>FALSE</code> to override this behaviour explic
 <span class="r-in"><span>           fancy_names <span class="op">=</span> <span class="va">new_names</span>,</span></span>
 <span class="r-in"><span>           output_type <span class="op">=</span> <span class="st">"word"</span></span></span>
 <span class="r-in"><span>           <span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Saving output in: /tmp/RtmplsKqN3/data_BoxPlot.docx</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Saving output in: /tmp/RtmplP7rcW/data_BoxPlot.docx</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Use a formula to plot several response parameters (response 1 + response 2 etc)</span></span></span>
 <span class="r-in"><span><span class="co"># and generate a rmd output without boxplot_explanation.</span></span></span>
@@ -239,21 +239,21 @@ Set to <code>TRUE</code> or <code>FALSE</code> to override this behaviour explic
 <span class="r-in"><span>           boxplot_explanation <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
 <span class="r-in"><span>           output_type <span class="op">=</span> <span class="st">"word"</span></span></span>
 <span class="r-in"><span>           <span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Saving output in: /tmp/RtmplsKqN3/mtcars_BoxPlot.docx</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Saving output in: /tmp/RtmplP7rcW/mtcars_BoxPlot.docx</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Pass a bare numeric vector. Its name is used as the y-axis label</span></span></span>
 <span class="r-in"><span><span class="co"># and as the data_name in the output filename.</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">my_vec</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">50</span>, mean <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu">f_boxplot</span><span class="op">(</span><span class="va">my_vec</span>, output_type <span class="op">=</span> <span class="st">"png"</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> PNG files saved in: /tmp/RtmplsKqN3</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> PNG files saved in: /tmp/RtmplP7rcW</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>    </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Formula with bare vectors (no data.frame): group hp by cyl.</span></span></span>
 <span class="r-in"><span><span class="va">hp1</span>  <span class="op">&lt;-</span> <span class="va">mtcars</span><span class="op">$</span><span class="va">hp</span></span></span>
 <span class="r-in"><span><span class="va">cyl1</span> <span class="op">&lt;-</span> <span class="va">mtcars</span><span class="op">$</span><span class="va">cyl</span></span></span>
 <span class="r-in"><span><span class="fu">f_boxplot</span><span class="op">(</span><span class="va">hp1</span> <span class="op">~</span> <span class="va">cyl1</span>, output_type <span class="op">=</span> <span class="st">"png"</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> PNG files saved in: /tmp/RtmplsKqN3</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> PNG files saved in: /tmp/RtmplP7rcW</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>    </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Multiple unnamed numeric vectors, base R's boxplot() convention:</span></span></span>
@@ -261,7 +261,7 @@ Set to <code>TRUE</code> or <code>FALSE</code> to override this behaviour explic
 <span class="r-in"><span><span class="co"># original variable name. Use the formula syntax above when you</span></span></span>
 <span class="r-in"><span><span class="co"># instead want to group one response by a factor.</span></span></span>
 <span class="r-in"><span><span class="fu">f_boxplot</span><span class="op">(</span><span class="va">hp1</span>, <span class="va">cyl1</span>, output_type <span class="op">=</span> <span class="st">"png"</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> PNG files saved in: /tmp/RtmplsKqN3</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> PNG files saved in: /tmp/RtmplP7rcW</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>    </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Capture the R Markdown output as a string and render it inline.</span></span></span>
@@ -280,28 +280,28 @@ Set to <code>TRUE</code> or <code>FALSE</code> to override this behaviour explic
 <span class="r-out co"><span class="r-pr">#&gt;</span> #  Boxplots of:  Sepal.Length   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ##  Boxplot of:  Sepal.Length  as function of  Species   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplsKqN3/file1da250f693ba.png)    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplP7rcW/file1c2a62ddf11f.png)    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> #  Boxplots of:  Sepal.Width   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ##  Boxplot of:  Sepal.Width  as function of  Species   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplsKqN3/file1da2422f4da9.png)    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplP7rcW/file1c2a6bf10f6a.png)    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> #  Boxplots of:  Petal.Length   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ##  Boxplot of:  Petal.Length  as function of  Species   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplsKqN3/file1da269d7793.png)    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplP7rcW/file1c2a5724d498.png)    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> #  Boxplots of:  Petal.Width   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ##  Boxplot of:  Petal.Width  as function of  Species   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplsKqN3/file1da2738e7838.png)    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ![](/tmp/RtmplP7rcW/file1c2a32845ba9.png)    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># ...or splice it into a knitr child chunk with results = "asis":</span></span></span>

@@ -22,12 +22,24 @@ f_model_compare(
 - model1:
 
   The first model object. Supported classes include:
-  `"lm", "glm", "aov", "lmerMod", "glmerMod", and "nls"`.
+  `"lm", "glm", "aov", "lmerMod", "glmerMod", and "nls"`. The result of
+  [`f_lm()`](https://delde001.github.io/rfriend/reference/f_lm.md),
+  [`f_aov()`](https://delde001.github.io/rfriend/reference/f_aov.md),
+  [`f_glm()`](https://delde001.github.io/rfriend/reference/f_glm.md) or
+  [`f_lmer()`](https://delde001.github.io/rfriend/reference/f_lmer.md)
+  (for one response) is also accepted; the fitted model stored in it is
+  used.
 
 - model2:
 
   The second model object. Supported classes include:
-  `"lm", "glm", "aov", "lmerMod", "glmerMod", and "nls"`.
+  `"lm", "glm", "aov", "lmerMod", "glmerMod", and "nls"`. The result of
+  [`f_lm()`](https://delde001.github.io/rfriend/reference/f_lm.md),
+  [`f_aov()`](https://delde001.github.io/rfriend/reference/f_aov.md),
+  [`f_glm()`](https://delde001.github.io/rfriend/reference/f_glm.md) or
+  [`f_lmer()`](https://delde001.github.io/rfriend/reference/f_lmer.md)
+  (for one response) is also accepted; the fitted model stored in it is
+  used.
 
 - nested:
 
@@ -130,7 +142,19 @@ model first, the function automatically swaps them and issues a message.
 
 If the models are nested, an ANOVA test is performed to compare them,
 and a p-value is provided to assess whether the more complex model
-significantly improves fit.
+significantly improves fit. For linear models this is an F test. For
+GLMs with a fixed dispersion (binomial, poisson, negative binomial) it
+is a likelihood-ratio (chi-square) test; for GLMs with an estimated
+dispersion (gaussian, Gamma, quasi families) it is an F test. Mixed
+models are compared with a likelihood-ratio test.
+
+Linear mixed models fitted with REML (the
+[`lme4::lmer()`](https://rdrr.io/pkg/lme4/man/lmer.html) default, and
+the models stored by
+[`f_lmer()`](https://delde001.github.io/rfriend/reference/f_lmer.md))
+are refitted with maximum likelihood before the comparison, with a
+message: AIC, BIC and the log-likelihood of REML fits are not comparable
+between models with different fixed effects.
 
 ## Note
 
@@ -171,7 +195,17 @@ The function supports the following model classes:
 - Nonlinear least squares models ("nls")
 
 Note: Multi-stratum AOV models (fitted with `Error()`) are not supported
-and will produce a warning.
+and stop with an error that suggests the equivalent mixed model.
+
+Results of rfriend test functions are accepted as well: for a result of
+[`f_lm()`](https://delde001.github.io/rfriend/reference/f_lm.md),
+[`f_aov()`](https://delde001.github.io/rfriend/reference/f_aov.md),
+[`f_glm()`](https://delde001.github.io/rfriend/reference/f_glm.md) or
+[`f_lmer()`](https://delde001.github.io/rfriend/reference/f_lmer.md) the
+fitted model stored in it is compared. A result with more than one
+response, or with a response that the function transformed (Box-Cox or
+bestNormalize), stops with a message, because models on different scales
+cannot be compared on AIC, BIC or likelihood.
 
 ## See also
 
